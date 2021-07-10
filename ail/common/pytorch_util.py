@@ -59,7 +59,7 @@ def orthogonal_init(module: nn.Module, gain: float = 1) -> None:
             module.bias.data.fill_(0.0)
 
 
-def disable_gradient(net):
+def disable_gradient(net: nn.Module):
     for param in net.parameters():
         param.requires_grad = False
 

@@ -45,19 +45,19 @@ def unnormalize(x, mean, std):
     return x * std + mean
 
 
-def reparameterize(means, log_stds):
+def reparameterize(means: th.Tensor, log_stds: th.Tensor):
     noises = th.randn_like(means)
     us = means + noises * log_stds.exp()
     actions = th.tanh(us)
     return actions, calculate_log_pi(log_stds, noises, actions)
 
 
-def atanh(x):
+def atanh(x: th.Tensor):
     # pytorch's atanh does not clamp the value learning to Nan/inf
     return 0.5 * (th.log(1 + x + 1e-6) - th.log(1 - x + 1e-6))
 
 
-def evaluate_lop_pi(means, log_stds, actions):
+def evaluate_lop_pi(means: th.Tensor, log_stds: th.Tensor, actions: th.Tensor):
     noises = (atanh(actions) - means) / (log_stds.exp() + 1e-8)
     return calculate_log_pi(log_stds, noises, actions)
 
@@ -72,7 +72,7 @@ def calculate_log_pi(log_stds, noises, actions):
     return gaussian_log_probs - correction
 
 
-def log_prob_correction(actions):
+def log_prob_correction(actions: th.Tensor) -> th.Tensor:
     """
     Squash correction (from original SAC implementation)
     log(1 - tanh(x)^2)
@@ -84,6 +84,7 @@ def log_prob_correction(actions):
     = 2 * log(2e^-x / (e^-2x + 1))
     = 2 * (log(2) - x - log(e^-2x + 1))
     = 2 * (log(2) - x - softplus(-2x))
+    :param actions:
     """
     x = atanh(actions)
     return 2 * (LOG_2 - x - F.softplus(-2 * x))
