@@ -91,11 +91,9 @@ class Trainer(ABC):
         self.device = None
         self.start_time = None
 
-
     # -----------------------
     # Training/ evaluation
     # -----------------------
-
 
     @abstractmethod
     def run_training_loop(self):
@@ -139,11 +137,9 @@ class Trainer(ABC):
         # Turn back to train mode.
         self.algo.train()
 
-
     # -----------------------
     # Conditions
     # -----------------------
-
 
     def is_train_logging(self, step) -> bool:
         return (
@@ -158,11 +154,7 @@ class Trainer(ABC):
         return all(cond)
 
     def is_saving_model(self, step) -> bool:
-        cond = (
-            step > 0,
-            step % self.save_freq == 0,
-            step / self.num_steps > 0.3
-        )
+        cond = (step > 0, step % self.save_freq == 0, step / self.num_steps > 0.3)
         return all(cond) or step == self.num_steps - 1
 
     def train_logging(self, train_logs, step) -> None:
@@ -192,7 +184,7 @@ class Trainer(ABC):
             train_logs["ep_return_mean"],
             train_logs["std_return"],
             train_logs["max_return"],
-            train_logs["min_return"]
+            train_logs["min_return"],
         ) = get_statistics(train_returns)
 
         # Eval
@@ -201,7 +193,7 @@ class Trainer(ABC):
             eval_logs["ep_return_mean"],
             eval_logs["std_return"],
             eval_logs["max_return"],
-            eval_logs["min_return"]
+            eval_logs["min_return"],
         ) = get_statistics(eval_returns)
 
         print("-" * 41)
@@ -241,9 +233,7 @@ class Trainer(ABC):
         )
 
         # Test log
-        self.writer.add_scalar(
-            "return/test/ep_len", eval_logs.get("ep_len_mean"), step
-        )
+        self.writer.add_scalar("return/test/ep_len", eval_logs.get("ep_len_mean"), step)
         self.writer.add_scalar(
             "return/test/ep_rew_mean", eval_logs.get("ep_return_mean"), step
         )
@@ -256,7 +246,9 @@ class Trainer(ABC):
         assert train_logs is not None, "train log can not be `None`"
         self.writer.add_scalar("loss/actor", train_logs.get("actor_loss"), epoch)
         self.writer.add_scalar("loss/critic", train_logs.get("critic_loss"), epoch)
-        self.writer.add_scalar("info/actor/approx_kl", train_logs.get("approx_kl"), epoch)
+        self.writer.add_scalar(
+            "info/actor/approx_kl", train_logs.get("approx_kl"), epoch
+        )
         self.writer.add_scalar("info/actor/entropy", train_logs.get("entropy"), epoch)
         self.writer.add_scalar(
             "info/actor/clip_fraction", train_logs["clip_fraction"], epoch
@@ -301,7 +293,11 @@ class Trainer(ABC):
         else:
             raise Exception(f"Unrecognized type of observation {type(obs)}")
 
-    def to_torch(self, array: np.ndarray, copy: bool = True,) -> th.Tensor:
+    def to_torch(
+        self,
+        array: np.ndarray,
+        copy: bool = True,
+    ) -> th.Tensor:
         """
         Convert a numpy array to a PyTorch tensor.
         Note: it copies the data by default
