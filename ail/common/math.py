@@ -67,12 +67,12 @@ def calculate_log_pi(log_stds, noises, actions):
         dim=-1, keepdim=True
     ) - 0.5 * LOG2PI * log_stds.size(-1)
 
-    correction = log_prob_correction(actions).sum(dim=-1, keepdim=True)
+    correction = squash_logprob_correction(actions).sum(dim=-1, keepdim=True)
 
     return gaussian_log_probs - correction
 
 
-def log_prob_correction(actions: th.Tensor) -> th.Tensor:
+def squash_logprob_correction(actions: th.Tensor) -> th.Tensor:
     """
     Squash correction (from original SAC implementation)
     log(1 - tanh(x)^2)
