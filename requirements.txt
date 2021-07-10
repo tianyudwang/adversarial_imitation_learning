@@ -1,0 +1,7 @@
+gym
+mujoco-py
+tensorboard
+tensorboardX
+matplotlib
+torch
+yacs

@@ -1,0 +1,20 @@
+AGENT:
+  policy_update_per_iter: 1
+  reward_update_per_iter: 1
+MODEL:
+  activation: tanh
+  learning_rate: 0.001
+  n_layers: 2
+  output_size: 1
+  size: 128
+SYS:
+  cmds: train_ail.py
+TRAINER:
+  env_name: HalfCheetah-v2
+  epochs: 100
+  gpu:
+  - 0
+  logdir: logs
+  scalar_log_freq: 1
+  seed: 1
+  video_log_freq: -1
