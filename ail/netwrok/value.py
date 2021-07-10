@@ -57,7 +57,7 @@ class StateFunction(BaseValue):
         )
 
     def forward(self, state: th.Tensor):
-        """ self.net()"""
+        """self.net()"""
         # TODO: Critical to ensure v has right shape.
         return self.net(state)
 
@@ -95,16 +95,18 @@ class StateActionFunction(BaseValue):
 
 
 def mlp_value(
-        state_dim: int,
-        action_dim: int,
-        val_type: str,
-        value_layers: Sequence[int],
-        activation: str = "relu",
-        **kwargs
+    state_dim: int,
+    action_dim: int,
+    val_type: str,
+    value_layers: Sequence[int],
+    activation: str = "relu",
+    **kwargs
 ):
     if val_type.upper() == "V":
         return StateFunction(state_dim, value_layers, activation, **kwargs)
     elif val_type == "Qsa" or val_type == "Q":
-        return StateActionFunction(state_dim, action_dim, value_layers, activation, **kwargs)
+        return StateActionFunction(
+            state_dim, action_dim, value_layers, activation, **kwargs
+        )
     else:
         raise ValueError
