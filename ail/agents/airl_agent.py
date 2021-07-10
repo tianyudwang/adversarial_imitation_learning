@@ -1,5 +1,5 @@
+from ail.agents.base_agent import BaseAgent
 
-from ail.agents.base_agent import BaseAgent 
 
 class AIRL_Agent(BaseAgent):
     def __init__(self, agent_flags):
@@ -8,7 +8,7 @@ class AIRL_Agent(BaseAgent):
         self.flags = agent_flags
 
         # Discriminator
-        # self.discriminator = MLP 
+        # self.discriminator = MLP
 
         # Generator
         # self.generator = PPO/SAC ...
