@@ -1,6 +1,6 @@
 import numpy as np
 import torch as th
-from common.math import squash_logprob_correction
+from ail.common.math import squash_logprob_correction
 
 w = th.ones(1)
 x = th.tanh(1 * w)

@@ -1,5 +1,5 @@
 import numpy as np
-from common.math import pure_discount_cumsum, discount_cumsum
+from ail.common.math import pure_discount_cumsum, discount_cumsum
 
 
 x1 = [1, 1, 1, 1, 1, 1, 1, 1]

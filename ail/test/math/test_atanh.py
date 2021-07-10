@@ -1,7 +1,7 @@
 import math
 import numpy as np
 import torch as th
-from common.math import atanh
+from ail.common.math import atanh
 
 x = th.tanh(th.tensor([2e6]))
 y = th.tanh(th.tensor([-2e6]))
