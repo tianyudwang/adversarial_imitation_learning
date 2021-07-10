@@ -4,7 +4,8 @@ import numpy as np
 import torch
 import gym
 
-import ail.utils.pytorch_util as ptu
+import ail.common.pytorch_util as ptu
+
 from ail.agents.airl_agent import AIRL_Agent
 from config import parse_args
 
