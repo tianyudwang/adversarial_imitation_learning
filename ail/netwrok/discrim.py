@@ -12,6 +12,7 @@ from ail.common.type_alias import Activation
 
 class Arch(Enum):
     """Arch types of Discriminator"""
+
     s = auto()
     sa = auto()
     ss = auto()
