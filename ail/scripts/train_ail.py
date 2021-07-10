@@ -4,12 +4,12 @@ import numpy as np
 import torch
 import gym
 
-import ail.utils.pytorch_util as ptu 
+import ail.utils.pytorch_util as ptu
 from ail.agents.airl_agent import AIRL_Agent
 from config import parse_args
 
-class AIL_Trainer():
 
+class AIL_Trainer(object):
     def __init__(self, flags):
 
         #############
@@ -23,10 +23,7 @@ class AIL_Trainer():
         self.seed = self.flags.seed
         np.random.seed(self.seed)
         torch.manual_seed(self.seed)
-        ptu.init_gpu(
-            use_gpu=len(self.flags.gpu) > 0,
-            gpu_id=self.flags.gpu[0]
-        )
+        ptu.init_gpu(use_gpu=len(self.flags.gpu) > 0, gpu_id=self.flags.gpu[0])
 
         #############
         ## ENV and AGENT
@@ -58,28 +55,20 @@ class AIL_Trainer():
         flags.freeze()
         self.agent = AIRL_Agent(flags)
 
-
     def run_training_loop(self):
-        """
-
-        """
+        """ """
         pass
 
         # Obtain expert trajectories
 
         # Main loop
-        # 1. Interact with the environment using the current generator 
+        # 1. Interact with the environment using the current generator
         #    and store the experience in a replay buffer
         # 2. Update discriminator
         # 3. Update generator
 
 
-
-
-
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Load configs
     FLAGS = parse_args()
 
