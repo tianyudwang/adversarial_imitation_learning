@@ -24,6 +24,7 @@ except ImportError:
 
         def __getattr__(self, key):
             return self
+
     init = ColoramaMock("")
     Back = Cursor = Fore = Style = ColoramaMock("")
 
