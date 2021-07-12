@@ -119,6 +119,7 @@ class Trainer(ABC):
                 state, reward, done, info = self.env_test.step(action)
                 ep_len += 1
                 ep_ret += reward
+                
             if deterministic:
                 valid_ep_lens.append(ep_len)
                 valid_returns.append(ep_ret)
