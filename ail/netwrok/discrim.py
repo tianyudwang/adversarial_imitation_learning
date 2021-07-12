@@ -122,6 +122,7 @@ class GAILDiscrim(DiscrimNet):
     ):
         if disc_kwargs is None:
             disc_kwargs = {}
+        
         super(GAILDiscrim, self).__init__(
             state_dim, action_dim, hidden_units, hidden_activation, None, disc_kwargs
         )
@@ -195,7 +196,6 @@ class AIRLStateDiscrim(DiscrimNet):
         # logits = self.forward(state, done, log_pi, next_state)
         # return -F.logsigmoid(-logits)
         kwargs = {
-            "state": state,
             "done": done,
             "next_state": next_state,
             "log_pi": log_pi,
@@ -203,8 +203,8 @@ class AIRLStateDiscrim(DiscrimNet):
         return super()._calculate_reward(state, **kwargs)
 
     """
-    The objective of the discriminator is to minimize cross-entropy loss between expert demonstrations
-    and generated samples:
+    The objective of the discriminator is to minimize cross-entropy loss 
+    between expert demonstrations and generated samples:
         L(θ) = \sum_{t=0}{T} -E_D [log {D_θ (s_t , a_t )}] − E_πt [log{1 − Dθ (s_t , a_t )}]
     
     DISCRIMINATOR Objective
@@ -237,6 +237,7 @@ class AIRLStateActionDiscrim(DiscrimNet):
     ):
         if disc_kwargs is None:
             disc_kwargs = {"disc_type", Arch.sa}
+
         super(AIRLStateActionDiscrim, self).__init__(
             state_dim, action_dim, hidden_units, hidden_activation, gamma, disc_kwargs
         )
@@ -255,7 +256,6 @@ class AIRLStateActionDiscrim(DiscrimNet):
         # logits = self.forward(state, action, log_pi)
         # return -F.logsigmoid(-logits)
         kwargs = {
-            "state": state,
             "action": action,
             "log_pi": log_pi,
         }
