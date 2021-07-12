@@ -102,9 +102,9 @@ def mlp_value(
     activation: str = "relu",
     **kwargs
 ):
-    if val_type.upper() == "V":
+    if val_type in  ["V", "v", "Vs"]:
         return StateFunction(state_dim, value_layers, activation, **kwargs)
-    elif val_type == "Qsa" or val_type == "Q":
+    elif val_type in ["Qsa", "Q"]:
         return StateActionFunction(
             state_dim, action_dim, value_layers, activation, **kwargs
         )
