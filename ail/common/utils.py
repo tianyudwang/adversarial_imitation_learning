@@ -28,3 +28,7 @@ def combined_shape(length: int, shape=None):
     if shape is None:
         return (length,)  # noqa
     return (length, shape) if np.isscalar(shape) else (length, *shape)
+
+
+def asarray_shape2(x):
+    return np.asarray(x, dtype=np.float32).reshape(1, -1)
