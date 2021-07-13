@@ -6,7 +6,7 @@ import gym
 
 import ail.common.pytorch_util as ptu
 
-from ail.agents.airl_agent import AIRL_Agent
+from ail.agents.irl_agent.airl_agent import AIRL
 from config import parse_args
 
 
@@ -27,7 +27,7 @@ class AIL_Trainer(object):
         ptu.init_gpu(use_gpu=len(self.flags.gpu) > 0, gpu_id=self.flags.gpu[0])
 
         #############
-        ## ENV and AGENT
+        # ENV and AGENT
         #############
 
         self.init_env()
@@ -54,7 +54,7 @@ class AIL_Trainer(object):
         flags.ob_dim = ob_dim
         flags.ac_dim = ac_dim
         flags.freeze()
-        self.agent = AIRL_Agent(flags)
+        self.agent = AIRL(flags)
 
     def run_training_loop(self):
         """ """
