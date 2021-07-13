@@ -33,4 +33,3 @@ def test_squash_logprob_correction_neg_zero():
     # log(1 - tanh(x)^2)
     original = th.log(1 - actions.pow(2)).numpy()
     assert np.allclose(out, original)
-
