@@ -75,5 +75,6 @@ class RL_Trainer(BaseTrainer):
             if step % self.eval_interval == 0:
                 self.evaluate(step)
 
-        # Wait for the logging to be finished.
+        # Wait to ensure that all pending events have been written to disk.
+        self.writer.flush()
         countdown(10)
