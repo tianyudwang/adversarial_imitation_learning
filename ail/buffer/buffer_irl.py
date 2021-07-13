@@ -261,8 +261,8 @@ class BaseBuffer(object):
         env: Optional[GymEnv] = None,
         obs_shape: Optional[Tuple[int, ...]] = None,
         act_shape: Optional[Tuple[int, ...]] = None,
-        obs_dtype: Optional[np.dtype] = None,
-        act_dtype: Optional[np.dtype] = None,
+        obs_dtype: np.dtype = np.float32,
+        act_dtype: np.dtype = np.float32,
         with_reward=True,
     ):
         params = [obs_shape, act_shape, obs_dtype, act_dtype]
@@ -442,8 +442,8 @@ class ReplayBuffer(BaseBuffer):
         env: Optional[GymEnv] = None,
         obs_shape: Optional[Tuple[int, ...]] = None,
         act_shape: Optional[Tuple[int, ...]] = None,
-        obs_dtype: Optional[np.dtype] = None,
-        act_dtype: Optional[np.dtype] = None,
+        obs_dtype: np.dtype = np.float32,
+        act_dtype: np.dtype = np.float32,
         with_reward=True,
         buf_kwargs=None,
     ):
@@ -491,8 +491,8 @@ class RolloutBuffer(BaseBuffer):
         env: Optional[GymEnv] = None,
         obs_shape: Optional[Tuple[int, ...]] = None,
         act_shape: Optional[Tuple[int, ...]] = None,
-        obs_dtype: Optional[np.dtype] = None,
-        act_dtype: Optional[np.dtype] = None,
+        obs_dtype: np.dtype = np.float32,
+        act_dtype: np.dtype = np.float32,
         with_reward=True,
         extra_shapes: Optional[Dict[str, Tuple[int, ...]]] = None,
         extra_dtypes: Optional[Dict[str, np.dtype]] = None,
@@ -538,7 +538,6 @@ class RolloutBuffer(BaseBuffer):
                 "vals": np.float32,
                 "log_pis": np.float32,
             }
-
         self.sample_shapes.update(extra_shapes)
         self.dtypes.update(extra_dtypes)
         self._init_buffer()
