@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional, Dict
 from time import time
 
 from torch.utils.tensorboard import SummaryWriter
@@ -14,14 +14,14 @@ class RL_Trainer(BaseTrainer):
         env: Union[GymEnv, str],
         algo,
         algo_kwargs: dict,
-        env_kwargs=None,
+        env_kwargs: Optional[Dict] = None,
         max_ep_len=None,
         seed: int = 42,
         eval_interval: int = 5_000,
         num_eval_episodes: int = 10,
-        save_freq: int = 10_000,
+        save_freq: int = 50_000,
         log_dir: str = "runs",
-        log_interval: int = 5_000,
+        log_interval: int = 10_000,
         verbose: int = 2,
         use_wandb: bool = False,
         **kwargs,
@@ -62,6 +62,9 @@ class RL_Trainer(BaseTrainer):
         # Initialize the environment.
         obs = self.env.reset()
 
+        self.n_steps_pbar.set_description(
+            f"{self.algo.__class__.__name__} ({self.device})"
+        )
         for step in self.n_steps_pbar:
             # Pass to the algorithm to update state and episode timestep.
             # return of algo.step() is next_obs
@@ -69,12 +72,22 @@ class RL_Trainer(BaseTrainer):
 
             # Update the algorithm whenever ready.
             if self.algo.is_update(step):
-                self.algo.update()
+                train_logs = self.algo.update()
+                self.train_logging(train_logs, step)
+                self.train_count += 1
+                # Log changes from training updates.
+                # TODO: set a better interval to log to reduce overhead.
+                if self.train_count % 2 == 0:  # ! naive one: half
+                    self.info_to_tb(train_logs, step)
 
             # Evaluate regularly.
             if step % self.eval_interval == 0:
                 self.evaluate(step)
 
+            # Saving the model.
+            if self.is_saving_model(step):
+                self.save_models(step)
+
         # Wait to ensure that all pending events have been written to disk.
         self.writer.flush()
-        countdown(10)
+        countdown(5)
