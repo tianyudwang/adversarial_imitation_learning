@@ -3,8 +3,6 @@ from typing import Dict, Mapping, Optional, Tuple, Union
 import numpy as np
 import torch as th
 
-from icecream import ic
-
 from ail.common.type_alias import GymEnv
 
 
@@ -23,8 +21,6 @@ class Buffer(object):
 
     :param device: PyTorch device to which the values will be converted.
     """
-
-    __slots__ = ["capacity", "sample_shapes", "_arrays", "stored_keys", "_n_data", "_idx", "device"]
 
     def __init__(
         self,
@@ -107,7 +103,9 @@ class Buffer(object):
         buf.store(data, truncate_ok=truncate_ok)
         return buf
 
-    def store(self, data: Dict[str, np.ndarray], truncate_ok: bool = False, missing_ok=True) -> None:
+    def store(
+        self, data: Dict[str, np.ndarray], truncate_ok: bool = False, missing_ok=True
+    ) -> None:
         """
         Stores new data samples, replacing old samples with FIFO priority.
 
@@ -142,12 +140,10 @@ class Buffer(object):
             if not truncate_ok:
                 raise ValueError("Not enough capacity to store data.")
             else:
-                data = {k: data[k][-self.capacity:] for k in data.keys()}
+                data = {k: data[k][-self.capacity :] for k in data.keys()}
 
         for k in data.keys():
             if data[k].shape[1:] != self.sample_shapes[k]:
-                ic(data[k].shape[1:])
-                ic(self.sample_shapes[k])
                 raise ValueError(f"Wrong data shape for {k}")
 
         new_idx = self._idx + n_samples
@@ -176,6 +172,8 @@ class Buffer(object):
             Otherwise, store only the final `self.capacity` transitions.
         Note: serve as singe pair store
         """
+        # sample should has shape (1, n):
+        # 1 is the number of samples, n is the dimension of that sample
         n_samples = np.unique([arr.shape[0] for arr in data.values()])
         assert len(n_samples) == 1
         n_samples = n_samples[0]
@@ -185,10 +183,9 @@ class Buffer(object):
             if not truncate_ok:
 
                 if self._n_data + n_samples > self.capacity:
-                    ic(self._n_data, n_samples)
                     raise ValueError("exceed buffer capacity")
 
-            self._arrays[k][self._idx: idx_hi] = data[k]
+            self._arrays[k][self._idx : idx_hi] = data[k]
         self._idx = idx_hi % self.capacity
         self._n_data = int(min(self._n_data + n_samples, self.capacity))
 
@@ -206,7 +203,7 @@ class Buffer(object):
 
     def get(self, n_samples: Optional[int] = None) -> Dict[str, th.Tensor]:
         if n_samples is None:
-            assert self.size() == self.capacity, "Buffer is not full"    
+            assert self.size() == self.capacity, "Buffer is not full"
             return self._get_samples()
         else:
             path_slice = slice(0, n_samples)
@@ -215,9 +212,10 @@ class Buffer(object):
     def _get_samples(self, batch_idxes: Union[np.ndarray, slice] = None):
         """Get a batch size or whole buffer size with order preserved."""
         batch_idxes = slice(0, self.capacity) if batch_idxes is None else batch_idxes
-        return {
+        out = {
             k: self.to_torch(buffer[batch_idxes]) for k, buffer in self._arrays.items()
         }
+        return out
 
     def to_torch(self, array: np.ndarray, copy: bool = True, **kwargs) -> th.Tensor:
         """
@@ -276,18 +274,18 @@ class BaseBuffer(object):
 
             self.sample_shapes.update(
                 {
-                    'obs': tuple(env.observation_space.shape),
-                    'acts': tuple(env.action_space.shape),
-                    'next_obs': tuple(env.observation_space.shape),
+                    "obs": tuple(env.observation_space.shape),
+                    "acts": tuple(env.action_space.shape),
+                    "next_obs": tuple(env.observation_space.shape),
                     "dones": (1,),
                 }
             )
 
             self.dtypes.update(
                 {
-                    'obs': env.observation_space.dtype,
-                    'acts': env.action_space.dtype,
-                    'next_obs': env.observation_space.dtype,
+                    "obs": env.observation_space.dtype,
+                    "acts": env.action_space.dtype,
+                    "next_obs": env.observation_space.dtype,
                     "dones": np.float32,
                 }
             )
@@ -309,13 +307,12 @@ class BaseBuffer(object):
             }
 
         if with_reward:
-            self.sample_shapes['rews'] = (1,)
-            self.dtypes['rews'] = np.float32
+            self.sample_shapes["rews"] = (1,)
+            self.dtypes["rews"] = np.float32
 
         self.capacity = capacity
         self.device = device
         self._buffer = None
-
 
     def _init_buffer(self) -> None:
         """Initiate Buffer"""
@@ -324,7 +321,7 @@ class BaseBuffer(object):
         self.reset()
 
     def reset(self):
-        """ Reset equivalent to re-initiate a new Buffer"""
+        """Reset equivalent to re-initiate a new Buffer"""
         self._buffer = Buffer(
             capacity=self.capacity,
             sample_shapes=self.sample_shapes,
@@ -337,7 +334,9 @@ class BaseBuffer(object):
         return self._buffer.size()
 
     def store(
-        self, transitions: Dict[str, np.ndarray], truncate_ok: bool = False,
+        self,
+        transitions: Dict[str, np.ndarray],
+        truncate_ok: bool = False,
     ) -> None:
         """Store obs-act-obs triples and additional info in transitions.
         Args:
@@ -351,7 +350,7 @@ class BaseBuffer(object):
         intersect = self._buffer.stored_keys.intersection(transitions.keys())
         # Remove unnecessary fields
         trans_dict = {k: transitions[k] for k in intersect}
-        self._buffer._store_easy(trans_dict, truncate_ok=truncate_ok)
+        self._buffer._store_easy(trans_dict, truncate_ok=truncate_ok)  # noqa
 
     def store_path(
         self, transitions: Dict[str, np.ndarray], truncate_ok: bool = True
@@ -370,7 +369,6 @@ class BaseBuffer(object):
         trans_dict = {k: transitions[k] for k in intersect}
         self._buffer.store(trans_dict, truncate_ok=truncate_ok)
 
-
     def sample(self, n_samples: int) -> Dict[str, th.Tensor]:
         """Sample obs-act-obs triples.
         Args:
@@ -381,7 +379,8 @@ class BaseBuffer(object):
         return self._buffer.sample(n_samples)
 
     def get(self, n_samples: Optional[int] = None):
-        return self._buffer.get(n_samples)
+        out = self._buffer.get(n_samples)
+        return out
 
     @classmethod
     def from_data(
@@ -470,7 +469,7 @@ class ReplayBuffer(BaseBuffer):
             act_shape,
             obs_dtype,
             act_dtype,
-            with_reward
+            with_reward,
         )
 
         if buf_kwargs is None:
@@ -495,7 +494,8 @@ class RolloutBuffer(BaseBuffer):
         obs_dtype: Optional[np.dtype] = None,
         act_dtype: Optional[np.dtype] = None,
         with_reward=True,
-        buf_kwargs=None,
+        extra_shapes: Optional[Dict[str, Tuple[int, ...]]] = None,
+        extra_dtypes: Optional[Dict[str, np.dtype]] = None,
     ):
         """
         Constructs a ReplayBuffer.
@@ -519,32 +519,26 @@ class RolloutBuffer(BaseBuffer):
             act_shape,
             obs_dtype,
             act_dtype,
-            with_reward
+            with_reward,
         )
-        if buf_kwargs is None:
-            buf_kwargs = {}
 
         # log_pis, advs, rets, vals
-        extra_shapes = buf_kwargs.get(
-            "extra_shapes",
-            {
+        if extra_shapes is None:
+            extra_shapes = {
                 "advs": (1,),
                 "rets": (1,),
                 "vals": (1,),
                 "log_pis": (1,),
             }
-        )
-        extra_dtypes = buf_kwargs.get(
-            "extra_dtypes",
-            {
+
+        if extra_dtypes is None:
+            extra_dtypes = {
                 "advs": np.float32,
                 "rets": np.float32,
                 "vals": np.float32,
                 "log_pis": np.float32,
             }
-        )
+
         self.sample_shapes.update(extra_shapes)
         self.dtypes.update(extra_dtypes)
         self._init_buffer()
-
-
