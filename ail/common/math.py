@@ -75,7 +75,7 @@ def calculate_log_pi(log_stds, noises, actions):
 def squash_logprob_correction(actions: th.Tensor) -> th.Tensor:
     """
     Squash correction (from original SAC implementation)
-    log(1 - tanh(x)^2) 
+    log(1 - tanh(x)^2)
     # TODO: mark 1e-6
     this code is more numerically stable.
     (https://github.com/DLR-RM/stable-baselines3/blob/master/stable_baselines3/common/distributions.py#L195)
