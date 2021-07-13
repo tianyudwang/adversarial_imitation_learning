@@ -34,5 +34,5 @@ _str_to_activation = {
 
 OPT = {
     "adam": Adam,
-    "adamW": AdamW,
+    "adamw": AdamW,
 }
