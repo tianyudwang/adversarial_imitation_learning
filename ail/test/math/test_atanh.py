@@ -34,4 +34,3 @@ def test_atanh_output_accuracy():
     assert np.allclose(atanh(x).numpy(), th.atanh(x).numpy())
     assert np.allclose(atanh(y).numpy(), th.atanh(y).numpy())
     assert np.allclose(atanh(z).numpy(), th.atanh(z).numpy())
-
