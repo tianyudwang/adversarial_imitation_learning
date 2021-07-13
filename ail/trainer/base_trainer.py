@@ -1,7 +1,9 @@
 import os
+from time import time
+from datetime import timedelta
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, Optional
 
 import numpy as np
 import torch as th
@@ -9,40 +11,40 @@ from tqdm import tqdm
 
 from ail.common.env_utils import maybe_make_env
 from ail.common.running_stats import RunningStats
-from ail.common.pytorch_util import to_torch, to_numpy
+from ail.common.pytorch_util import to_torch
 from ail.common.type_alias import GymEnv
-from ail.common.utils import set_random_seed, duration, get_statistics
-from ail.console.color_console import COLORS
+from ail.common.utils import set_random_seed, get_stats
+from ail.console.color_console import COLORS, Console
 
 
 class BaseTrainer(ABC):
-    
     def __init__(
         self,
         num_steps: int,
         env: Union[GymEnv, str],
-        env_kwargs=None,
-        max_ep_len=None,
-        eval_interval: int = 5_000,
-        num_eval_episodes: int = 10,
-        save_freq: int = 10,
-        log_dir: str = "",
-        log_interval: int = 5_000,
-        seed: int = 42,
-        verbose: int = 2,
-        use_wandb=False,
+        env_kwargs: dict,
+        max_ep_len: Optional[int],
+        eval_interval: int,
+        num_eval_episodes: int,
+        save_freq: int,
+        log_dir: str,
+        log_interval: int,
+        seed: int,
+        verbose: int,
+        use_wandb: bool,
         **kwargs,
     ):
 
         if env_kwargs is None:
             env_kwargs = {
-                "env_wrapper": [],
+                "env_wrapper": [],  # ? should we apply ActionNormlize wrapper by default?
                 "tag": "training",
                 "color": "dim_blue",
             }
 
         # Env to collect samples.
         self.env = maybe_make_env(env, verbose=verbose, **env_kwargs)
+        self.seed = seed
         self.env.seed(seed)
 
         # Env for evaluation.
@@ -71,6 +73,11 @@ class BaseTrainer(ABC):
             os.path.join(log_dir, "summary"),
             os.path.join(log_dir, "model"),
         )
+
+        for d in [self.log_dir, self.summary_dir, self.model_dir]:
+            if not os.path.exists(d):
+                os.makedirs(d, exist_ok=True)
+
         self.use_wandb = use_wandb
         self.writer = None
 
@@ -82,11 +89,13 @@ class BaseTrainer(ABC):
         self.stochastic_eval_episodes = num_eval_episodes // 2
         self.log_interval = log_interval
 
+        # Progress param
+        self.n_steps_pbar = tqdm(range(1, num_steps + 1))
+        self.best_ret = -float("inf")
+        self.rs = RunningStats()
+
         # Other parameters.
         self.num_steps = num_steps
-        self.n_steps_pbar = tqdm(range(1, num_steps + 1))
-        self.best_rew_mean, self.best_ret = -float("inf"), -float("inf")
-        self.rs = RunningStats()
         self.verbose = verbose
         self.algo = None
         self.batch_size = None
@@ -102,26 +111,32 @@ class BaseTrainer(ABC):
         raise NotImplementedError()
 
     @th.no_grad()
-    def evaluate(self, step) -> None:
-        """Evaluate current policy"""
-        self.algo.eval()
+    def evaluate(self, step: int):
+        # set algo to evaluation mode
+        self.algo.actor.eval()
+        self.rs.clear()
         train_returns, train_ep_lens = [], []
         valid_returns, valid_ep_lens = [], []
-
+        # visualize result from half explore and half exploit
+        stochastic_eval_episodes = self.num_eval_episodes // 2
         for t in range(self.num_eval_episodes):
-
-            state, done = self.env_test.reset(), False
-            ep_len, ep_ret = 0, 0.0
-            deterministic = False if t < self.stochastic_eval_episodes else True
+            obs = self.env_test.reset()
+            ep_ret = 0.0
+            ep_len = 0
+            done = False
 
             while not done:
-                state = self.obs_as_tensor(state)
-                action  = self.algo.get_action(state, deterministic)
-
-                state, reward, done, info = self.env_test.step(action)
-                ep_len += 1
+                obs = self.obs_as_tensor(obs)
+                if t < stochastic_eval_episodes:
+                    act, _ = self.algo.explore(obs)
+                else:
+                    act = self.algo.exploit(obs)
+                obs, reward, done, _ = self.env_test.step(act)
                 ep_ret += reward
-                
+                ep_len += 1
+
+            self.rs.push(ep_ret)
+            deterministic = False if t < stochastic_eval_episodes else True
             if deterministic:
                 valid_ep_lens.append(ep_len)
                 valid_returns.append(ep_ret)
@@ -139,6 +154,14 @@ class BaseTrainer(ABC):
         )
         # Turn back to train mode.
         self.algo.train()
+
+        if self.rs.mean() > self.best_ret:
+            self.best_ret = self.rs.mean()
+        Console.info(
+            f"Num steps: {step}\t"
+            f"| Best Ret: {self.best_ret:.1f}\t"
+            f"| Return: {self.rs.mean():.1f}"
+        )
 
     # -----------------------
     # Logging conditions
@@ -164,12 +187,12 @@ class BaseTrainer(ABC):
         """Log training info (no saving yet)"""
         time_logs = OrderedDict()
         time_logs["total_timestep"] = step
-        time_logs["time_elapsed "] = duration(self.start_time)
+        time_logs["time_elapsed "] = self.duration(self.start_time)
 
         print("-" * 41)
         self.output_block(train_logs, tag="Train", color="invisible")
         self.output_block(time_logs, tag="Time", color="invisible")
-        print("-" * 41 + "\n")
+        print("\n")
 
     def eval_logging(
         self, step, train_returns, train_ep_lens, eval_returns, eval_ep_lens
@@ -179,7 +202,7 @@ class BaseTrainer(ABC):
 
         # Time
         time_logs["total_timestep"] = step
-        time_logs["time_elapsed "] = duration(self.start_time)
+        time_logs["time_elapsed "] = self.duration(self.start_time)
 
         # Train
         train_logs["ep_len_mean"] = np.mean(train_ep_lens)
@@ -188,7 +211,7 @@ class BaseTrainer(ABC):
             train_logs["std_return"],
             train_logs["max_return"],
             train_logs["min_return"],
-        ) = get_statistics(train_returns)
+        ) = get_stats(train_returns)
 
         # Eval
         eval_logs["ep_len_mean"] = np.mean(eval_ep_lens)
@@ -197,7 +220,7 @@ class BaseTrainer(ABC):
             eval_logs["std_return"],
             eval_logs["max_return"],
             eval_logs["min_return"],
-        ) = get_statistics(eval_returns)
+        ) = get_stats(eval_returns)
 
         print("-" * 41)
         self.output_block(train_logs, tag="Train", color="invisible")
@@ -218,7 +241,7 @@ class BaseTrainer(ABC):
             else:
                 b = f"{v: <12}\t|"
             print("".join([a, b]))
-        print('-'*41)
+        print("-" * 41)
 
     # -----------------------
     # Logging/Saving methods
@@ -328,4 +351,6 @@ class BaseTrainer(ABC):
         """Convert torch tensor to numpy array and send to CPU"""
         return tensor.detach().cpu().numpy()
 
-
+    @staticmethod
+    def duration(start_time) -> str:
+        return str(timedelta(seconds=int(time() - start_time)))
