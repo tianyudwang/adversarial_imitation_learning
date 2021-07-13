@@ -99,7 +99,7 @@ def mlp_value(
     action_dim: int,
     val_type: str,
     value_layers: Sequence[int],
-    activation: str = "relu",
+    activation: Union[nn.Module, str] = "relu",
     **kwargs
 ):
     if val_type in ["V", "v", "Vs"]:
