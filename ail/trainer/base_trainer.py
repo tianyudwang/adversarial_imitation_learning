@@ -22,7 +22,7 @@ class BaseTrainer(ABC):
         self,
         num_steps: int,
         env: Union[GymEnv, str],
-        env_kwargs: dict,
+        env_kwargs: Dict[Any],
         max_ep_len: Optional[int],
         eval_interval: int,
         num_eval_episodes: int,
@@ -93,6 +93,7 @@ class BaseTrainer(ABC):
         self.n_steps_pbar = tqdm(range(1, num_steps + 1))
         self.best_ret = -float("inf")
         self.rs = RunningStats()
+        self.train_count = 0
 
         # Other parameters.
         self.num_steps = num_steps
@@ -145,13 +146,14 @@ class BaseTrainer(ABC):
                 train_returns.append(ep_ret)
 
         # Logging evaluation.
-        self.eval_logging(
-            step,
-            train_returns,
-            train_ep_lens,
-            valid_returns,
-            valid_ep_lens,
-        )
+        if self.is_eval_logging(step):
+            self.eval_logging(
+                step,
+                train_returns,
+                train_ep_lens,
+                valid_returns,
+                valid_ep_lens,
+            )
         # Turn back to train mode.
         self.algo.train()
 
@@ -168,16 +170,22 @@ class BaseTrainer(ABC):
     # -----------------------
 
     def is_train_logging(self, step) -> bool:
-        return (
-            step % self.log_interval == 0 or step == self.num_steps
-        ) and self.verbose == 1
+        return all(
+            [
+                step % self.log_interval == 0,
+                step > self.log_interval,
+                self.verbose >= 1,
+            ]
+        )
 
     def is_eval_logging(self, step) -> bool:
-        cond = (
-            (step % self.eval_interval == 0) or (step == self.num_steps),
-            self.verbose == 1,
+        return all(
+            [
+                step % self.eval_interval == 0,
+                step > self.eval_interval,
+                self.verbose >= 1,
+            ]
         )
-        return all(cond)
 
     def is_saving_model(self, step) -> bool:
         cond = (step > 0, step % self.save_freq == 0, step / self.num_steps > 0.3)
@@ -185,14 +193,15 @@ class BaseTrainer(ABC):
 
     def train_logging(self, train_logs, step) -> None:
         """Log training info (no saving yet)"""
-        time_logs = OrderedDict()
-        time_logs["total_timestep"] = step
-        time_logs["time_elapsed "] = self.duration(self.start_time)
+        if self.is_train_logging(step):
+            time_logs = OrderedDict()
+            time_logs["total_timestep"] = step
+            time_logs["time_elapsed "] = self.duration(self.start_time)
 
-        print("-" * 41)
-        self.output_block(train_logs, tag="Train", color="invisible")
-        self.output_block(time_logs, tag="Time", color="invisible")
-        print("\n")
+            print("-" * 41)
+            self.output_block(train_logs, tag="Train", color="invisible")
+            self.output_block(time_logs, tag="Time", color="invisible")
+            print("\n")
 
     def eval_logging(
         self, step, train_returns, train_ep_lens, eval_returns, eval_ep_lens
@@ -273,31 +282,18 @@ class BaseTrainer(ABC):
         assert train_logs is not None, "train log can not be `None`"
         self.writer.add_scalar("loss/actor", train_logs.get("actor_loss"), epoch)
         self.writer.add_scalar("loss/critic", train_logs.get("critic_loss"), epoch)
-        # TODO: add theses back
-        # self.writer.add_scalar(
-        #     "info/actor/approx_kl", train_logs.get("approx_kl"), epoch
-        # )
-        # self.writer.add_scalar("info/actor/entropy", train_logs.get("entropy"), epoch)
-        # self.writer.add_scalar(
-        #     "info/actor/clip_fraction", train_logs["clip_fraction"], epoch
-        # )
+        self.writer.add_scalar(
+            "info/actor/approx_kl", train_logs.get("approx_kl"), epoch
+        )
+        self.writer.add_scalar("info/actor/entropy", train_logs.get("entropy"), epoch)
+        self.writer.add_scalar(
+            "info/actor/clip_fraction", train_logs["clip_fraction"], epoch
+        )
 
     def save_models(self, save_dir: str, verbose=False, **kwargs):
         # use algo.sav_mdoels directly for now
         # self.algo.save_models(save_dir, verbose)
         pass
-
-    def update_progress(self, ep_ret) -> None:
-
-        if ep_ret > self.best_ret:
-            self.best_ret = ep_ret
-
-        self.n_steps_pbar.set_description(
-            f"{self.algo.__class__.__name__} ({self.device}): "
-            f"| Best Mean Ret: {self.best_ret:.2f} "
-            f"| Running Stats: {self.rs.mean():.2f} +/- "
-            f"{self.rs.standard_deviation():.2f}"
-        )
 
     # -----------------------
     # Helper functions.
