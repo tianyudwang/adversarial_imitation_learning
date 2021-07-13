@@ -109,4 +109,4 @@ def mlp_value(
             state_dim, action_dim, value_layers, activation, **kwargs
         )
     else:
-        raise ValueError
+        raise ValueError()
