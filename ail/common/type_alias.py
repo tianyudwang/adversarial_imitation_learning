@@ -1,4 +1,6 @@
+from dataclasses import dataclass
 from typing import Any, Dict, Tuple, Union
+
 import gym
 import numpy as np
 import torch as th
@@ -36,3 +38,25 @@ OPT = {
     "adam": Adam,
     "adamw": AdamW,
 }
+
+
+# ----------------------------------------------------------------
+# Buffer shape and dtype
+@dataclass(frozen=True, eq=False)
+class Extra_shape:
+    advs: Tuple[int, ...] = (1,)
+    rets: Tuple[int, ...] = (1,)
+    vals: Tuple[int, ...] = (1,)
+    log_pis: Tuple[int, ...] = (1,)
+
+
+@dataclass(frozen=True, eq=False)
+class Extra_dtypes:
+    advs: np.dtype = np.float32
+    rets: np.dtype = np.float32
+    vals: np.dtype = np.float32
+    log_pis: np.dtype = np.float32
+
+extra_shapes = Extra_shape()
+extra_dtypes = Extra_dtypes()
+
