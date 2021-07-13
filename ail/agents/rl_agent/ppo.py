@@ -1,14 +1,12 @@
-from typing import Union, Sequence
+from typing import Union, Sequence, Optional
 
-import numpy as np
 import torch as th
 from torch import nn
-from torch.nn.utils import clip_grad_norm_
+from torch.cuda.amp import autocast
 
-
-from ail.agents.base_agent import BaseAgent
+from ail.agents.rl_agent.base import RLAgent
 from ail.common.math import normalize
-from ail.common.type_alias import OPT, TensorDict, GymSpace
+from ail.common.type_alias import OPT, TensorDict, GymSpace, extra_shapes, extra_dtypes
 from ail.buffer.buffer_irl import RolloutBuffer
 from ail.network.policies import StateIndependentPolicy
 from ail.network.value import mlp_value
@@ -36,7 +34,7 @@ def calculate_gae(data, values, next_values, gamma, lambd, normal=True):
         return targets, gaes
 
 
-class PPO(BaseAgent):
+class PPO(RLAgent):
     def __init__(
         self,
         state_space: GymSpace,
@@ -53,10 +51,10 @@ class PPO(BaseAgent):
         gae_lambda: float = 0.97,
         clip_eps: float = 0.2,
         coef_ent: float = 0.01,
-        max_grad_norm: float = 0.5,
-        optim_kwargs=None,
+        max_grad_norm: Optional[float] = None,
+        optim_kwargs: Optional[dict] = None,
     ):
-        super().__init__(state_space, action_space, device, seed, gamma)
+        super().__init__(state_space, action_space, device, seed, gamma, max_grad_norm)
 
         if optim_kwargs is None:
             optim_kwargs = {}
@@ -68,8 +66,8 @@ class PPO(BaseAgent):
             act_shape=self.action_shape,
             device=self.device,
             with_reward=True,
-            extra_shapes={"log_pis": (1,)},
-            extra_dtypes={"log_pis": np.float32},
+            extra_shapes={"log_pis": extra_shapes.log_pis},
+            extra_dtypes={"log_pis": extra_dtypes.log_pis},
         )
 
         # Actor.
@@ -89,10 +87,18 @@ class PPO(BaseAgent):
             activation=nn.Tanh(),
         ).to(self.device)
 
-        self.optim_cls = OPT[optim_kwargs.get("optim_cls", "adam").lower()]
+        # Orthogonal Initialize.
+        self.weight_initiation()
 
-        self.optim_actor = self.optim_cls(self.actor.parameters(), lr=lr_actor)
-        self.optim_critic = self.optim_cls(self.critic.parameters(), lr=lr_critic)
+        # Learning rate.
+        # TODO: add learning rate scheduler.
+        # ? Is there one suitable for RL?
+        self.lr_actor = lr_actor
+        self.lr_critic = lr_critic
+
+        self.optim_cls = OPT[optim_kwargs.get("optim_cls", "adam").lower()]
+        self.optim_actor = self.optim_cls(self.actor.parameters(), lr=self.lr_actor)
+        self.optim_critic = self.optim_cls(self.critic.parameters(), lr=self.lr_critic)
 
         self.learning_steps_ppo = 0
         self.batch_size = batch_size
@@ -100,28 +106,28 @@ class PPO(BaseAgent):
         self.clip_eps = clip_eps
         self.gae_lambda = gae_lambda
         self.coef_ent = coef_ent
-        self.max_grad_norm = max_grad_norm
 
     def is_update(self, step):
         return step % self.batch_size == 0
 
     def step(self, env, state, t, step):
+        """Intereact with environment and store the transition."""
         t += 1
 
         action, log_pi = self.explore(state)
         next_state, reward, done, _ = env.step(action)
         # TODO: may remove mask
-        mask = False if t == env._max_episode_steps else done
+        # mask = False if t == env._max_episode_steps else done
 
         data = {
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
             "rews": asarray_shape2d(reward),
-            "dones": asarray_shape2d(mask),
+            "dones": asarray_shape2d(done),
             "log_pis": asarray_shape2d(log_pi),
             "next_obs": asarray_shape2d(next_state),
         }
-
+        # Store transition. not allow size larger than buffer capcity.
         self.buffer.store(data, truncate_ok=False)
 
         if done:
@@ -134,16 +140,14 @@ class PPO(BaseAgent):
         self.learning_steps += 1
         data = self.buffer.get()
         self.buffer.reset()
-        self.update_ppo(data)
+        train_logs = self.update_ppo(data)
+        return train_logs
 
     def update_ppo(self, data: TensorDict):
-        states, actions, rewards, dones, log_pis, next_states = (
+        states, actions, log_pis = (
             data["obs"],
             data["acts"],
-            data["rews"],
-            data["dones"],
             data["log_pis"],
-            data["next_obs"],
         )
 
         with th.no_grad():
@@ -156,30 +160,67 @@ class PPO(BaseAgent):
 
         for _ in range(self.epoch_ppo):
             self.learning_steps_ppo += 1
-            self.update_critic(states, targets)
-            self.update_actor(states, actions, log_pis, gaes)
+            loss_critic = self.update_critic(states, targets)
+            loss_actor, pi_info = self.update_actor(states, actions, log_pis, gaes)
+
+        # return log changes(key used for logging name).
+        return {
+            "actor_loss": loss_actor.item(),
+            "critic_loss": loss_critic.item(),
+            "approx_kl": pi_info["kl"].item(),
+            "entropy": pi_info["ent"].item(),
+            "clip_fraction": pi_info["cf"].item(),
+            "pi_lr": self.lr_actor,
+            "vf_lr": self.lr_critic,
+            "learn_steps_ppo": self.learning_steps_ppo,
+        }
 
     def update_critic(self, states, targets):
-        loss_critic = (self.critic(states) - targets).pow_(2).mean()
 
         self.optim_critic.zero_grad()
-        loss_critic.backward(retain_graph=False)
-        clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
-        self.optim_critic.step()
+        with autocast():
+            loss_critic = (self.critic(states) - targets).pow_(2).mean()
+        self.one_gradient_step(loss_critic, self.optim_critic, self.critic)
+        return loss_critic
 
     def update_actor(self, states, actions, log_pis_old, gaes):
         log_pis = self.actor.evaluate_log_pi(states, actions)
-        entropy = -log_pis.mean()
+        # TODO: use true entropy when analytical form exists.
+        # ? Is the anayltic form exists for squash Gaussians?
+        # ent = -log_pis.mean() if self.actor.entropy() is None else self.actor.entropy()
 
-        ratios = (log_pis - log_pis_old).exp_()
+        # approximate entropy
+        approx_ent = -log_pis.mean()
+
+        log_ratios = log_pis - log_pis_old
+        ratios = (log_ratios).exp()
         loss_actor1 = -ratios * gaes
         loss_actor2 = -th.clamp(ratios, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * gaes
         loss_actor = th.max(loss_actor1, loss_actor2).mean()
 
         self.optim_actor.zero_grad()
-        (loss_actor - self.coef_ent * entropy).backward(retain_graph=False)
-        clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
-        self.optim_actor.step()
+        with autocast():
+            loss_actor_ent = loss_actor - self.coef_ent * approx_ent
+        self.one_gradient_step(loss_actor_ent, self.optim_actor, self.actor)
+
+        # Useful extra info
+        """
+        Calculate approximate form of reverse KL Divergence for early stopping.
+        See issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
+        and discussion in PR #419: https://github.com/DLR-RM/stable-baselines3/pull/419
+        and Schulman blog: https://joschu.net/blog/kl-approx.html
+        KL(q||p): (r-1) - log(r), where r = p(x)/q(x)
+        """
+        # ! Deprecated:
+        # ! Naive version: approx_kl = (log_pi_old - log_pi).mean().item()
+        # ! This is an unbiased estimator, but it has large variance.
+        # ! Since it can take on negative values. (as opposed to the actual KL Divergence measure)
+        with th.no_grad():
+            approx_kl = ((ratios - 1) - log_ratios).mean()
+            clipped = ratios.gt(1 + self.clip_eps) | ratios.lt(1 - self.clip_eps)
+            clip_frac = th.as_tensor(clipped, dtype=th.float32).mean()
+            pi_info = {"kl": approx_kl, "ent": approx_ent, "cf": clip_frac}
+        return loss_actor, pi_info
 
     def save_models(self, save_dir):
         pass
