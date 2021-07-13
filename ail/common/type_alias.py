@@ -57,6 +57,6 @@ class Extra_dtypes:
     vals: np.dtype = np.float32
     log_pis: np.dtype = np.float32
 
+
 extra_shapes = Extra_shape()
 extra_dtypes = Extra_dtypes()
-
