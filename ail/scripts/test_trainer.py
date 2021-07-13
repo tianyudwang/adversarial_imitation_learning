@@ -4,10 +4,8 @@ from datetime import datetime
 import yaml
 
 try:
-    import icecream  # noqa
-    from icecream import ic
-
-    icecream.install()
+    from icecream import install  # noqa
+    install()
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noq
 
@@ -22,7 +20,7 @@ def run(args):
         seed=args.seed,
         batch_size=args.rollout_length,
         gamma=0.99,
-        max_grad_norm=0.5,
+        max_grad_norm=None,
         gae_lambda=0.97,
         coef_ent=0.01,
         lr_actor=1e-4,
@@ -50,9 +48,9 @@ def run(args):
         seed=args.seed,
         eval_interval=args.eval_interval,
         num_eval_episodes=args.num_eval_episodes,
-        save_freq=10_000,
+        save_freq=50_000,
         log_dir=log_dir,
-        log_interval=5_000,
+        log_interval=10_000,
         verbose=args.verbose,
         use_wandb=args.use_wandb,
     )
@@ -60,10 +58,6 @@ def run(args):
 
 
 if __name__ == "__main__":
-    from icecream import install
-
-    install()
-
     p = argparse.ArgumentParser()
     p.add_argument("--rollout_length", type=int, default=1_000)
     p.add_argument("--algo", type=str, default="ppo")
