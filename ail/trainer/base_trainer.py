@@ -15,19 +15,20 @@ from ail.common.utils import set_random_seed, duration, get_statistics
 from ail.console.color_console import COLORS
 
 
-class Trainer(ABC):
+class BaseTrainer(ABC):
+    
     def __init__(
         self,
-        env: Union[GymEnv, str],
         num_steps: int,
-        log_dir: str = "",
+        env: Union[GymEnv, str],
         env_kwargs=None,
         max_ep_len=None,
-        seed: int = 42,
         eval_interval: int = 5_000,
         num_eval_episodes: int = 10,
         save_freq: int = 10,
+        log_dir: str = "",
         log_interval: int = 5_000,
+        seed: int = 42,
         verbose: int = 2,
         use_wandb=False,
         **kwargs,
@@ -54,6 +55,7 @@ class Trainer(ABC):
         )
         self.env_test.seed(2 ** 31 - seed)
 
+        # set max_ep_len or use default
         self.max_ep_len: int = (
             max_ep_len
             if max_ep_len is not None and isinstance(max_ep_len, int)
@@ -114,7 +116,7 @@ class Trainer(ABC):
 
             while not done:
                 state = self.obs_as_tensor(state)
-                action = to_numpy(self.algo.get_action(state, deterministic))
+                action  = self.algo.get_action(state, deterministic)
 
                 state, reward, done, info = self.env_test.step(action)
                 ep_len += 1
@@ -139,7 +141,7 @@ class Trainer(ABC):
         self.algo.train()
 
     # -----------------------
-    # Conditions
+    # Logging conditions
     # -----------------------
 
     def is_train_logging(self, step) -> bool:
@@ -165,8 +167,8 @@ class Trainer(ABC):
         time_logs["time_elapsed "] = duration(self.start_time)
 
         print("-" * 41)
-        self.output_block(train_logs, tag="Train", color="back_dim_green")
-        self.output_block(time_logs, tag="Time", color="back_dim_cyan")
+        self.output_block(train_logs, tag="Train", color="invisible")
+        self.output_block(time_logs, tag="Time", color="invisible")
         print("-" * 41 + "\n")
 
     def eval_logging(
@@ -198,10 +200,10 @@ class Trainer(ABC):
         ) = get_statistics(eval_returns)
 
         print("-" * 41)
-        self.output_block(train_logs, tag="Train", color="back_dim_green")
-        self.output_block(eval_logs, tag="Evaluate", color="back_dim_red")
-        self.output_block(time_logs, tag="Time", color="back_dim_yellow")
-        print("-" * 41 + "\n")
+        self.output_block(train_logs, tag="Train", color="invisible")
+        self.output_block(eval_logs, tag="Evaluate", color="invisible")
+        self.output_block(time_logs, tag="Time", color="invisible")
+        print("\n")
 
         self.metric_to_tb(step, train_logs, eval_logs)
 
@@ -216,6 +218,7 @@ class Trainer(ABC):
             else:
                 b = f"{v: <12}\t|"
             print("".join([a, b]))
+        print('-'*41)
 
     # -----------------------
     # Logging/Saving methods
@@ -247,17 +250,19 @@ class Trainer(ABC):
         assert train_logs is not None, "train log can not be `None`"
         self.writer.add_scalar("loss/actor", train_logs.get("actor_loss"), epoch)
         self.writer.add_scalar("loss/critic", train_logs.get("critic_loss"), epoch)
-        self.writer.add_scalar(
-            "info/actor/approx_kl", train_logs.get("approx_kl"), epoch
-        )
-        self.writer.add_scalar("info/actor/entropy", train_logs.get("entropy"), epoch)
-        self.writer.add_scalar(
-            "info/actor/clip_fraction", train_logs["clip_fraction"], epoch
-        )
+        # TODO: add theses back
+        # self.writer.add_scalar(
+        #     "info/actor/approx_kl", train_logs.get("approx_kl"), epoch
+        # )
+        # self.writer.add_scalar("info/actor/entropy", train_logs.get("entropy"), epoch)
+        # self.writer.add_scalar(
+        #     "info/actor/clip_fraction", train_logs["clip_fraction"], epoch
+        # )
 
-    def save_models(self, save_dir: str, verbose=False):
+    def save_models(self, save_dir: str, verbose=False, **kwargs):
         # use algo.sav_mdoels directly for now
-        self.algo.save_models(save_dir, verbose)
+        # self.algo.save_models(save_dir, verbose)
+        pass
 
     def update_progress(self, ep_ret) -> None:
 
@@ -322,3 +327,5 @@ class Trainer(ABC):
     def to_numpy(tensor: th.Tensor) -> np.ndarray:
         """Convert torch tensor to numpy array and send to CPU"""
         return tensor.detach().cpu().numpy()
+
+
