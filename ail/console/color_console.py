@@ -28,13 +28,13 @@ except ImportError:
     init = ColoramaMock("")
     Back = Cursor = Fore = Style = ColoramaMock("")
 
-try:
-    # overwrite to more readable error traceback
-    from rich import traceback  # noqa
+# try:
+#     # overwrite to more readable error traceback
+#     from rich import traceback  # noqa
 
-    traceback.install()
-except ImportError:
-    print("Fall back to default traceback")
+#     traceback.install()
+# except ImportError:
+#     print("Fall back to default traceback")
 
 
 COLORS = {
