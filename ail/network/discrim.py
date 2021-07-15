@@ -6,7 +6,7 @@ import torch as th
 from torch import nn
 import torch.nn.functional as F
 
-from ail.netwrok.value import StateFunction, StateActionFunction
+from ail.network.value import StateFunction, StateActionFunction
 from ail.common.type_alias import Activation
 
 
@@ -22,6 +22,30 @@ class Arch(Enum):
 class DiscrimNet(nn.Module, ABC):
     """
     Abstract base class for discriminator, used in AIRL and GAIL.
+    
+    D = sigmoid(f)
+    D(s, a) = sigmoid(f(s, a))    
+    D(s, a) = exp{f(s,a)} / (exp{f(s,a) + \pi(a|s)}
+    where f is a discriminator logit (a learnable function represented as MLP)
+    
+    Choice of reward function:
+    • r(s, a) = − ln(1 − D) = softplus(h) (used in the original GAIL paper),
+    • r(s, a) = ln D − ln(1 − D) = h (introduced in AIRL).
+    • r(s, a) = ln D = −softplus(−h),
+    • r(s, a) = −h exp(h) (introduced in FAIRL)
+    # TODO: clip rewards with the absolute values higher than max reward magnitude
+    # ! The GAIL paper uses the inverse convention in which
+    # ! D denotes the probability as being classified as non-expert.
+    
+    The objective of the discriminator is to 
+    minimize cross-entropy loss
+    between expert demonstrations and generated samples:
+    
+    L = \sum[ -E_{D} log(D) - E_{\pi} log(1 - D)]
+    
+    write the negative loss to turn the minimization problem into maximization:
+    -L = \sum[ -E_{D} log(D) + E_{\pi} log(1 - D)] 
+    
     """
 
     def __init__(
@@ -106,10 +130,6 @@ class DiscrimNet(nn.Module, ABC):
     def calculate_reward(self, *args, **kwargs):
         raise NotImplementedError()
 
-    def _calculate_reward(self, state: th.Tensor, **kwargs):
-        with th.no_grad():
-            return -F.logsigmoid(-self.forward(state, **kwargs))
-
 
 class GAILDiscrim(DiscrimNet):
     def __init__(
@@ -123,7 +143,7 @@ class GAILDiscrim(DiscrimNet):
         if disc_kwargs is None:
             disc_kwargs = {}
 
-        super(GAILDiscrim, self).__init__(
+        super().__init__(
             state_dim, action_dim, hidden_units, hidden_activation, None, disc_kwargs
         )
 
@@ -132,9 +152,12 @@ class GAILDiscrim(DiscrimNet):
         return self.f(th.cat([state, action], dim=-1))
 
     def calculate_reward(self, state, action):
-        # PPO(GAIL) is to maximize E_{\pi} [-log(1 - D)].
+        # (GAIL) is to maximize E_{\pi} [-log(1 - D)].
+        # r(s, a) = − ln(1 − D) = softplus(h)
+        # TODO: modify this to softplus or keep the same
         with th.no_grad():
-            return -F.logsigmoid(-self.forward(state, action))
+            r = -F.logsigmoid(-self.forward(state, action))
+            return r 
 
 
 class AIRLStateDiscrim(DiscrimNet):
@@ -154,7 +177,7 @@ class AIRLStateDiscrim(DiscrimNet):
         if disc_kwargs is None:
             disc_kwargs = {"disc_type", Arch.s}
 
-        super(AIRLStateDiscrim, self).__init__(
+        super().__init__(
             state_dim, None, hidden_units, hidden_activation, gamma, disc_kwargs
         )
 
@@ -193,30 +216,15 @@ class AIRLStateDiscrim(DiscrimNet):
         """
         Calculate GAN reward (can pass all data at once)
         """
-        # logits = self.forward(state, done, log_pi, next_state)
-        # return -F.logsigmoid(-logits)
+        # r(s, a) = ln D − ln(1 − D) = f
         kwargs = {
             "done": done,
             "next_state": next_state,
             "log_pi": log_pi,
         }
-        return super()._calculate_reward(state, **kwargs)
-
-    """
-    The objective of the discriminator is to minimize cross-entropy loss 
-    between expert demonstrations and generated samples:
-        L(θ) = \sum_{t=0}{T} -E_D [log {D_θ (s_t , a_t )}] − E_πt [log{1 − Dθ (s_t , a_t )}]
-    
-    DISCRIMINATOR Objective
-    => d L(θ) 
-        =   \sum_{t=0}{T} -E_D [f_θ (s_t , a_t )] 
-            − E_{\mu} [exp{f_θ (s_t , a_t )} / \mu_t (s_t , a_t )}]
-    
-    Policy Objective
-        \hat{r}_t = log[D_θ(s,a)] - log[1-D_θ(s,a)]
-        = log[exp{f_θ} /(exp{f_θ} + \pi)] - log[\pi / (exp{f_θ} + \pi)]
-        = f_θ (s,a) - log \pi (a|s)        
-    """  # noqa
+        with th.no_grad():
+            r = self.forward(state, **kwargs)
+        return r
 
 
 class AIRLStateActionDiscrim(DiscrimNet):
@@ -231,14 +239,14 @@ class AIRLStateActionDiscrim(DiscrimNet):
         state_dim: int,
         action_dim: int,
         hidden_units: Sequence[int],
-        hidden_activation,
+        hidden_activation: Activation,
         gamma: float,
         disc_kwargs: Optional[Dict[str, Any]] = None,
     ):
         if disc_kwargs is None:
             disc_kwargs = {"disc_type", Arch.sa}
 
-        super(AIRLStateActionDiscrim, self).__init__(
+        super().__init__(
             state_dim, action_dim, hidden_units, hidden_activation, gamma, disc_kwargs
         )
 
@@ -253,10 +261,11 @@ class AIRLStateActionDiscrim(DiscrimNet):
     def calculate_reward(
         self, state: th.Tensor, action: th.Tensor, log_pi: Optional[th.Tensor] = None
     ):
-        # logits = self.forward(state, action, log_pi)
-        # return -F.logsigmoid(-logits)
+        # r(s, a) = ln D − ln(1 − D) = f
         kwargs = {
             "action": action,
             "log_pi": log_pi,
         }
-        return super()._calculate_reward(state, **kwargs)
+        with th.no_grad():
+            r = self.forward(state, **kwargs)
+        return r
