@@ -95,15 +95,9 @@ class StateActionFunction(BaseValue):
 
 
 class TwinnedStateActionFunction(BaseValue):
-
     def __init__(
-        self, 
-        obs_dim,
-        act_dim,
-        hidden_units,   #(256, 256),
-        activation,
-        **kwargs
-        ):
+        self, obs_dim, act_dim, hidden_units, activation, **kwargs  # (256, 256),
+    ):
         super().__init__(obs_dim, act_dim)
 
         self.net1 = build_mlp(
@@ -123,7 +117,7 @@ class TwinnedStateActionFunction(BaseValue):
 
     def q1(self, states, actions):
         return self.net1(th.cat([states, actions], dim=-1))
-    
+
     def get_value(self, state, action):
         pass
 
@@ -134,7 +128,7 @@ def mlp_value(
     value_layers: Sequence[int],
     activation: Union[nn.Module, str],
     val_type: str,
-    **kwargs    # * use_spectral_norm should specified in kwargs
+    **kwargs  # * use_spectral_norm should specified in kwargs
 ):
     if val_type in ["V", "v", "Vs", "vs"]:
         return StateFunction(state_dim, value_layers, activation, **kwargs)

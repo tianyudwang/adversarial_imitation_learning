@@ -69,7 +69,6 @@ class RL_Trainer(BaseTrainer):
             # Pass to the algorithm to update state and episode timestep.
             # return of algo.step() is next_obs
             obs, t = self.algo.step(self.env, self.obs_as_tensor(obs), t, step)
-
             # Update the algorithm whenever ready.
             if self.algo.is_update(step):
                 train_logs = self.algo.update()

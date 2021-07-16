@@ -11,7 +11,7 @@ class StateIndependentPolicy(nn.Module):
         obs_dim: int,
         act_dim: int,
         hidden_units,  # (64, 64),
-        hidden_activation,  #nn.Tanh(),
+        hidden_activation,  # nn.Tanh(),
     ):
         super().__init__()
 
@@ -38,7 +38,7 @@ class StateDependentPolicy(nn.Module):
         obs_dim: int,
         act_dim: int,
         hidden_units,  # (256, 256),
-        hidden_activation, #nn.ReLU(inplace=True),
+        hidden_activation,  # nn.ReLU(inplace=True),
     ):
         super().__init__()
 

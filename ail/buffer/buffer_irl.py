@@ -436,7 +436,7 @@ class ReplayBuffer(BaseBuffer):
     """Replay Buffer for Transitions."""
 
     tag = "ReplayBuffer"
-    
+
     def __init__(
         self,
         capacity: int,
@@ -487,7 +487,7 @@ class RolloutBuffer(BaseBuffer):
     """Rollout Buffer for Transitions."""
 
     tag = "RolloutBuffer"
-    
+
     def __init__(
         self,
         capacity: int,

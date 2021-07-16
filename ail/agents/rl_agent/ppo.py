@@ -37,14 +37,12 @@ class PPO(OnPolicyAgent):
         device: Union[th.device, str],
         seed: int,
         batch_size: int,
-        policy_kwargs: Dict[str,Any],
-
+        policy_kwargs: Dict[str, Any],
         epoch_ppo: int = 10,
         gamma: float = 0.99,
         gae_lambda: float = 0.97,
         clip_eps: float = 0.2,
         coef_ent: float = 0.01,
-        
         max_grad_norm: Optional[float] = None,
         fp16: bool = False,
         optim_kwargs: Optional[dict] = None,
@@ -66,18 +64,18 @@ class PPO(OnPolicyAgent):
             optim_kwargs,
             buffer_kwargs,
             init_buffer,
-            init_models,    
+            init_models,
         )
 
         # learning rate scheduler.
         # TODO: add learning rate scheduler.
         # ? Is there one suitable for RL?
-        
-        '''alpha_t = alpha_0 (1 - t/T)'''
+
+        """alpha_t = alpha_0 (1 - t/T)"""
         # schedule = lambda epoch: 1 - epoch/(self.param.evaluation['total_timesteps'] // self.batch_size)
         # self.scheduler_actor = optim.lr_scheduler.LambdaLR(self.optim_actor, schedule)
         # self.scheduler_critic = optim.lr_scheduler.LambdaLR(self.optim_critic, schedule)
-        
+
         self.learning_steps_ppo = 0
         self.epoch_ppo = epoch_ppo
         self.clip_eps = clip_eps
@@ -95,7 +93,7 @@ class PPO(OnPolicyAgent):
         # TODO: may remove mask
         # * intuitively, mask make sence that agent keeps alive which is not done by env
         # ! mask = False if t == env._max_episode_steps else done
-        
+
         data = {
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
@@ -134,7 +132,7 @@ class PPO(OnPolicyAgent):
             next_values = self.critic(next_states)
 
         rewards, dones = data["rews"], data["dones"]
-        
+
         targets, gaes = calculate_gae(
             rewards, dones, values, next_values, self.gamma, self.gae_lambda
         )
@@ -168,7 +166,7 @@ class PPO(OnPolicyAgent):
         log_pis = self.actor.evaluate_log_pi(states, actions)
 
         # * Since we bounded the mean action with tanh(), there is no analytical form of entropy
-        # approximate entropy. 
+        # approximate entropy.
         approx_ent = -log_pis.mean()
 
         log_ratios = log_pis - log_pis_old

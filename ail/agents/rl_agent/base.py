@@ -19,9 +19,7 @@ from ail.common.pytorch_util import init_gpu, to_numpy, orthogonal_init
 from ail.common.type_alias import OPT, GymSpace, EXTRA_SHAPES, EXTRA_DTYPES
 
 
-
 class BaseRLAgent(nn.Module, ABC):
-
     def __init__(
         self,
         state_space: GymSpace,
@@ -76,7 +74,7 @@ class BaseRLAgent(nn.Module, ABC):
     def _init_buffer(self):
         """Initialize the rollout/replay buffer."""
         raise NotImplementedError()
-    
+
     @abstractmethod
     def is_update(self, step):
         raise NotImplementedError()
@@ -118,7 +116,6 @@ class BaseRLAgent(nn.Module, ABC):
 
 
 class OnPolicyAgent(BaseRLAgent):
-    
     def __init__(
         self,
         state_space,
@@ -136,27 +133,29 @@ class OnPolicyAgent(BaseRLAgent):
         init_models: bool,
         **kwargs
     ):
-        super().__init__(state_space, action_space, device, seed, gamma, max_grad_norm, fp16)
-        
+        super().__init__(
+            state_space, action_space, device, seed, gamma, max_grad_norm, fp16
+        )
+
         if optim_kwargs is None:
             optim_kwargs = {}
-        
+
         if buffer_kwargs is None:
             buffer_kwargs = {}
-        
+
         # Optimizer kwargs
         self.optim_cls = OPT[optim_kwargs.get("optim_cls", "adam").lower()]
         self.optim_set_to_none = optim_kwargs.get("optim_set_to_none", False)
-        
+
         # Rollout Buffer
         self.batch_size = batch_size
         self.buffer_kwargs = buffer_kwargs
         if init_buffer:
             self._init_buffer()
-        
+
         # Policy kwargs
         self._init_models_componet(policy_kwargs)
-        
+
         # Build actor and critic and initialize optimizer
         if init_models:
             self._init_models()
@@ -165,28 +164,34 @@ class OnPolicyAgent(BaseRLAgent):
             if orthogonal_init:
                 self.weight_initiation()
             self.optim_actor = self.optim_cls(self.actor.parameters(), lr=self.lr_actor)
-            self.optim_critic = self.optim_cls(self.critic.parameters(), lr=self.lr_critic)
-    
+            self.optim_critic = self.optim_cls(
+                self.critic.parameters(), lr=self.lr_critic
+            )
+
     def _init_models_componet(self, policy_kwargs: Dict[str, Any]):
         """Check if the core componet exits in policy kwargs"""
         assert policy_kwargs is not None, "policy_kwargs cannot be None"
         assert isinstance(policy_kwargs, dict), "policy_kwargs must be a Dict[str, Any]"
         assert len(policy_kwargs) > 0, "policy_kwargs cannot be empty"
-        
+
         assert "pi" in policy_kwargs, "Missing `pi` key in policy_kwargs"
         assert "vf" in policy_kwargs, "Missing `vf` key in policy_kwargs"
-        assert "activation" in policy_kwargs, "Missing `activation` key in policy_kwargs"
-        assert "critic_type" in policy_kwargs, "Missing `critic_type` key in policy_kwargs"
+        assert (
+            "activation" in policy_kwargs
+        ), "Missing `activation` key in policy_kwargs"
+        assert (
+            "critic_type" in policy_kwargs
+        ), "Missing `critic_type` key in policy_kwargs"
         assert "lr_actor" in policy_kwargs, "Missing `lr_actor` key in policy_kwargs"
         assert "lr_critic" in policy_kwargs, "Missing `lr_critic` key in policy_kwargs"
-        
+
         self.units_actor = policy_kwargs["pi"]
         self.units_critic = policy_kwargs["vf"]
         self.hidden_activation = policy_kwargs["activation"]
         self.critic_type = policy_kwargs["critic_type"]
         self.lr_actor = policy_kwargs["lr_actor"]
         self.lr_critic = policy_kwargs["lr_critic"]
-    
+
     def _init_models(self):
         """Build model for actor and critic"""
         # Actor.
@@ -205,9 +210,7 @@ class OnPolicyAgent(BaseRLAgent):
             self.hidden_activation,
             self.critic_type,
         ).to(self.device)
-        
-    
-        
+
     def _init_buffer(self):
         """Initialize rollout buffer"""
         data = self.buffer_kwargs.get("extra_data", [])
@@ -215,21 +218,16 @@ class OnPolicyAgent(BaseRLAgent):
             data = [data]
         shape_dict = dataclass_quick_asdict(EXTRA_SHAPES)
         dtypes_dict = dataclass_quick_asdict(EXTRA_DTYPES)
-        
-        extra_shapes = {
-            k: shape_dict[k] for k in data if k in shape_dict
-        }
-        extra_dtypes = {
-            k: dtypes_dict[k] for k in data if k in dtypes_dict
-        }
-        
+
+        extra_shapes = {k: shape_dict[k] for k in data if k in shape_dict}
+        extra_dtypes = {k: dtypes_dict[k] for k in data if k in dtypes_dict}
+
         self.buffer = RolloutBuffer(
             capacity=self.batch_size,
             device=self.device,
             obs_shape=self.state_shape,
             act_shape=self.action_shape,
-            with_reward= self.buffer_kwargs.get("with_reward", True),
+            with_reward=self.buffer_kwargs.get("with_reward", True),
             extra_shapes=extra_shapes,
             extra_dtypes=extra_dtypes,
         )
-        

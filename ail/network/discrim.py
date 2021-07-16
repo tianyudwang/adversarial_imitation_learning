@@ -22,12 +22,12 @@ class Arch(Enum):
 class DiscrimNet(nn.Module, ABC):
     """
     Abstract base class for discriminator, used in AIRL and GAIL.
-    
+
     D = sigmoid(f)
-    D(s, a) = sigmoid(f(s, a))    
+    D(s, a) = sigmoid(f(s, a))
     D(s, a) = exp{f(s,a)} / (exp{f(s,a) + \pi(a|s)}
     where f is a discriminator logit (a learnable function represented as MLP)
-    
+
     Choice of reward function:
     • r(s, a) = − ln(1 − D) = softplus(h) (used in the original GAIL paper),
     • r(s, a) = ln D − ln(1 − D) = h (introduced in AIRL).
@@ -36,16 +36,16 @@ class DiscrimNet(nn.Module, ABC):
     # TODO: clip rewards with the absolute values higher than max reward magnitude
     # ! The GAIL paper uses the inverse convention in which
     # ! D denotes the probability as being classified as non-expert.
-    
-    The objective of the discriminator is to 
+
+    The objective of the discriminator is to
     minimize cross-entropy loss
     between expert demonstrations and generated samples:
-    
+
     L = \sum[ -E_{D} log(D) - E_{\pi} log(1 - D)]
-    
+
     write the negative loss to turn the minimization problem into maximization:
-    -L = \sum[ -E_{D} log(D) + E_{\pi} log(1 - D)] 
-    
+    -L = \sum[ -E_{D} log(D) + E_{\pi} log(1 - D)]
+
     """
 
     def __init__(
@@ -157,7 +157,7 @@ class GAILDiscrim(DiscrimNet):
         # TODO: modify this to softplus or keep the same
         with th.no_grad():
             r = -F.logsigmoid(-self.forward(state, action))
-            return r 
+            return r
 
 
 class AIRLStateDiscrim(DiscrimNet):
