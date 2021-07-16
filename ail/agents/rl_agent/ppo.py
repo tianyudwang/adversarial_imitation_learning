@@ -12,10 +12,8 @@ from ail.network.policies import StateIndependentPolicy
 from ail.network.value import mlp_value
 from ail.common.utils import asarray_shape2d
 
-
-def calculate_gae(data, values, next_values, gamma, lambd, normal=True):
-    rewards = data["rews"]
-    dones = data["dones"]
+# TODO: test performance with scipy.filter and torch-discount-cumsum
+def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True):
     # Calculate TD errors.
     deltas = rewards + gamma * next_values * (1 - dones) - values
     # Initialize gae.
@@ -91,14 +89,23 @@ class PPO(RLAgent):
         self.weight_initiation()
 
         # Learning rate.
-        # TODO: add learning rate scheduler.
-        # ? Is there one suitable for RL?
+        
         self.lr_actor = lr_actor
         self.lr_critic = lr_critic
-
+        
+        # learning rate scheduler.
+        # TODO: add learning rate scheduler.
+        # ? Is there one suitable for RL?
+        
+        '''alpha_t = alpha_0 (1 - t/T)'''
+        # schedule = lambda epoch: 1 - epoch/(self.param.evaluation['total_timesteps'] // self.batch_size)
+        # self.scheduler_actor = optim.lr_scheduler.LambdaLR(self.optim_actor, schedule)
+        # self.scheduler_critic = optim.lr_scheduler.LambdaLR(self.optim_critic, schedule)
+        
         self.optim_cls = OPT[optim_kwargs.get("optim_cls", "adam").lower()]
         self.optim_actor = self.optim_cls(self.actor.parameters(), lr=self.lr_actor)
         self.optim_critic = self.optim_cls(self.critic.parameters(), lr=self.lr_critic)
+        self.optim_set_to_none = optim_kwargs.get("optim_set_to_none", False)
 
         self.learning_steps_ppo = 0
         self.batch_size = batch_size
@@ -113,11 +120,11 @@ class PPO(RLAgent):
     def step(self, env, state, t, step):
         """Intereact with environment and store the transition."""
         t += 1
-
         action, log_pi = self.explore(state)
         next_state, reward, done, _ = env.step(action)
         # TODO: may remove mask
-        # mask = False if t == env._max_episode_steps else done
+        # * intuitively, mask make sence that agent keeps alive which is not done by env
+        # ! mask = False if t == env._max_episode_steps else done
 
         data = {
             "obs": asarray_shape2d(state),
@@ -144,18 +151,21 @@ class PPO(RLAgent):
         return train_logs
 
     def update_ppo(self, data: TensorDict):
-        states, actions, log_pis = (
+        states, actions, next_states, log_pis = (
             data["obs"],
             data["acts"],
+            data["next_obs"],
             data["log_pis"],
         )
 
         with th.no_grad():
-            values = self.critic(data["obs"])
-            next_values = self.critic(data["next_obs"])
+            values = self.critic(states)
+            next_values = self.critic(next_states)
 
+        rewards, dones = data["rews"], data["dones"]
+        
         targets, gaes = calculate_gae(
-            data, values, next_values, self.gamma, self.gae_lambda
+            rewards, dones, values, next_values, self.gamma, self.gae_lambda
         )
 
         for _ in range(self.epoch_ppo):
@@ -177,7 +187,7 @@ class PPO(RLAgent):
 
     def update_critic(self, states, targets):
 
-        self.optim_critic.zero_grad()
+        self.optim_critic.zero_grad(set_to_none=self.optim_set_to_none)
         with autocast():
             loss_critic = (self.critic(states) - targets).pow_(2).mean()
         self.one_gradient_step(loss_critic, self.optim_critic, self.critic)
@@ -185,11 +195,9 @@ class PPO(RLAgent):
 
     def update_actor(self, states, actions, log_pis_old, gaes):
         log_pis = self.actor.evaluate_log_pi(states, actions)
-        # TODO: use true entropy when analytical form exists.
-        # ? Is the anayltic form exists for squash Gaussians?
-        # ent = -log_pis.mean() if self.actor.entropy() is None else self.actor.entropy()
 
-        # approximate entropy
+        # * Since we bounded the mean action with tanh(), there is no analytical form of entropy
+        # approximate entropy. 
         approx_ent = -log_pis.mean()
 
         log_ratios = log_pis - log_pis_old
@@ -198,7 +206,7 @@ class PPO(RLAgent):
         loss_actor2 = -th.clamp(ratios, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * gaes
         loss_actor = th.max(loss_actor1, loss_actor2).mean()
 
-        self.optim_actor.zero_grad()
+        self.optim_actor.zero_grad(set_to_none=self.optim_set_to_none)
         with autocast():
             loss_actor_ent = loss_actor - self.coef_ent * approx_ent
         self.one_gradient_step(loss_actor_ent, self.optim_actor, self.actor)
