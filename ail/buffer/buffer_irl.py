@@ -6,7 +6,7 @@ import torch as th
 from ail.common.type_alias import GymEnv
 
 
-class Buffer(object):
+class Buffer:
     """
     A FIFO ring buffer for NumPy arrays of a fixed shape and dtype.
     Supports random sampling with replacement.
@@ -238,7 +238,7 @@ class Buffer(object):
         return tensor.detach().cpu().numpy()
 
 
-class BaseBuffer(object):
+class BaseBuffer:
     """
     Base class that represent a buffer (rollout or replay)
 
@@ -435,6 +435,8 @@ class BaseBuffer(object):
 class ReplayBuffer(BaseBuffer):
     """Replay Buffer for Transitions."""
 
+    tag = "ReplayBuffer"
+    
     def __init__(
         self,
         capacity: int,
@@ -484,6 +486,8 @@ class ReplayBuffer(BaseBuffer):
 class RolloutBuffer(BaseBuffer):
     """Rollout Buffer for Transitions."""
 
+    tag = "RolloutBuffer"
+    
     def __init__(
         self,
         capacity: int,
