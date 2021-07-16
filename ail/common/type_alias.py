@@ -58,5 +58,5 @@ class Extra_dtypes:
     log_pis: np.dtype = np.float32
 
 
-extra_shapes = Extra_shape()
-extra_dtypes = Extra_dtypes()
+EXTRA_SHAPES = Extra_shape()
+EXTRA_DTYPES = Extra_dtypes()
