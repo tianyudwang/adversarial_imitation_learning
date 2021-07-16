@@ -105,3 +105,10 @@ def to_torch(
 def to_numpy(tensor: th.Tensor) -> np.ndarray:
     """Convert torch tensor to numpy array and send to CPU"""
     return tensor.detach().cpu().numpy()
+
+
+def asarray_shape2d(x):
+    if isinstance(x, th.Tensor):
+        return to_numpy(x).reshape(1, -1)
+    else:
+        return np.asarray(x, dtype=np.float32).reshape(1, -1)
