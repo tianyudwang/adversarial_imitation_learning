@@ -1,16 +1,13 @@
-from typing import Union, Sequence, Optional
+from typing import Union, Optional, Dict, Any
 
 import torch as th
 from torch import nn
 from torch.cuda.amp import autocast
 
-from ail.agents.rl_agent.base import RLAgent
+from ail.agents.rl_agent.base import OnPolicyAgent
 from ail.common.math import normalize
-from ail.common.type_alias import OPT, TensorDict, GymSpace, extra_shapes, extra_dtypes
-from ail.buffer.buffer_irl import RolloutBuffer
-from ail.network.policies import StateIndependentPolicy
-from ail.network.value import mlp_value
-from ail.common.utils import asarray_shape2d
+from ail.common.type_alias import TensorDict, GymSpace
+from ail.common.pytorch_util import asarray_shape2d
 
 # TODO: test performance with scipy.filter and torch-discount-cumsum
 def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True):
@@ -32,7 +29,7 @@ def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True
         return targets, gaes
 
 
-class PPO(RLAgent):
+class PPO(OnPolicyAgent):
     def __init__(
         self,
         state_space: GymSpace,
@@ -40,59 +37,38 @@ class PPO(RLAgent):
         device: Union[th.device, str],
         seed: int,
         batch_size: int,
-        lr_actor: float,
-        lr_critic: float,
-        units_actor: Sequence[int],
-        units_critic: Sequence[int],
+        policy_kwargs: Dict[str,Any],
+
         epoch_ppo: int = 10,
         gamma: float = 0.99,
         gae_lambda: float = 0.97,
         clip_eps: float = 0.2,
         coef_ent: float = 0.01,
+        
         max_grad_norm: Optional[float] = None,
+        fp16: bool = False,
         optim_kwargs: Optional[dict] = None,
+        buffer_kwargs: Optional[Dict[str, Any]] = None,
+        init_buffer: bool = True,
+        init_models: bool = True,
+        **kwargs,
     ):
-        super().__init__(state_space, action_space, device, seed, gamma, max_grad_norm)
-
-        if optim_kwargs is None:
-            optim_kwargs = {}
-
-        # Rollout
-        self.buffer = RolloutBuffer(
-            capacity=batch_size,
-            obs_shape=self.state_shape,
-            act_shape=self.action_shape,
-            device=self.device,
-            with_reward=True,
-            extra_shapes={"log_pis": extra_shapes.log_pis},
-            extra_dtypes={"log_pis": extra_dtypes.log_pis},
+        super().__init__(
+            state_space,
+            action_space,
+            device,
+            seed,
+            gamma,
+            max_grad_norm,
+            fp16,
+            batch_size,
+            policy_kwargs,
+            optim_kwargs,
+            buffer_kwargs,
+            init_buffer,
+            init_models,    
         )
 
-        # Actor.
-        self.actor = StateIndependentPolicy(
-            self.obs_dim,
-            self.act_dim,
-            hidden_units=units_actor,
-            hidden_activation=nn.Tanh(),
-        ).to(self.device)
-
-        # Critic.
-        self.critic = mlp_value(
-            self.obs_dim,
-            self.act_dim,
-            val_type="V",
-            value_layers=units_critic,
-            activation=nn.Tanh(),
-        ).to(self.device)
-
-        # Orthogonal Initialize.
-        self.weight_initiation()
-
-        # Learning rate.
-        
-        self.lr_actor = lr_actor
-        self.lr_critic = lr_critic
-        
         # learning rate scheduler.
         # TODO: add learning rate scheduler.
         # ? Is there one suitable for RL?
@@ -102,13 +78,7 @@ class PPO(RLAgent):
         # self.scheduler_actor = optim.lr_scheduler.LambdaLR(self.optim_actor, schedule)
         # self.scheduler_critic = optim.lr_scheduler.LambdaLR(self.optim_critic, schedule)
         
-        self.optim_cls = OPT[optim_kwargs.get("optim_cls", "adam").lower()]
-        self.optim_actor = self.optim_cls(self.actor.parameters(), lr=self.lr_actor)
-        self.optim_critic = self.optim_cls(self.critic.parameters(), lr=self.lr_critic)
-        self.optim_set_to_none = optim_kwargs.get("optim_set_to_none", False)
-
         self.learning_steps_ppo = 0
-        self.batch_size = batch_size
         self.epoch_ppo = epoch_ppo
         self.clip_eps = clip_eps
         self.gae_lambda = gae_lambda
@@ -121,11 +91,11 @@ class PPO(RLAgent):
         """Intereact with environment and store the transition."""
         t += 1
         action, log_pi = self.explore(state)
-        next_state, reward, done, _ = env.step(action)
+        next_state, reward, done, info = env.step(action)
         # TODO: may remove mask
         # * intuitively, mask make sence that agent keeps alive which is not done by env
         # ! mask = False if t == env._max_episode_steps else done
-
+        
         data = {
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
@@ -134,6 +104,7 @@ class PPO(RLAgent):
             "log_pis": asarray_shape2d(log_pi),
             "next_obs": asarray_shape2d(next_state),
         }
+
         # Store transition. not allow size larger than buffer capcity.
         self.buffer.store(data, truncate_ok=False)
 
