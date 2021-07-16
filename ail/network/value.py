@@ -44,8 +44,8 @@ class StateFunction(BaseValue):
     def __init__(
         self,
         obs_dim: int,
-        hidden_units: Sequence[int] = (64, 64),
-        activation: Union[str, nn.Module] = nn.ReLU(inplace=True),
+        hidden_units: Sequence[int],  #  (64, 64)
+        activation: Union[str, nn.Module],
         use_spectral_norm=False,
         **kwargs
     ):
@@ -74,8 +74,8 @@ class StateActionFunction(BaseValue):
         self,
         obs_dim: int,
         act_dim: int,
-        hidden_units: Sequence[int] = (64, 64),
-        activation: Union[str, nn.Module] = nn.ReLU(inplace=True),
+        hidden_units: Sequence[int],  # (64, 64),
+        activation: Union[str, nn.Module],
         use_spectral_norm=False,
         **kwargs
     ):
@@ -94,18 +94,56 @@ class StateActionFunction(BaseValue):
         return self.net(th.cat([state, action], dim=-1)).squeeze(-1)
 
 
+class TwinnedStateActionFunction(BaseValue):
+
+    def __init__(
+        self, 
+        obs_dim,
+        act_dim,
+        hidden_units,   #(256, 256),
+        activation,
+        **kwargs
+        ):
+        super().__init__(obs_dim, act_dim)
+
+        self.net1 = build_mlp(
+            [obs_dim + act_dim] + list(hidden_units) + [1],
+            hidden_units,
+            activation,
+        )
+        self.net2 = build_mlp(
+            [obs_dim + act_dim] + list(hidden_units) + [1],
+            hidden_units,
+            activation,
+        )
+
+    def forward(self, states, actions):
+        xs = th.cat([states, actions], dim=-1)
+        return self.net1(xs), self.net2(xs)
+
+    def q1(self, states, actions):
+        return self.net1(th.cat([states, actions], dim=-1))
+    
+    def get_value(self, state, action):
+        pass
+
+
 def mlp_value(
     state_dim: int,
     action_dim: int,
-    val_type: str,
     value_layers: Sequence[int],
-    activation: Union[nn.Module, str] = "relu",
-    **kwargs
+    activation: Union[nn.Module, str],
+    val_type: str,
+    **kwargs    # * use_spectral_norm should specified in kwargs
 ):
-    if val_type in ["V", "v", "Vs"]:
+    if val_type in ["V", "v", "Vs", "vs"]:
         return StateFunction(state_dim, value_layers, activation, **kwargs)
-    elif val_type in ["Qsa", "Q"]:
+    elif val_type in ["Qsa", "qsa", "Q", "q"]:
         return StateActionFunction(
+            state_dim, action_dim, value_layers, activation, **kwargs
+        )
+    elif val_type in ["Twin", "twin"]:
+        return TwinnedStateActionFunction(
             state_dim, action_dim, value_layers, activation, **kwargs
         )
     else:
