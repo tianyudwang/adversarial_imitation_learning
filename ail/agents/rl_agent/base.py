@@ -58,14 +58,14 @@ class RLAgent(nn.Module, ABC):
         assert isinstance(state, th.Tensor)
         with th.no_grad():
             action, log_pi = self.actor.sample(state.unsqueeze_(0))
-        return to_numpy(action), log_pi.item()
+        return to_numpy(action)[0], log_pi.item()
 
     def exploit(self, state):
         assert isinstance(state, th.Tensor)
 
         with th.no_grad():
             action = self.actor(state.unsqueeze_(0))
-        return to_numpy(action)
+        return to_numpy(action)[0]
 
     @abstractmethod
     def is_update(self, step):
