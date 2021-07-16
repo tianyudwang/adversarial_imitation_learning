@@ -22,7 +22,7 @@ class BaseTrainer(ABC):
         self,
         num_steps: int,
         env: Union[GymEnv, str],
-        env_kwargs: Dict[Any],
+        env_kwargs: Dict[str, Any],
         max_ep_len: Optional[int],
         eval_interval: int,
         num_eval_episodes: int,
