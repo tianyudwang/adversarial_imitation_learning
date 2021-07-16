@@ -1,6 +1,7 @@
 import random
+import dataclasses
 from time import sleep
-from typing import Tuple
+from typing import Tuple, Dict, Any
 
 import numpy as np
 import torch as th
@@ -35,5 +36,13 @@ def combined_shape(length: int, shape=None):
     return (length, shape) if np.isscalar(shape) else (length, *shape)
 
 
-def asarray_shape2d(x):
-    return np.asarray(x, dtype=np.float32).reshape(1, -1)
+def dataclass_quick_asdict(dataclass_instance) -> Dict[str, Any]:
+    """
+    Extract dataclass to items using `dataclasses.fields` + dict comprehension.
+    This is a quick alternative to `dataclasses.asdict`, which expensively and
+    undocumentedly deep-copies every numpy array value.
+    See https://stackoverflow.com/a/52229565/1091722.
+    """
+    obj = dataclass_instance
+    d = {f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}
+    return d
