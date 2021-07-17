@@ -20,14 +20,14 @@ def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True
     https://github.com/openai/baselines/blob/ea25b9e8b234e6ee1bca43083f8f3cf974143998/baselines/ppo1/pposgd_simple.py#L66
     """
     # Calculate TD errors.
-    deltas = rewards + gamma * next_values * (1 - dones) - values
+    deltas = rewards + gamma * next_values * (1.0 - dones) - values
     # Initialize gae.
     gaes = th.empty_like(rewards)
 
     # Calculate gae recursively from behind.
     gaes[-1] = deltas[-1]
     for t in reversed(range(rewards.size(0) - 1)):
-        gaes[t] = deltas[t] + gamma * lambd * (1 - dones[t]) * gaes[t + 1]
+        gaes[t] = deltas[t] + gamma * lambd * (1.0 - dones[t]) * gaes[t + 1]
 
     targets = values + gaes
 
