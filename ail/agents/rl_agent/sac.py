@@ -1,7 +1,6 @@
 from typing import Union, Optional, Dict, Any
 
 import torch as th
-from torch import nn
 from torch.cuda.amp import autocast
 
 from ail.agents.rl_agent.base import OffPolicyAgent
@@ -49,7 +48,8 @@ class SAC(OffPolicyAgent):
             init_buffer,
             init_models,
         )
-
+        
+        # TODO: (Yifan) Build the model inside off policy class latter.
         # Actor.
         self.actor = StateDependentPolicy(
             self.obs_dim, self.act_dim, self.units_actor, self.hidden_activation
@@ -64,7 +64,6 @@ class SAC(OffPolicyAgent):
             self.critic_type,
         ).to(self.device)
 
-        # ? can I diretly use deepcopy here?
         self.critic_target = (
             mlp_value(
                 self.obs_dim,
@@ -107,6 +106,7 @@ class SAC(OffPolicyAgent):
         if step <= self.start_steps:
             # Random uniform sampling.
             action = env.action_space.sample()
+            # TODO: (Yifan) may enable this in AIRL, test the case without it.
             # log_pi = self.actor.evaluate_log_pi(
             #     th.as_tensor(state, dtype=th.float, device=self.device),
             #     th.as_tensor(action, dtype=th.float, device=self.device)
@@ -123,13 +123,13 @@ class SAC(OffPolicyAgent):
             "acts": asarray_shape2d(action),
             "rews": asarray_shape2d(reward),
             "dones": asarray_shape2d(done),
-            "log_pis": asarray_shape2d(log_pi),
+            # "log_pis": asarray_shape2d(log_pi),
             "next_obs": asarray_shape2d(next_state),
         }
 
         # Store transition.
         # * ALLOW size larger than buffer capcity.
-        self.buffer.store(data, truncate_ok=False)
+        self.buffer.store(data, truncate_ok=True)
 
         if done:
             t = 0
@@ -167,7 +167,8 @@ class SAC(OffPolicyAgent):
             next_qs = th.min(next_qs1, next_qs2) - self.alpha * log_pis
 
         target_qs = rewards + (1.0 - dones) * self.gamma * next_qs
-
+        
+        # TODO: (Yifan) modify this using one_gradient_step after test.
         loss_critic1 = (curr_qs1 - target_qs).pow_(2).mean()
         loss_critic2 = (curr_qs2 - target_qs).pow_(2).mean()
         (loss_critic1 + loss_critic2).backward(retain_graph=False)
@@ -178,6 +179,7 @@ class SAC(OffPolicyAgent):
         qs1, qs2 = self.critic(states, actions)
         loss_actor = self.alpha * log_pis.mean() - th.min(qs1, qs2).mean()
 
+        # TODO: (Yifan) modify this using one_gradient_step after test.
         self.optim_actor.zero_grad(set_to_none=self.opti_set_None)
         loss_actor.backward(retain_graph=False)
         self.optim_actor.step()
@@ -197,4 +199,6 @@ class SAC(OffPolicyAgent):
 
     def save_models(self, save_dir):
         super().save_models(save_dir)
+        # TODO: (Yifan) implement this.
+        # Only save actor to reduce workloads
         # th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))

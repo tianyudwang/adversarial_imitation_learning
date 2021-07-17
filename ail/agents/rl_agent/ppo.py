@@ -8,8 +8,17 @@ from ail.common.math import normalize
 from ail.common.type_alias import TensorDict, GymEnv, GymSpace
 from ail.common.pytorch_util import asarray_shape2d
 
-# TODO: test performance with scipy.filter and torch-discount-cumsum
+
 def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True):
+    """
+    Compute the lambda-return (TD(lambda) estimate) and GAE(lambda) advantage.
+    
+    Uses Generalized Advantage Estimation (https://arxiv.org/abs/1506.02438)
+    to compute the advantage. To obtain vanilla advantage (A(s) = R - V(S))
+    where R is the discounted reward with value bootstrap,
+    set `lambd=1.0`.
+    https://github.com/openai/baselines/blob/ea25b9e8b234e6ee1bca43083f8f3cf974143998/baselines/ppo1/pposgd_simple.py#L66
+    """
     # Calculate TD errors.
     deltas = rewards + gamma * next_values * (1 - dones) - values
     # Initialize gae.
@@ -59,7 +68,7 @@ class PPO(OnPolicyAgent):
             gamma,
             max_grad_norm,
             batch_size,
-            batch_size,  # * here assumes batch_size == buffer_size
+            batch_size,  # * (Yifan) here assumes batch_size == buffer_size
             policy_kwargs,
             optim_kwargs,
             buffer_kwargs,
@@ -69,7 +78,7 @@ class PPO(OnPolicyAgent):
 
         # learning rate scheduler.
         # TODO: add learning rate scheduler.
-        # ? Is there one suitable for RL?
+        # ? (Yifan) Is there one suitable for RL?
 
         """alpha_t = alpha_0 (1 - t/T)"""
         # schedule = lambda epoch: 1 - epoch/(self.param.evaluation['total_timesteps'] // self.batch_size)
@@ -94,7 +103,7 @@ class PPO(OnPolicyAgent):
         action, log_pi = self.explore(state)
         next_state, reward, done, info = env.step(action)
         # TODO: may remove mask, test this
-        # * intuitively, mask make sence that agent keeps alive which is not done by env
+        # * (Yifan) Intuitively, mask make sence that agent keeps alive which is not done by env
         # ! mask = False if t == env._max_episode_steps else done
 
         data = {
@@ -124,19 +133,19 @@ class PPO(OnPolicyAgent):
         return train_logs
 
     def update_ppo(self, data: TensorDict):
-        states, actions, next_states, log_pis = (
+        states, actions, rewards, dones, next_states, log_pis = (
             data["obs"],
             data["acts"],
+            data["rews"],
+            data["dones"],
             data["next_obs"],
             data["log_pis"],
         )
-
+        # ? is it necessary to store observation and next_observation?
         with th.no_grad():
             values = self.critic(states)
             next_values = self.critic(next_states)
-
-        rewards, dones = data["rews"], data["dones"]
-
+        
         targets, gaes = calculate_gae(
             rewards, dones, values, next_values, self.gamma, self.gae_lambda
         )
@@ -146,7 +155,7 @@ class PPO(OnPolicyAgent):
             loss_critic = self.update_critic(states, targets)
             loss_actor, pi_info = self.update_actor(states, actions, log_pis, gaes)
 
-        # return log changes(key used for logging name).
+        # Return log changes(key used for logging name).
         return {
             "actor_loss": loss_actor.item(),
             "critic_loss": loss_critic.item(),
@@ -161,7 +170,7 @@ class PPO(OnPolicyAgent):
     def update_critic(self, states, targets):
 
         self.optim_critic.zero_grad(set_to_none=self.optim_set_to_none)
-        with autocast():
+        with autocast(enabled=self.fp16):
             loss_critic = (self.critic(states) - targets).pow_(2).mean()
         self.one_gradient_step(loss_critic, self.optim_critic, self.critic)
         return loss_critic
@@ -169,8 +178,9 @@ class PPO(OnPolicyAgent):
     def update_actor(self, states, actions, log_pis_old, gaes):
         log_pis = self.actor.evaluate_log_pi(states, actions)
 
-        # * Since we bounded the mean action with tanh(), there is no analytical form of entropy
-        # approximate entropy.
+        # ? Does analytical form exists?
+        # * (Yifan) Since we bounded the mean action with tanh(), there is no analytical form of entropy
+        # Approximate entropy.
         approx_ent = -log_pis.mean()
 
         log_ratios = log_pis - log_pis_old
@@ -180,7 +190,7 @@ class PPO(OnPolicyAgent):
         loss_actor = th.max(loss_actor1, loss_actor2).mean()
 
         self.optim_actor.zero_grad(set_to_none=self.optim_set_to_none)
-        with autocast():
+        with autocast(enabled=self.fp16):
             loss_actor_ent = loss_actor - self.coef_ent * approx_ent
         self.one_gradient_step(loss_actor_ent, self.optim_actor, self.actor)
 
@@ -192,6 +202,7 @@ class PPO(OnPolicyAgent):
         and Schulman blog: https://joschu.net/blog/kl-approx.html
         KL(q||p): (r-1) - log(r), where r = p(x)/q(x)
         """
+        # ! (Yifan)
         # ! Deprecated:
         # ! Naive version: approx_kl = (log_pi_old - log_pi).mean().item()
         # ! This is an unbiased estimator, but it has large variance.
@@ -205,6 +216,6 @@ class PPO(OnPolicyAgent):
 
     def save_models(self, save_dir):
         super().save_models(save_dir)
-        # only save actor to reduce workloads
         # TODO: implement save actor
+        # Only save actor to reduce workloads
         # th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))

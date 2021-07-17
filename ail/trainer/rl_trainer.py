@@ -1,4 +1,4 @@
-from typing import Union, Optional, Dict
+from typing import Union, Optional, Dict, Any
 from time import time
 
 from torch.utils.tensorboard import SummaryWriter
@@ -13,8 +13,8 @@ class RL_Trainer(BaseTrainer):
         num_steps: int,
         env: Union[GymEnv, str],
         algo,
-        algo_kwargs: dict,
-        env_kwargs: Optional[Dict] = None,
+        algo_kwargs: Dict[str, Any],
+        env_kwargs: Optional[Dict[str, Any]] = None,
         max_ep_len=None,
         seed: int = 42,
         eval_interval: int = 5_000,
