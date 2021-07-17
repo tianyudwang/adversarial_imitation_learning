@@ -52,7 +52,6 @@ def orthogonal_init(module: nn.Module, gain: float = 1) -> None:
     """
     Orthogonal initialization (used in PPO and A2C)
     """
-    # TODO: this might move inside to model creation
     if isinstance(module, (nn.Linear, nn.Conv2d)):
         nn.init.orthogonal_(module.weight, gain=gain)
         if module.bias is not None:
@@ -66,6 +65,11 @@ def disable_gradient(net: nn.Module):
 
 
 def soft_update(target: nn.Module, source: nn.Module, tau: float):
+    """
+    Polyak Averaging
+    Use an in-place operations "mul_", "add_" to update target params,
+    as opposed to "mul" and "add", which would make new tensors.
+    """
     for t, s in zip(target.parameters(), source.parameters()):
         t.data.mul_(1.0 - tau)
         t.data.add_(tau * s.data)
