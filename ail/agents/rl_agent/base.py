@@ -227,7 +227,7 @@ class OnPolicyAgent(BaseRLAgent):
 
         # Build actor and critic and initialize optimizer.
         if init_models:
-            self._init_models()
+            self._setup_models()
             # Optinally weight initialization
             orthogonal_init = policy_kwargs.get("orthogonal_init", False)
             if orthogonal_init:
@@ -237,7 +237,7 @@ class OnPolicyAgent(BaseRLAgent):
                 self.critic.parameters(), lr=self.lr_critic
             )
 
-    def _init_models(self):
+    def _setup_models(self):
         """Build model for actor and critic."""
         # Actor.
         self.actor = StateIndependentPolicy(

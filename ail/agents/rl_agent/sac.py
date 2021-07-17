@@ -100,13 +100,21 @@ class SAC(OffPolicyAgent):
         )
 
         # Entropy regularization coefficient(alpha) explicitly controls explore-exploit tradeoff.
-        self.alpha = 1.0  # TODO: give alpha a user input initial value.
+        # The entropy coefficient or entropy can be learned automatically
+        # see Automating Entropy Adjustment for Maximum Entropy RL section
+        # of https://arxiv.org/abs/1812.05905
+        self.alpha = 1.0  # * Default initial value of ent_coef when learned
         self.lr_alpha = lr_alpha
+        
         # Enforces an entropy constraint by varying alpha over the course of training.
         # We optimize log(alpha) because alpha should be always bigger than 0.
+        # as discussed in https://github.com/rail-berkeley/softlearning/issues/37
         self.log_alpha = th.zeros(1, device=self.device, requires_grad=True)
+        
         # Target entropy is -|A|.
         self.target_entropy = -float(self.action_shape[0])
+        # TODO: test is this same as ?
+        # self.target_entropy = -np.prod(self.action_shape).astype(np.float32)
 
         # Config optimizer
         self.optim_actor = self.optim_cls(self.actor.parameters(), lr=self.lr_actor)

@@ -74,6 +74,7 @@ def soft_update(target: nn.Module, source: nn.Module, tau: float):
     :param tau: the soft update coefficient controls the interpolation:
         ``tau=1`` corresponds to copying the parameters to the target ones
         whereas nothing happens when ``tau=0``.
+    See https://github.com/DLR-RM/stable-baselines3/issues/93
     """
     with th.no_grad():
         # zip does not raise an exception if length of parameters does not match.
@@ -81,6 +82,7 @@ def soft_update(target: nn.Module, source: nn.Module, tau: float):
             # Use an in-place operations "mul_", "add_" to update target params,
             # to prevent unnecessary copying
             # TODO: test on th.addcumul_
+            # current implemntation based on openai
             t.data.mul_(1.0 - tau)
             t.data.add_(tau * s.data)
 
