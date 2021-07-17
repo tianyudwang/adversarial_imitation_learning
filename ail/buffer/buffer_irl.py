@@ -447,7 +447,8 @@ class ReplayBuffer(BaseBuffer):
         obs_dtype: np.dtype = np.float32,
         act_dtype: np.dtype = np.float32,
         with_reward=True,
-        buf_kwargs=None,
+        extra_shapes: Optional[Dict[str, Tuple[int, ...]]] = None,
+        extra_dtypes: Optional[Dict[str, np.dtype]] = None,
     ):
         """
         Constructs a ReplayBuffer.
@@ -474,13 +475,8 @@ class ReplayBuffer(BaseBuffer):
             with_reward,
         )
 
-        if buf_kwargs is None:
-            buf_kwargs = {}
-
-        extra_sample_shapes = buf_kwargs.get("extra_sample_shapes", {})
-        extra_sample_dtypes = buf_kwargs.get("extra_sample_dtypes", {})
-        self.sample_shapes.update(extra_sample_shapes)
-        self.dtypes.update(extra_sample_dtypes)
+        self.sample_shapes.update(extra_shapes)
+        self.dtypes.update(extra_dtypes)
 
 
 class RolloutBuffer(BaseBuffer):
@@ -528,20 +524,19 @@ class RolloutBuffer(BaseBuffer):
 
         # log_pis, advs, rets, vals
         if extra_shapes is None:
-            extra_shapes = {
-                "advs": (1,),
-                "rets": (1,),
-                "vals": (1,),
-                "log_pis": (1,),
-            }
+            extra_shapes = {}
 
         if extra_dtypes is None:
-            extra_dtypes = {
-                "advs": np.float32,
-                "rets": np.float32,
-                "vals": np.float32,
-                "log_pis": np.float32,
-            }
+            extra_dtypes = {}
+
         self.sample_shapes.update(extra_shapes)
         self.dtypes.update(extra_dtypes)
         self._init_buffer()
+
+
+BUFFER = {
+    "rollout": RolloutBuffer,
+    "rolloutbuffer": RolloutBuffer,
+    "replay": ReplayBuffer,
+    "replaybuffer": ReplayBuffer,
+}

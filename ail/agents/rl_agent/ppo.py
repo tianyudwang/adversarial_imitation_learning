@@ -1,12 +1,11 @@
 from typing import Union, Optional, Dict, Any
 
 import torch as th
-from torch import nn
 from torch.cuda.amp import autocast
 
 from ail.agents.rl_agent.base import OnPolicyAgent
 from ail.common.math import normalize
-from ail.common.type_alias import TensorDict, GymSpace
+from ail.common.type_alias import TensorDict, GymEnv, GymSpace
 from ail.common.pytorch_util import asarray_shape2d
 
 # TODO: test performance with scipy.filter and torch-discount-cumsum
@@ -55,11 +54,12 @@ class PPO(OnPolicyAgent):
             state_space,
             action_space,
             device,
+            fp16,
             seed,
             gamma,
             max_grad_norm,
-            fp16,
             batch_size,
+            batch_size,  # * here assumes batch_size == buffer_size
             policy_kwargs,
             optim_kwargs,
             buffer_kwargs,
@@ -76,6 +76,7 @@ class PPO(OnPolicyAgent):
         # self.scheduler_actor = optim.lr_scheduler.LambdaLR(self.optim_actor, schedule)
         # self.scheduler_critic = optim.lr_scheduler.LambdaLR(self.optim_critic, schedule)
 
+        # Other algo params.
         self.learning_steps_ppo = 0
         self.epoch_ppo = epoch_ppo
         self.clip_eps = clip_eps
@@ -85,12 +86,14 @@ class PPO(OnPolicyAgent):
     def is_update(self, step):
         return step % self.batch_size == 0
 
-    def step(self, env, state, t, step):
+    def step(
+        self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
+    ):
         """Intereact with environment and store the transition."""
         t += 1
         action, log_pi = self.explore(state)
         next_state, reward, done, info = env.step(action)
-        # TODO: may remove mask
+        # TODO: may remove mask, test this
         # * intuitively, mask make sence that agent keeps alive which is not done by env
         # ! mask = False if t == env._max_episode_steps else done
 
@@ -103,7 +106,8 @@ class PPO(OnPolicyAgent):
             "next_obs": asarray_shape2d(next_state),
         }
 
-        # Store transition. not allow size larger than buffer capcity.
+        # Store transition.
+        # * NOT allow size larger than buffer capcity.
         self.buffer.store(data, truncate_ok=False)
 
         if done:
@@ -200,4 +204,7 @@ class PPO(OnPolicyAgent):
         return loss_actor, pi_info
 
     def save_models(self, save_dir):
-        pass
+        super().save_models(save_dir)
+        # only save actor to reduce workloads
+        # TODO: implement save actor
+        # th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))

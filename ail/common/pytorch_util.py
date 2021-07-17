@@ -60,8 +60,15 @@ def orthogonal_init(module: nn.Module, gain: float = 1) -> None:
 
 
 def disable_gradient(net: nn.Module):
+    """Freeze the gradient in network"""
     for param in net.parameters():
         param.requires_grad = False
+
+
+def soft_update(target: nn.Module, source: nn.Module, tau: float):
+    for t, s in zip(target.parameters(), source.parameters()):
+        t.data.mul_(1.0 - tau)
+        t.data.add_(tau * s.data)
 
 
 def init_gpu(use_gpu=True, gpu_id=0) -> th.device:
@@ -107,7 +114,7 @@ def to_numpy(tensor: th.Tensor) -> np.ndarray:
     return tensor.detach().cpu().numpy()
 
 
-def asarray_shape2d(x):
+def asarray_shape2d(x) -> np.ndarray:
     if isinstance(x, th.Tensor):
         return to_numpy(x).reshape(1, -1)
     else:
