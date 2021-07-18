@@ -4,23 +4,21 @@ from typing import Union, Optional, Dict, Any
 from functools import partial
 from math import sqrt
 
-from gym.spaces import Box
 import torch as th
-from torch import nn
-from torch.cuda.amp import GradScaler
 from torch.nn.utils import clip_grad_norm_
 
+
+from ail.agents.base import BaseAgent
 from ail.network.policies import StateIndependentPolicy
 from ail.network.value import mlp_value
 from ail.buffer.buffer_irl import BUFFER
 
-from ail.common.utils import set_random_seed, dataclass_quick_asdict
-from ail.common.env_utils import get_obs_shape, get_flat_obs_dim, get_act_dim
-from ail.common.pytorch_util import init_gpu, to_numpy, orthogonal_init
-from ail.common.type_alias import OPT, GymSpace, EXTRA_SHAPES, EXTRA_DTYPES
+from ail.common.utils import dataclass_quick_asdict
+from ail.common.pytorch_util import to_numpy, orthogonal_init
+from ail.common.type_alias import GymSpace, EXTRA_SHAPES, EXTRA_DTYPES
 
 
-class BaseRLAgent(nn.Module, ABC):
+class BaseRLAgent(BaseAgent, ABC):
     def __init__(
         self,
         state_space: GymSpace,
@@ -35,46 +33,20 @@ class BaseRLAgent(nn.Module, ABC):
         optim_kwargs: Optional[Dict[str, Any]],
         buffer_kwargs: Optional[Dict[str, Any]],
     ):
-        super().__init__()
-
-        # RNG.
-        set_random_seed(seed)
-
-        # env spaces.
-        self.state_space = state_space
-        self.action_space = action_space
-
-        # shapes of space useful for buffer.
-        self.state_shape = get_obs_shape(state_space)
-        if isinstance(action_space, Box):
-            self.action_shape = action_space.shape
-        else:
-            raise NotImplementedError()
-
-        # Space dimension and action dimension.
-        self.obs_dim = get_flat_obs_dim(state_space)
-        self.act_dim = get_act_dim(action_space)
-
-        # Action limits.
-        self.act_low = action_space.low
-        self.act_high = action_space.high
-
-        # Device management.
-        self.device = init_gpu(use_gpu=(device == "cuda"))
-        # Use automatic mixed precision training in GPU
-        self.fp16 = fp16 and th.cuda.is_available() and device == "cuda"
-        self.scaler = GradScaler() if self.fp16 else None
-
-        # Optimizer kwargs.
-        self.optim_kwargs = {} if optim_kwargs is None else optim_kwargs
-        self.optim_cls = OPT[self.optim_kwargs.get("optim_cls", "adam").lower()]
-        self.optim_set_to_none = self.optim_kwargs.get("optim_set_to_none", False)
-
+        super().__init__(
+            state_space,
+            action_space,
+            device,
+            fp16,
+            seed,
+            optim_kwargs,
+        )
+        
         # Buffer kwargs.
         self.batch_size = batch_size
         self.buffer_size = buffer_size
         self.buffer_kwargs = {} if buffer_kwargs is None else buffer_kwargs
-
+        
         # Other parameters.
         self.learning_steps = 0
         self.gamma = gamma
