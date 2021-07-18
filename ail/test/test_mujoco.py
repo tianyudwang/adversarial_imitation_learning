@@ -1,5 +1,6 @@
-import mujoco_py
 import os
+import mujoco_py
+
 
 mj_path, _ = mujoco_py.utils.discover_mujoco()
 xml_path = os.path.join(mj_path, "model", "humanoid.xml")
