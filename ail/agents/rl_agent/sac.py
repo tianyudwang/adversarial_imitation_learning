@@ -207,6 +207,16 @@ class SAC(OffPolicyAgent):
         return next_state, t
 
     def update(self) -> Dict[str, Any]:
+        """
+        A general Roadmap
+        for each gradient step do
+            -Sample transition from replay buffer
+            -Update the Q-function parameters
+            -Update policy weights
+            -Adjust temperature
+            -Update target network weights every n gradient steps
+        end for
+        """
         for gradient_step in range(self.num_gradient_steps):
             self.learning_steps += 1    
             # Random uniform sampling a batch of transitions, B = {(s, a, r, s',d)}, from buffer.
@@ -250,9 +260,10 @@ class SAC(OffPolicyAgent):
 
     def update_alpha(self, log_pis_new):
         """
-        Optimize entropy coefficient (alpha)        
+        Optimize entropy coefficient (alpha)
+        L(alpha) = E_{at ∼ pi_t} [−alpha * log pi(a_t |s_t ) − alpha * H].        
         ent_loss = E[-alpha * (log_pis) - alpha * target_ent]
-                 = E [-alphat (log_pis + target_ent)]
+                 = E [-alpha (log_pis + target_ent)]
                  = (-alpha * (log_pis + target_ent)).mean()
                  As log do preserve order
                  = (-log_alpha * (target_ent + log_ent).mean()
