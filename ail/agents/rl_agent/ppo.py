@@ -6,13 +6,13 @@ from torch.cuda.amp import autocast
 from ail.agents.rl_agent.core import OnPolicyAgent
 from ail.common.math import normalize
 from ail.common.type_alias import TensorDict, GymEnv, GymSpace
-from ail.common.pytorch_util import asarray_shape2d
+from ail.common.pytorch_util import asarray_shape2d, count_vars
 
 
 def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True):
     """
     Compute the lambda-return (TD(lambda) estimate) and GAE(lambda) advantage.
-    
+
     Uses Generalized Advantage Estimation (https://arxiv.org/abs/1506.02438)
     to compute the advantage. To obtain vanilla advantage (A(s) = R - V(S))
     where R is the discounted reward with value bootstrap,
@@ -38,6 +38,10 @@ def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True
 
 
 class PPO(OnPolicyAgent):
+    """
+    Proximal Policy Optimization algorithm (PPO) (clip version)
+    """
+
     def __init__(
         self,
         state_space: GymSpace,
@@ -57,7 +61,7 @@ class PPO(OnPolicyAgent):
         buffer_kwargs: Optional[Dict[str, Any]] = None,
         init_buffer: bool = True,
         init_models: bool = True,
-        **kwargs,
+        **kwargs
     ):
         super().__init__(
             state_space,
@@ -91,6 +95,10 @@ class PPO(OnPolicyAgent):
         self.clip_eps = clip_eps
         self.gae_lambda = gae_lambda
         self.coef_ent = coef_ent
+
+    def info(self):
+        # Count variables (protip: try to get a feel for how different size networks behave!)
+        return {module: count_vars(module) for module in [self.actor, self.critic]}
 
     def is_update(self, step):
         return step % self.batch_size == 0
@@ -145,7 +153,7 @@ class PPO(OnPolicyAgent):
         with th.no_grad():
             values = self.critic(states)
             next_values = self.critic(next_states)
-        
+
         targets, gaes = calculate_gae(
             rewards, dones, values, next_values, self.gamma, self.gae_lambda
         )

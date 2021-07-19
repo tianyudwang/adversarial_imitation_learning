@@ -29,6 +29,8 @@ class Buffer:
         dtypes: Mapping[str, np.dtype],
         device: Union[th.device, str],
     ):
+        assert isinstance(capacity, int), "capacity must be integer"
+
         if sample_shapes.keys() != dtypes.keys():
             raise KeyError("sample_shape and dtypes keys don't match")
         self.capacity = capacity
@@ -52,7 +54,9 @@ class Buffer:
     def size(self) -> int:
         """Returns the number of samples currently stored in the buffer."""
         # _ndata: integer in `range(0, self.capacity + 1)`.
-        assert 0 <= self._n_data <= self.capacity
+        assert (
+            0 <= self._n_data <= self.capacity
+        ), "_ndata: integer in range(0, self.capacity + 1)."
         return self._n_data
 
     @classmethod
@@ -196,6 +200,7 @@ class Buffer:
             samples (np.ndarray): An array with shape `(n_samples) + self.sample_shape`.
         """
         # TODO: ERE (https://arxiv.org/pdf/1906.04009.pdf)
+        assert isinstance(n_samples, int)
         assert self.size() != 0, "Buffer is empty"
         # uniform sampling
         ind = np.random.randint(self.size(), size=n_samples)
@@ -206,6 +211,7 @@ class Buffer:
             assert self.size() == self.capacity, "Buffer is not full"
             return self._get_samples()
         else:
+            assert isinstance(n_samples, int)
             path_slice = slice(0, n_samples)
             return self._get_samples(path_slice)
 
@@ -347,6 +353,7 @@ class BaseBuffer:
         Raises:
             ValueError: The arguments didn't have the same length.
         """
+
         intersect = self._buffer.stored_keys.intersection(transitions.keys())
         # Remove unnecessary fields
         trans_dict = {k: transitions[k] for k in intersect}
@@ -446,7 +453,7 @@ class ReplayBuffer(BaseBuffer):
         act_shape: Optional[Tuple[int, ...]] = None,
         obs_dtype: np.dtype = np.float32,
         act_dtype: np.dtype = np.float32,
-        with_reward=True,
+        with_reward: bool = True,
         extra_shapes: Optional[Dict[str, Tuple[int, ...]]] = None,
         extra_dtypes: Optional[Dict[str, np.dtype]] = None,
     ):
@@ -475,8 +482,15 @@ class ReplayBuffer(BaseBuffer):
             with_reward,
         )
 
+        if extra_shapes is None:
+            extra_shapes = {}
+
+        if extra_dtypes is None:
+            extra_dtypes = {}
+
         self.sample_shapes.update(extra_shapes)
         self.dtypes.update(extra_dtypes)
+        self._init_buffer()
 
 
 class RolloutBuffer(BaseBuffer):
@@ -493,7 +507,7 @@ class RolloutBuffer(BaseBuffer):
         act_shape: Optional[Tuple[int, ...]] = None,
         obs_dtype: np.dtype = np.float32,
         act_dtype: np.dtype = np.float32,
-        with_reward=True,
+        with_reward: bool = True,
         extra_shapes: Optional[Dict[str, Tuple[int, ...]]] = None,
         extra_dtypes: Optional[Dict[str, np.dtype]] = None,
     ):

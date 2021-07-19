@@ -1,4 +1,5 @@
 from typing import Union, Optional, Dict, Any
+from pprint import pprint
 from time import time
 
 from torch.utils.tensorboard import SummaryWriter
@@ -42,11 +43,21 @@ class RL_Trainer(BaseTrainer):
             **kwargs,
         )
 
+        # algo kwargs
+        if self.verbose > 0:
+            print("-" * 10, f"{algo}", "-" * 10)
+            pprint(algo_kwargs)
+
         self.algo = algo(
             self.env.observation_space,
             self.env.action_space,
             **algo_kwargs,
         )
+
+        # number of variables and net arch.
+        if self.verbose > 1:
+            var_counts = self.algo.info()
+            pprint(var_counts)
 
         # Sync same device with algo.
         self.device = self.algo.device

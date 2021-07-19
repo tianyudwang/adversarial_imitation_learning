@@ -41,17 +41,23 @@ class BaseRLAgent(BaseAgent, ABC):
             seed,
             optim_kwargs,
         )
-        
+
+        assert isinstance(batch_size, int), "batch_size must be integer."
+        assert isinstance(buffer_size, int), "buffer_size must be integer."
+
         # Buffer kwargs.
         self.batch_size = batch_size
         self.buffer_size = buffer_size
         self.buffer_kwargs = {} if buffer_kwargs is None else buffer_kwargs
-        
+
         # Other parameters.
         self.learning_steps = 0
         self.gamma = gamma
         self.max_grad_norm = max_grad_norm
         self.clipping = max_grad_norm is not None
+
+    def info(self) -> Dict[Any, Any]:
+        return {}
 
     def explore(self, state: th.Tensor):
         assert isinstance(state, th.Tensor)
@@ -232,8 +238,8 @@ class OnPolicyAgent(BaseRLAgent):
 class OffPolicyAgent(BaseRLAgent):
     def __init__(
         self,
-        state_space,
-        action_space,
+        state_space: GymSpace,
+        action_space: GymSpace,
         device: Union[th.device, str],
         fp16: bool,
         seed: int,
@@ -248,6 +254,7 @@ class OffPolicyAgent(BaseRLAgent):
         init_models: bool,  # TODO: not implemented
         **kwargs
     ):
+
         super().__init__(
             state_space,
             action_space,

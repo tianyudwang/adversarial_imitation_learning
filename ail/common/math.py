@@ -3,8 +3,12 @@ from itertools import accumulate
 
 import numpy as np
 import torch as th
+from torch import nn
 import torch.nn.functional as F
 from scipy.signal import lfilter
+
+from ail.common.utils import zip_strict
+
 
 LOG_2 = log(2)
 LOG2PI = log(2 * pi)
@@ -89,3 +93,27 @@ def squash_logprob_correction(actions: th.Tensor) -> th.Tensor:
     """
     x = atanh(actions)
     return 2 * (LOG_2 - x - F.softplus(-2 * x))
+
+
+def soft_update(
+    target: nn.Module, source: nn.Module, tau: float, one: th.Tensor
+) -> None:
+    """
+    Perform a Polyak average update on ``target_params`` using ``params``
+    target parameters are slowly updated towards the main parameters.
+    :param target: Target network
+    :param source: Source network
+    :param tau: the soft update coefficient controls the interpolation:
+        ``tau=1`` corresponds to copying the parameters to the target ones
+        whereas nothing happens when ``tau=0``.
+    See https://github.com/DLR-RM/stable-baselines3/issues/93
+    """
+    with th.no_grad():
+        # zip does not raise an exception if length of parameters does not match.
+        for t, s in zip_strict(target.parameters(), source.parameters()):
+            # Use an in-place operations "mul_", "add_" to update target params,
+            # to prevent unnecessary copying
+            t.data.mul_(1.0 - tau)
+            t.data.addcmul_(s.data, one, value=tau)
+            # th.add(t.data, s.data, alpha=tau, out=t.data)
+            # t.data.add_(tau * s.data)

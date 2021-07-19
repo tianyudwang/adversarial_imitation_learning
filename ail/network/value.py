@@ -102,12 +102,10 @@ class TwinnedStateActionFunction(BaseValue):
 
         self.net1 = build_mlp(
             [obs_dim + act_dim] + list(hidden_units) + [1],
-            hidden_units,
             activation,
         )
         self.net2 = build_mlp(
             [obs_dim + act_dim] + list(hidden_units) + [1],
-            hidden_units,
             activation,
         )
 

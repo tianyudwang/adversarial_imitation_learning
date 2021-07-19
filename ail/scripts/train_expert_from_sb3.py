@@ -99,7 +99,6 @@ def train_demo(params: dict, algo: str, eval_render=False):
             sde_sample_freq=-1,
             use_sde_at_warmup=False,
             # Whether to use gSDE instead of uniform sampling during the warm up phase (before learning starts)
-            
             # utils
             tensorboard_log=params.get("tensorboard_log", None),
             create_eval_env=params.get("create_eval_env", False),
@@ -129,7 +128,9 @@ def train_demo(params: dict, algo: str, eval_render=False):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--env_id", "-env", type=str, default="Pendulum-v0")  # HalfCheetah-v2
+    p.add_argument(
+        "--env_id", "-env", type=str, default="Pendulum-v0"
+    )  # HalfCheetah-v2
     p.add_argument("--env_wrapper", "-w", type=str, default="")
     p.add_argument("--algo", "-algo", type=str, default="sac")
     p.add_argument("--render", "-r", action="store_true", default=False)
@@ -154,7 +155,7 @@ if __name__ == "__main__":
         "save_dir": save_dir,
         "final_model_dir": f"../weights/{args.env_id}/sb3_{args.algo}",
         "device": args.device,
-        "eval_freq": 10_000
+        "eval_freq": 10_000,
     }
 
     # path to save final model

@@ -280,15 +280,18 @@ class BaseTrainer(ABC):
     def info_to_tb(self, train_logs, epoch) -> None:
         """Logging to tensorboard or wandb (if sync)"""
         assert train_logs is not None, "train log can not be `None`"
-        self.writer.add_scalar("loss/actor", train_logs.get("actor_loss"), epoch)
-        self.writer.add_scalar("loss/critic", train_logs.get("critic_loss"), epoch)
-        self.writer.add_scalar(
-            "info/actor/approx_kl", train_logs.get("approx_kl"), epoch
-        )
-        self.writer.add_scalar("info/actor/entropy", train_logs.get("entropy"), epoch)
-        self.writer.add_scalar(
-            "info/actor/clip_fraction", train_logs["clip_fraction"], epoch
-        )
+        if len(train_logs) > 0:
+            self.writer.add_scalar("loss/actor", train_logs.get("actor_loss"), epoch)
+            self.writer.add_scalar("loss/critic", train_logs.get("critic_loss"), epoch)
+            self.writer.add_scalar(
+                "info/actor/approx_kl", train_logs.get("approx_kl"), epoch
+            )
+            self.writer.add_scalar(
+                "info/actor/entropy", train_logs.get("entropy"), epoch
+            )
+            self.writer.add_scalar(
+                "info/actor/clip_fraction", train_logs["clip_fraction"], epoch
+            )
 
     def save_models(self, save_dir: str, verbose=False, **kwargs):
         # use algo.sav_mdoels directly for now

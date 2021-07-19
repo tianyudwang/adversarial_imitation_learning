@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Union, Optional, Dict, Any
+from typing import Optional, Dict, Any
 
 import torch as th
 
@@ -23,7 +23,6 @@ class BaseIRLAgent(BaseAgent, ABC):
         disc_kwargs,
         lr_disc,
         optim_kwargs: Optional[Dict[str, Any]],
-        
     ):
         super().__init__(
             state_space,
@@ -32,16 +31,14 @@ class BaseIRLAgent(BaseAgent, ABC):
             fp16,
             seed,
             optim_kwargs,
-            
         )
-        
+
         self.gen_algo = gen(**gen_kwargs)
-        
+
         self.disc = disc(**disc_kwargs)
         self.lr_disc = lr_disc
         self.optim_disc = self.optim_cls(self.disc.parameters(), lr=self.lr_disc)
-        
+
         # Expert's buffer.
         self.batch_size = batch_size
         self.buffer_exp = buffer_exp
-        

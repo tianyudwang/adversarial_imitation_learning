@@ -5,8 +5,6 @@ import torch as th
 from torch import nn
 from torch.nn.utils import spectral_norm
 
-
-from ail.common.utils import zip_strict
 from ail.common.type_alias import Activation, _str_to_activation
 from ail.console.color_console import Console
 
@@ -63,35 +61,6 @@ def disable_gradient(net: nn.Module):
     """Freeze the gradient in network"""
     for param in net.parameters():
         param.requires_grad = False
-
-
-def soft_update(target: nn.Module, source: nn.Module, tau: float):
-    """
-    Perform a Polyak average update on ``target_params`` using ``params``
-    target parameters are slowly updated towards the main parameters.
-    :param target: Target network
-    :param source: Source network
-    :param tau: the soft update coefficient controls the interpolation:
-        ``tau=1`` corresponds to copying the parameters to the target ones
-        whereas nothing happens when ``tau=0``.
-    See https://github.com/DLR-RM/stable-baselines3/issues/93
-    """
-    with th.no_grad():
-        # zip does not raise an exception if length of parameters does not match.
-        for t, s in zip_strict(target.parameters(), source.parameters()):
-            # Use an in-place operations "mul_", "add_" to update target params,
-            # to prevent unnecessary copying
-            # TODO: test on th.addcumul_
-            # current implemntation based on openai
-            t.data.mul_(1.0 - tau)
-            t.data.add_(tau * s.data)
-
-# def fast_polyak(agent):
-#   one = th.ones(1, requires_grad=False).to(agent.device)
-#   for param, target_param in zip(agent.critic.parameters(), agent.critic_target.parameters()):
-#     target_param.data.mul_(1-agent.tau)
-#     target_param.data.addcmul_(param.data, one, value=agent.tau)
-
 
 
 def init_gpu(use_gpu=True, gpu_id=0) -> th.device:

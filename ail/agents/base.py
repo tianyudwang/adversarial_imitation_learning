@@ -11,6 +11,7 @@ from ail.common.utils import set_random_seed
 from ail.common.pytorch_util import init_gpu
 from ail.common.env_utils import get_obs_shape, get_flat_obs_dim, get_act_dim
 
+
 class BaseAgent(nn.Module):
     def __init__(
         self,
@@ -22,8 +23,9 @@ class BaseAgent(nn.Module):
         optim_kwargs: Optional[Dict[str, Any]],
     ):
         super().__init__()
-        
+
         # RNG.
+        assert isinstance(seed, int), "seed must be integer."
         set_random_seed(seed)
 
         # env spaces.
@@ -55,5 +57,3 @@ class BaseAgent(nn.Module):
         self.optim_kwargs = {} if optim_kwargs is None else optim_kwargs
         self.optim_cls = OPT[self.optim_kwargs.get("optim_cls", "adam").lower()]
         self.optim_set_to_none = self.optim_kwargs.get("optim_set_to_none", False)
-
-        
