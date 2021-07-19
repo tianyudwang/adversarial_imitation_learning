@@ -132,7 +132,6 @@ class SAC(OffPolicyAgent):
 
         # Enforces an entropy constraint by varying alpha over the course of training.
         # We optimize log(alpha) because alpha should be always bigger than 0.
-        # as discussed in https://github.com/rail-berkeley/softlearning/issues/37
         self.log_alpha = th.log(
             th.ones(1, device=self.device) * log_alpha_init
         ).requires_grad_(True)
@@ -250,14 +249,17 @@ class SAC(OffPolicyAgent):
         return {}  # TODO: add train logs
 
     def update_alpha(self, log_pis_new):
-        """Optimize entropy coefficient (alpha)"""
+        """
+        Optimize entropy coefficient (alpha)        
+        ent_loss = E[-alpha * (log_pis) - alpha * target_ent]
+                 = E [-alphat (log_pis + target_ent)]
+                 = (-alpha * (log_pis + target_ent)).mean()
+                 As log do preserve order
+                 = (-log_alpha * (target_ent + log_ent).mean()
+        As discussed in https://github.com/rail-berkeley/softlearning/issues/37
+        """
         self.optim_alpha.zero_grad(set_to_none=self.optim_set_to_none)
-        """
-        entropy = -log_pis.mean()
-        ent_loss = -log_ent * (target_ent - ent)
-                 = -log_ent * (target_ent - (-log_pis).mean())
-                 = -log_ent * (target_ent + log_ent.mean())
-        """
+        
         with autocast(enabled=self.fp16):
             # Important: detach the variable from the graph
             # so we don't change it with other losses
