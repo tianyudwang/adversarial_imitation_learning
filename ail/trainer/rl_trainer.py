@@ -4,7 +4,6 @@ from time import time
 
 from torch.utils.tensorboard import SummaryWriter
 from ail.trainer.base_trainer import BaseTrainer
-from ail.common.utils import countdown
 from ail.common.type_alias import GymEnv
 
 
@@ -97,8 +96,4 @@ class RL_Trainer(BaseTrainer):
             # Saving the model.
             if self.is_saving_model(step):
                 self.save_models(step)
-
-        # Wait to ensure that all pending events have been written to disk.
-        self.writer.flush()
-        print("Wait to ensure that all pending events have been written to disk.", flush=True)
-        countdown(5)
+        self.finish_logging()

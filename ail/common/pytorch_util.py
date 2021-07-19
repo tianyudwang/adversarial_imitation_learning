@@ -43,7 +43,7 @@ def build_mlp(
     return nn.Sequential(*layers)
 
 
-def count_vars(module):
+def count_vars(module) -> int:
     return sum([np.prod(p.shape) for p in module.parameters()])
 
 
@@ -57,10 +57,16 @@ def orthogonal_init(module: nn.Module, gain: float = 1) -> None:
             module.bias.data.fill_(0.0)
 
 
-def disable_gradient(net: nn.Module):
+def disable_gradient(net: nn.Module) -> None:
     """Freeze the gradient in network"""
     for param in net.parameters():
         param.requires_grad = False
+
+
+def enable_gradient(net: nn.Module) -> None:
+    """Enable gradient in network"""
+    for param in net.parameters():
+        param.requires_grad = True
 
 
 def init_gpu(use_gpu=True, gpu_id=0) -> th.device:

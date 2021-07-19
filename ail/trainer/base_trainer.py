@@ -13,7 +13,7 @@ from ail.common.env_utils import maybe_make_env
 from ail.common.running_stats import RunningStats
 from ail.common.pytorch_util import to_torch
 from ail.common.type_alias import GymEnv
-from ail.common.utils import set_random_seed, get_stats
+from ail.common.utils import set_random_seed, get_stats, countdown
 from ail.console.color_console import COLORS, Console
 
 
@@ -57,7 +57,7 @@ class BaseTrainer(ABC):
         )
         self.env_test.seed(2 ** 31 - seed)
 
-        # set max_ep_len or use default
+        # Set max_ep_len or use default
         self.max_ep_len: int = (
             max_ep_len
             if max_ep_len is not None and isinstance(max_ep_len, int)
@@ -112,7 +112,7 @@ class BaseTrainer(ABC):
         raise NotImplementedError()
 
     @th.no_grad()
-    def evaluate(self, step: int):
+    def evaluate(self, step: int) -> None:
         # set algo to evaluation mode
         self.algo.actor.eval()
         self.rs.clear()
@@ -169,7 +169,7 @@ class BaseTrainer(ABC):
     # Logging conditions
     # -----------------------
 
-    def is_train_logging(self, step) -> bool:
+    def is_train_logging(self, step: int) -> bool:
         return all(
             [
                 step % self.log_interval == 0,
@@ -178,7 +178,7 @@ class BaseTrainer(ABC):
             ]
         )
 
-    def is_eval_logging(self, step) -> bool:
+    def is_eval_logging(self, step: int) -> bool:
         return all(
             [
                 step % self.eval_interval == 0,
@@ -187,11 +187,11 @@ class BaseTrainer(ABC):
             ]
         )
 
-    def is_saving_model(self, step) -> bool:
+    def is_saving_model(self, step: int) -> bool:
         cond = (step > 0, step % self.save_freq == 0, step / self.num_steps > 0.3)
         return all(cond) or step == self.num_steps - 1
 
-    def train_logging(self, train_logs, step) -> None:
+    def train_logging(self, train_logs: Dict[str, Any], step: int) -> None:
         """Log training info (no saving yet)"""
         if self.is_train_logging(step):
             time_logs = OrderedDict()
@@ -204,7 +204,12 @@ class BaseTrainer(ABC):
             print("\n")
 
     def eval_logging(
-        self, step, train_returns, train_ep_lens, eval_returns, eval_ep_lens
+        self,
+        step: int,
+        train_returns: np.ndarray,
+        train_ep_lens: np.ndarray,
+        eval_returns: np.ndarray,
+        eval_ep_lens: np.ndarray,
     ) -> None:
         """Log evaluation info"""
         train_logs, eval_logs, time_logs = OrderedDict(), OrderedDict(), OrderedDict()
@@ -256,7 +261,9 @@ class BaseTrainer(ABC):
     # Logging/Saving methods
     # -----------------------
 
-    def metric_to_tb(self, step, train_logs, eval_logs):
+    def metric_to_tb(
+        self, step: int, train_logs: Dict[str, Any], eval_logs: Dict[str, Any]
+    ) -> None:
         # Train logs
         self.writer.add_scalar(
             "return/train/ep_len", train_logs.get("ep_len_mean"), step
@@ -277,7 +284,7 @@ class BaseTrainer(ABC):
             "return/test/ep_rew_std", eval_logs.get("std_return"), step
         )
 
-    def info_to_tb(self, train_logs, epoch) -> None:
+    def info_to_tb(self, train_logs: Dict[str, Any], epoch: int) -> None:
         """Logging to tensorboard or wandb (if sync)"""
         assert train_logs is not None, "train log can not be `None`"
         if len(train_logs) > 0:
@@ -293,7 +300,7 @@ class BaseTrainer(ABC):
                 "info/actor/clip_fraction", train_logs["clip_fraction"], epoch
             )
 
-    def save_models(self, save_dir: str, verbose=False, **kwargs):
+    def save_models(self, save_dir: str, verbose: bool = False, **kwargs) -> None:
         # use algo.sav_mdoels directly for now
         # self.algo.save_models(save_dir, verbose)
         pass
@@ -302,7 +309,9 @@ class BaseTrainer(ABC):
     # Helper functions.
     # -----------------------
 
-    def obs_as_tensor(self, obs, copy=False) -> Union[Dict[str, th.Tensor], th.Tensor]:
+    def obs_as_tensor(
+        self, obs: Union[dict, np.ndarray, th.Tensor], copy: bool = False
+    ) -> Union[Dict[str, th.Tensor], th.Tensor]:
         """
         Moves the observation to the given device.
         :param obs:
@@ -351,5 +360,14 @@ class BaseTrainer(ABC):
         return tensor.detach().cpu().numpy()
 
     @staticmethod
-    def duration(start_time) -> str:
+    def duration(start_time: float) -> str:
         return str(timedelta(seconds=int(time() - start_time)))
+
+    def finish_logging(self) -> None:
+        # Wait to ensure that all pending events have been written to disk.
+        self.writer.flush()
+        Console.info(
+            "Wait to ensure that all pending events have been written to disk."
+        )
+        countdown(10)
+        self.writer.close()

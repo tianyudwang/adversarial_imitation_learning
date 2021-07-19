@@ -51,7 +51,8 @@ class PPO(OnPolicyAgent):
             vf: [64, 64],
             activation: 'relu',
             lr_actor: 3e-4,
-            lr_critic: 3e-4
+            lr_critic: 3e-4,
+            critic_type="V",
             orthogonal_init: True,
             }
     :param epoch_ppo: Number of epoch when optimizing the surrogate loss.
@@ -67,11 +68,11 @@ class PPO(OnPolicyAgent):
             }
     :param buffer_kwargs: arguments to be passed to the buffer.
         eg. : {
-            with_reward:True, 
+            with_reward:True,
             extra_data:["log_pis"]
             }
-    :param init_buffer: Whether to create the buffer during initiation.
-    :param init_models: Whether to create the models during initiation.
+    :param init_buffer: Whether to create the buffer during initialization.
+    :param init_models: Whether to create the models during initialization.
     """
 
     def __init__(
@@ -128,19 +129,23 @@ class PPO(OnPolicyAgent):
         self.gae_lambda = gae_lambda
         self.coef_ent = coef_ent
 
-    def info(self):
+    def info(self)-> Dict:
         """
         Count variables.
         (protip): try to get a feel for how different size networks behave!
-        """ 
+        """
         return {module: count_vars(module) for module in [self.actor, self.critic]}
 
-    def is_update(self, step):
+    def is_update(self, step: int) -> bool:
         """wheter to pefrom update"""
         return step % self.batch_size == 0
 
     def step(
-        self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
+        self,
+        env: GymEnv,
+        state: th.Tensor,
+        t: th.Tensor,
+        step: Optional[int] = None
     ):
         """
         Intereact with environment and store the transition.
@@ -157,7 +162,7 @@ class PPO(OnPolicyAgent):
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
             "rews": asarray_shape2d(reward),
-            "dones": asarray_shape2d(mask),     # ? or done?
+            "dones": asarray_shape2d(mask),  # ? or done?
             "log_pis": asarray_shape2d(log_pi),
             "next_obs": asarray_shape2d(next_state),
         }
@@ -179,9 +184,9 @@ class PPO(OnPolicyAgent):
         :return train_logs: dict of training logs
         """
         self.learning_steps += 1
-        data = self.buffer.get()
+        rollout_data = self.buffer.get()
         self.buffer.reset()
-        train_logs = self.update_ppo(data)
+        train_logs = self.update_ppo(rollout_data)
         return train_logs
 
     def update_ppo(self, data: TensorDict):
@@ -242,10 +247,14 @@ class PPO(OnPolicyAgent):
         states: th.Tensor,
         actions: th.Tensor,
         log_pis_old: th.Tensor,
-        gaes: th.Tensor
-    )-> Tuple[th.Tensor, Dict[str, Any]]:
+        gaes: th.Tensor,
+    ) -> Tuple[th.Tensor, Dict[str, Any]]:
         """
         Update actor. (function for computing PPO policy loss)
+        :param states:
+        :param actions:
+        :param log_pis_old:
+        :param gaes: general advantage estimation
         : return: actor loss, policy_info
         """
         log_pis = self.actor.evaluate_log_pi(states, actions)
@@ -258,7 +267,7 @@ class PPO(OnPolicyAgent):
         # ratio between old and new policy, should be one at the first iteration
         log_ratios = log_pis - log_pis_old
         ratios = (log_ratios).exp()
-        
+
         # clipped surrogate loss
         loss_actor1 = ratios * gaes
         loss_actor2 = th.clamp(ratios, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * gaes
@@ -270,17 +279,17 @@ class PPO(OnPolicyAgent):
         self.one_gradient_step(loss_actor_ent, self.optim_actor, self.actor)
 
         # * Useful extra info
-        '''
+        """
         Calculate approximate form of reverse KL Divergence for early stopping.
         See issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
         and discussion in PR #419: https://github.com/DLR-RM/stable-baselines3/pull/419
         and Schulman blog: https://joschu.net/blog/kl-approx.html
         KL(q||p): (r-1) - log(r), where r = p(x)/q(x)
-        '''
+        """
         # ! (Yifan) Deprecated :
         # ! Naive version: approx_kl = (log_pi_old - log_pi).mean().item()
         # ! This is an unbiased estimator, but it has large variance.
-        # ! Since it can take on negative values. 
+        # ! Since it can take on negative values.
         # ! as opposed to the actual KL Divergence measure
         with th.no_grad():
             approx_kl = ((ratios - 1) - log_ratios).mean()
