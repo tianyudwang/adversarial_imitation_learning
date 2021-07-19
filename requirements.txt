@@ -3,5 +3,6 @@ numpy
 mujoco-py
 matplotlib
 torch
+tensorboard
 tqdm
 yacs
