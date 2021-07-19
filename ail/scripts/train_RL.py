@@ -1,4 +1,3 @@
-from math import e
 import os
 import argparse
 from datetime import datetime
@@ -82,6 +81,7 @@ def run(args):
     if not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
 
+    # Saving hyperparams to yaml file
     with open(os.path.join(log_dir, "hyperparams.yaml"), "w") as f:
         yaml.dump(algo_kwargs, f)
 

@@ -1,4 +1,4 @@
-from typing import Union, Optional, Dict, Any
+from typing import Union, Optional, Tuple, Dict, Any
 
 import torch as th
 from torch.cuda.amp import autocast
@@ -40,6 +40,38 @@ def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True
 class PPO(OnPolicyAgent):
     """
     Proximal Policy Optimization algorithm (PPO) (clip version)
+    :param state_space: state space.
+    :param action_space: action space.
+    :param device: PyTorch device to which the values will be converted.
+    :param seed: random seed.
+    :param batch_size: size of the batch (we assume batch_size == buffer_size).
+    :param policy_kwargs: arguments to be passed to the policy on creation.
+        e.g. : {
+            pi: [64, 64],
+            vf: [64, 64],
+            activation: 'relu',
+            lr_actor: 3e-4,
+            lr_critic: 3e-4
+            orthogonal_init: True,
+            }
+    :param epoch_ppo: Number of epoch when optimizing the surrogate loss.
+    :param gamma: Discount factor.
+    :param clip_eps: PPO clipping parameter.
+    :param coef_ent: Entropy coefficient for the loss calculation.
+    :param max_grad_norm: Maximum norm for the gradient clipping.
+    :param fp16: Whether to use float16 mixed precision training.
+    :optim_kwargs: arguments to be passed to the optimizer.
+        eg. : {
+            "optim_cls": adam,
+            "optim_set_to_none": True, # which set grad to None instead of zero.
+            }
+    :param buffer_kwargs: arguments to be passed to the buffer.
+        eg. : {
+            with_reward:True, 
+            extra_data:["log_pis"]
+            }
+    :param init_buffer: Whether to create the buffer during initiation.
+    :param init_models: Whether to create the models during initiation.
     """
 
     def __init__(
@@ -97,28 +129,35 @@ class PPO(OnPolicyAgent):
         self.coef_ent = coef_ent
 
     def info(self):
-        # Count variables (protip: try to get a feel for how different size networks behave!)
+        """
+        Count variables.
+        (protip): try to get a feel for how different size networks behave!
+        """ 
         return {module: count_vars(module) for module in [self.actor, self.critic]}
 
     def is_update(self, step):
+        """wheter to pefrom update"""
         return step % self.batch_size == 0
 
     def step(
         self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
     ):
-        """Intereact with environment and store the transition."""
+        """
+        Intereact with environment and store the transition.
+        return: next_state, episode length
+        """
         t += 1
         action, log_pi = self.explore(state)
         next_state, reward, done, info = env.step(action)
         # TODO: may remove mask, test this
         # * (Yifan) Intuitively, mask make sence that agent keeps alive which is not done by env
-        # ! mask = False if t == env._max_episode_steps else done
+        mask = False if t == env._max_episode_steps else done
 
         data = {
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
             "rews": asarray_shape2d(reward),
-            "dones": asarray_shape2d(done),
+            "dones": asarray_shape2d(mask),     # ? or done?
             "log_pis": asarray_shape2d(log_pi),
             "next_obs": asarray_shape2d(next_state),
         }
@@ -134,6 +173,11 @@ class PPO(OnPolicyAgent):
         return next_state, t
 
     def update(self):
+        """
+        A general road map for updating the model.
+        Obtain the training batch and perform update.
+        :return train_logs: dict of training logs
+        """
         self.learning_steps += 1
         data = self.buffer.get()
         self.buffer.reset()
@@ -141,6 +185,11 @@ class PPO(OnPolicyAgent):
         return train_logs
 
     def update_ppo(self, data: TensorDict):
+        """
+        Update the actor and critic.
+        :param data: a batch of randomly sampled transitions
+        :return train_logs: dict of training logs
+        """
         states, actions, rewards, dones, next_states, log_pis = (
             data["obs"],
             data["acts"],
@@ -175,15 +224,30 @@ class PPO(OnPolicyAgent):
             "learn_steps_ppo": self.learning_steps_ppo,
         }
 
-    def update_critic(self, states, targets):
-
+    def update_critic(self, states: th.Tensor, targets: th.Tensor):
+        """
+        Update critic. (value function approximation)
+        :param states:
+        :param targets: should be gae + v_pred
+        return: critic loss
+        """
         self.optim_critic.zero_grad(set_to_none=self.optim_set_to_none)
         with autocast(enabled=self.fp16):
             loss_critic = (self.critic(states) - targets).pow_(2).mean()
         self.one_gradient_step(loss_critic, self.optim_critic, self.critic)
         return loss_critic
 
-    def update_actor(self, states, actions, log_pis_old, gaes):
+    def update_actor(
+        self,
+        states: th.Tensor,
+        actions: th.Tensor,
+        log_pis_old: th.Tensor,
+        gaes: th.Tensor
+    )-> Tuple[th.Tensor, Dict[str, Any]]:
+        """
+        Update actor. (function for computing PPO policy loss)
+        : return: actor loss, policy_info
+        """
         log_pis = self.actor.evaluate_log_pi(states, actions)
 
         # ? Does analytical form exists?
@@ -191,30 +255,33 @@ class PPO(OnPolicyAgent):
         # Approximate entropy.
         approx_ent = -log_pis.mean()
 
+        # ratio between old and new policy, should be one at the first iteration
         log_ratios = log_pis - log_pis_old
         ratios = (log_ratios).exp()
-        loss_actor1 = -ratios * gaes
-        loss_actor2 = -th.clamp(ratios, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * gaes
-        loss_actor = th.max(loss_actor1, loss_actor2).mean()
+        
+        # clipped surrogate loss
+        loss_actor1 = ratios * gaes
+        loss_actor2 = th.clamp(ratios, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * gaes
+        loss_actor = -th.min(loss_actor1, loss_actor2).mean()
 
         self.optim_actor.zero_grad(set_to_none=self.optim_set_to_none)
         with autocast(enabled=self.fp16):
             loss_actor_ent = loss_actor - self.coef_ent * approx_ent
         self.one_gradient_step(loss_actor_ent, self.optim_actor, self.actor)
 
-        # Useful extra info
-        """
+        # * Useful extra info
+        '''
         Calculate approximate form of reverse KL Divergence for early stopping.
         See issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
         and discussion in PR #419: https://github.com/DLR-RM/stable-baselines3/pull/419
         and Schulman blog: https://joschu.net/blog/kl-approx.html
         KL(q||p): (r-1) - log(r), where r = p(x)/q(x)
-        """
-        # ! (Yifan)
-        # ! Deprecated:
+        '''
+        # ! (Yifan) Deprecated :
         # ! Naive version: approx_kl = (log_pi_old - log_pi).mean().item()
         # ! This is an unbiased estimator, but it has large variance.
-        # ! Since it can take on negative values. (as opposed to the actual KL Divergence measure)
+        # ! Since it can take on negative values. 
+        # ! as opposed to the actual KL Divergence measure
         with th.no_grad():
             approx_kl = ((ratios - 1) - log_ratios).mean()
             clipped = ratios.gt(1 + self.clip_eps) | ratios.lt(1 - self.clip_eps)
@@ -222,8 +289,10 @@ class PPO(OnPolicyAgent):
             pi_info = {"kl": approx_kl, "ent": approx_ent, "cf": clip_frac}
         return loss_actor, pi_info
 
-    def save_models(self, save_dir):
+    def save_models(self, save_dir: str):
+        """
+        Save the model. (Only save actor to reduce workloads)
+        """
         super().save_models(save_dir)
         # TODO: implement save actor
-        # Only save actor to reduce workloads
         # th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))

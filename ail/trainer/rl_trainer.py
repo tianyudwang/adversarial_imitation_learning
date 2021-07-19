@@ -100,4 +100,5 @@ class RL_Trainer(BaseTrainer):
 
         # Wait to ensure that all pending events have been written to disk.
         self.writer.flush()
+        print("Wait to ensure that all pending events have been written to disk.", flush=True)
         countdown(5)
