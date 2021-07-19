@@ -94,7 +94,6 @@ class BaseRLAgent(BaseAgent, ABC):
         assert len(policy_kwargs) > 0, "policy_kwargs cannot be empty."
 
         assert "pi" in policy_kwargs, "Missing `pi` key in policy_kwargs."
-        assert "vf" in policy_kwargs, "Missing `vf` key in policy_kwargs."
         assert (
             "activation" in policy_kwargs
         ), "Missing `activation` key in policy_kwargs."
@@ -105,7 +104,12 @@ class BaseRLAgent(BaseAgent, ABC):
         assert "lr_critic" in policy_kwargs, "Missing `lr_critic` key in policy_kwargs."
 
         self.units_actor = policy_kwargs["pi"]
-        self.units_critic = policy_kwargs["vf"]
+        if "vf" in policy_kwargs:
+            self.units_critic = policy_kwargs["vf"]
+        elif "qf" in policy_kwargs:
+            self.units_critic = policy_kwargs["qf"]
+        else:
+            raise ValueError("Missing `vf`/ `qf` key in policy_kwargs.")
         self.hidden_activation = policy_kwargs["activation"]
         self.critic_type = policy_kwargs["critic_type"]
         self.lr_actor = policy_kwargs["lr_actor"]

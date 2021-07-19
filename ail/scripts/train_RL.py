@@ -64,7 +64,7 @@ def run(args):
             # poliy args: net arch, activation, lr
             policy_kwargs=dict(
                 pi=(128, 128),
-                vf=(128, 128),
+                qf=(128, 128),
                 activation="relu_inplace",
                 critic_type="twin",
                 lr_actor=3e-4,

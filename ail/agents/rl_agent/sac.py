@@ -74,7 +74,7 @@ class SAC(OffPolicyAgent):
         start_steps: int,
         num_gradient_steps: int = 1,
         target_update_interval: int = 1,
-        log_alpha_init: float = 1,
+        log_alpha_init: float = 1.0,
         gamma: float = 0.99,
         tau: float = 0.005,
         max_grad_norm: Optional[float] = None,
