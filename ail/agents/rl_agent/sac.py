@@ -5,7 +5,7 @@ import numpy as np
 import torch as th
 from torch.cuda.amp import autocast
 
-from ail.agents.rl_agent.core import OffPolicyAgent
+from ail.agents.rl_agent.rl_core import OffPolicyAgent
 from ail.common.math import soft_update
 from ail.common.pytorch_util import (
     asarray_shape2d,

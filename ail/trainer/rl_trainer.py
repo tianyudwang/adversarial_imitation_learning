@@ -5,7 +5,7 @@ import re
 
 from torch.utils.tensorboard import SummaryWriter
 
-from ail.agents.rl_agent.core import OnPolicyAgent, OffPolicyAgent
+from ail.agents.rl_agent.rl_core import OnPolicyAgent, OffPolicyAgent
 from ail.common.type_alias import GymEnv
 from ail.trainer.base_trainer import BaseTrainer
 

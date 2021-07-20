@@ -3,7 +3,7 @@ from typing import Union, Optional, Tuple, Dict, Any
 import torch as th
 from torch.cuda.amp import autocast
 
-from ail.agents.rl_agent.core import OnPolicyAgent
+from ail.agents.rl_agent.rl_core import OnPolicyAgent
 from ail.common.math import normalize
 from ail.common.type_alias import TensorDict, GymEnv, GymSpace
 from ail.common.pytorch_util import asarray_shape2d, count_vars, obs_as_tensor
