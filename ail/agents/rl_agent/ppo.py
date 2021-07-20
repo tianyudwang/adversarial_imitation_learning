@@ -6,7 +6,7 @@ from torch.cuda.amp import autocast
 from ail.agents.rl_agent.core import OnPolicyAgent
 from ail.common.math import normalize
 from ail.common.type_alias import TensorDict, GymEnv, GymSpace
-from ail.common.pytorch_util import asarray_shape2d, count_vars,  obs_as_tensor
+from ail.common.pytorch_util import asarray_shape2d, count_vars, obs_as_tensor
 
 
 def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True):
@@ -41,7 +41,7 @@ class PPO(OnPolicyAgent):
     """
     Proximal Policy Optimization algorithm (PPO) (clip version)
     Paper: https://arxiv.org/abs/1707.06347
-       
+
     :param state_space: state space.
     :param action_space: action space.
     :param device: PyTorch device to which the values will be converted.
@@ -133,8 +133,8 @@ class PPO(OnPolicyAgent):
 
     def __repr__(self):
         return "PPO"
-    
-    def info(self)-> Dict:
+
+    def info(self) -> Dict:
         """
         Count variables.
         (protip): try to get a feel for how different size networks behave!
@@ -146,11 +146,7 @@ class PPO(OnPolicyAgent):
         return step % self.batch_size == 0
 
     def step(
-        self,
-        env: GymEnv,
-        state: th.Tensor,
-        t: th.Tensor,
-        step: Optional[int] = None
+        self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
     ):
         """
         Intereact with environment and store the transition.

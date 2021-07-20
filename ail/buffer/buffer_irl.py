@@ -471,7 +471,7 @@ class ReplayBuffer(BaseBuffer):
         :param obs_dtype: The dtype of the observation space.
         :param act_dtype: The dtype of the action space.
         """
-        
+
         super(ReplayBuffer, self).__init__(
             capacity,
             device,
@@ -492,10 +492,9 @@ class ReplayBuffer(BaseBuffer):
         self.sample_shapes.update(extra_shapes)
         self.dtypes.update(extra_dtypes)
         self._init_buffer()
-    
+
     def __repr__(self):
         return "ReplayBuffer"
-        
 
 
 class RolloutBuffer(BaseBuffer):
@@ -528,7 +527,7 @@ class RolloutBuffer(BaseBuffer):
         :param obs_dtype: The dtype of the observation space.
         :param act_dtype: The dtype of the action space.
         """
-        
+
         super(RolloutBuffer, self).__init__(
             capacity,
             device,
@@ -550,19 +549,17 @@ class RolloutBuffer(BaseBuffer):
         self.sample_shapes.update(extra_shapes)
         self.dtypes.update(extra_dtypes)
         self._init_buffer()
-    
+
     def __repr__(self):
         return "RolloutBuffer"
-        
+
 
 class BufferType(Enum):
     rollout = RolloutBuffer
     replay = ReplayBuffer
     rolloutbuffer = RolloutBuffer
-    replaybuffer= ReplayBuffer
+    replaybuffer = ReplayBuffer
     rollout_buffer = RolloutBuffer
-    replay_buffer= ReplayBuffer
+    replay_buffer = ReplayBuffer
     ROLLOUT_BUFFER = RolloutBuffer
     REPLAY_BUFFER = ReplayBuffer
-    
-

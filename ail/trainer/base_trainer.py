@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from ail.common.env_utils import maybe_make_env
 from ail.common.running_stats import RunningStats
-from ail.common.pytorch_util import obs_as_tensor 
+from ail.common.pytorch_util import obs_as_tensor
 from ail.common.type_alias import GymEnv
 from ail.common.utils import set_random_seed, get_stats, countdown
 from ail.console.color_console import COLORS, Console
@@ -35,6 +35,7 @@ class BaseTrainer(ABC):
     :param verbose: The verbosity level: 0 no output, 1 info, 2 debug.
     :param use_wandb: Wether to use wandb for metrics visualization.
     """
+
     def __init__(
         self,
         num_steps: int,
@@ -218,7 +219,6 @@ class BaseTrainer(ABC):
             print("-" * 41)
             self.output_block(train_logs, tag="Train", color="back_bold_green")
             self.output_block(time_logs, tag="Time", color="back_bold_cyan")
-            
 
             print("\n")
 

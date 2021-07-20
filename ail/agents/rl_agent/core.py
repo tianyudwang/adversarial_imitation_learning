@@ -21,7 +21,7 @@ from ail.common.type_alias import GymSpace, EXTRA_SHAPES, EXTRA_DTYPES
 class BaseRLAgent(BaseAgent, ABC):
     """
     Base RL agent.
-    
+
     :param state_space: state space.
     :param action_space: action space.
     :param device: PyTorch device to which the values will be converted.
@@ -34,6 +34,7 @@ class BaseRLAgent(BaseAgent, ABC):
     :optim_kwargs: arguments to be passed to the optimizer.
     :param buffer_kwargs: arguments to be passed to the buffer.
     """
+
     def __init__(
         self,
         state_space: GymSpace,
@@ -143,7 +144,7 @@ class BaseRLAgent(BaseAgent, ABC):
         extra_dtypes = {k: dtypes_dict[k] for k in data if k in dtypes_dict}
 
         buffer_cls = BufferType[buffer_type.lower()].value
-        
+
         self.buffer = buffer_cls(
             capacity=self.buffer_size,
             device=self.device,
@@ -185,7 +186,7 @@ class BaseRLAgent(BaseAgent, ABC):
 class OnPolicyAgent(BaseRLAgent):
     """
     On-policy RL Agent.
-    
+
     :param state_space: state space.
     :param action_space: action space.
     :param device: PyTorch device to which the values will be converted.
@@ -201,7 +202,7 @@ class OnPolicyAgent(BaseRLAgent):
     :param init_buffer: Whether to create the buffer during initialization.
     :param init_models: Whether to create the models during initialization.
     """
-    
+
     def __init__(
         self,
         state_space,
@@ -276,7 +277,7 @@ class OnPolicyAgent(BaseRLAgent):
 class OffPolicyAgent(BaseRLAgent):
     """
     Off-Policy Agent.
-    
+
     :param state_space: state space.
     :param action_space: action space.
     :param device: PyTorch device to which the values will be converted.
@@ -292,6 +293,7 @@ class OffPolicyAgent(BaseRLAgent):
     :param init_buffer: Whether to create the buffer during initialization.
     :param init_models: Whether to create the models during initialization.
     """
+
     def __init__(
         self,
         state_space: GymSpace,

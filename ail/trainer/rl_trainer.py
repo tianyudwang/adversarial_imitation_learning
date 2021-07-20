@@ -10,11 +10,10 @@ from ail.common.type_alias import GymEnv
 from ail.trainer.base_trainer import BaseTrainer
 
 
-
 class RL_Trainer(BaseTrainer):
     """
     RL_Trainer with tensorboard integration.
-    
+
     :param num_steps: number of steps to train
     :param env: The environment must satisfy the OpenAI Gym API.
     :param algo: The RL algorithm to train with.
@@ -32,7 +31,7 @@ class RL_Trainer(BaseTrainer):
     :param verbose: The verbosity level: 0 no output, 1 info, 2 debug.
     :param use_wandb: Wether to use wandb for metrics visualization.
     """
-    
+
     def __init__(
         self,
         num_steps: int,
@@ -88,7 +87,7 @@ class RL_Trainer(BaseTrainer):
 
         # Log setting.
         self.writer = SummaryWriter(log_dir=self.summary_dir)
-        
+
         DEVICE = "".join(re.findall("[a-zA-Z]+", str(self.device)))
         self.n_steps_pbar.set_description(f"{self.algo} ({DEVICE})")
 
@@ -107,7 +106,7 @@ class RL_Trainer(BaseTrainer):
             # Pass to the algorithm to update state and episode timestep.
             # * return of algo.step() is next_obs
             obs, t = self.algo.step(self.env, obs, t, step)
-            
+
             # Update the algorithm whenever ready.
             if self.algo.is_update(step):
                 train_logs = self.algo.update()

@@ -17,7 +17,9 @@ from ail.trainer.rl_trainer import RL_Trainer
 def CLI():
     p = argparse.ArgumentParser()
     p.add_argument(
-        "--env_id", type=str, default="InvertedPendulum-v2",
+        "--env_id",
+        type=str,
+        default="InvertedPendulum-v2",
         choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
         help="Envriment to train on",
     )
@@ -25,10 +27,13 @@ def CLI():
         "--algo",
         type=str,
         default="sac",
-        choices=['ppo', 'sac',],
+        choices=[
+            "ppo",
+            "sac",
+        ],
         help="RL algo to use",
     )
-    p.add_argument("--num_steps", type=int, default= 0.05 * 1e6)
+    p.add_argument("--num_steps", type=int, default=0.05 * 1e6)
     p.add_argument("--rollout_length", type=int, default=None)
     p.add_argument("--batch_size", type=int, default=256)
     p.add_argument("--buffer_size", type=int, default=1 * 1e6)
@@ -42,7 +47,7 @@ def CLI():
     p.add_argument("--debug", action="store_true")
     p.add_argument("--profiling", "-prof", action="store_true", default=False)
     p.add_argument("--use_wandb", "-wb", action="store_true", default=False)
-    
+
     args = p.parse_args()
 
     # Enforce type int
@@ -51,7 +56,7 @@ def CLI():
     args.buffer_size = int(args.buffer_size)
     args.device = "cuda" if args.cuda else "cpu"
     return args
-    
+
 
 def run(args):
 
@@ -105,8 +110,8 @@ def run(args):
                 qf=(128, 128),
                 activation="relu_inplace",
                 critic_type="twin",
-                lr_actor=7.3* 1e-4,
-                lr_critic=7.3* 1e-4,
+                lr_actor=7.3 * 1e-4,
+                lr_critic=7.3 * 1e-4,
             ),
         )
         algo_kwargs.update(sac_kwargs)
@@ -137,9 +142,9 @@ def run(args):
         log_dir=log_dir,
         log_interval=10_000,
         verbose=args.verbose,
-        use_wandb=args.use_wandb, # TODO: not implemented wandb intergration
+        use_wandb=args.use_wandb,  # TODO: not implemented wandb intergration
     )
-    
+
     if args.profiling:
         import cProfile
         import pstats
@@ -158,13 +163,14 @@ def run(args):
 if __name__ == "__main__":
     # ENVIRONMENT VARIABLE
     os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # modify to assign a meaningful name
-    
-    args=CLI()
+
+    args = CLI()
 
     if args.debug:
         import numpy as np
         import torch as th
-        np.seterr(all='raise')
+
+        np.seterr(all="raise")
         th.autograd.set_detect_anomaly(True)
-        
+
     run(args)

@@ -26,7 +26,7 @@ class BaseAgent(nn.Module):
             "optim_set_to_none": True, # which set grad to None instead of zero.
             }
     """
-    
+
     def __init__(
         self,
         state_space: GymSpace,

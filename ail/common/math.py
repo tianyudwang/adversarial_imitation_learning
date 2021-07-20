@@ -117,7 +117,7 @@ def soft_update(
         whereas nothing happens when ``tau=0``.
     :param one: dummy variable to equals to th.ones(1, device=device)
         Since it's a constant should pre-define it on proper device.
-    :param safe_zip: if true, will raise error 
+    :param safe_zip: if true, will raise error
         if source and target have different length of parameters.
     See https://github.com/DLR-RM/stable-baselines3/issues/93
     """
@@ -134,4 +134,3 @@ def soft_update(
             for t, s in zip(target.parameters(), source.parameters()):
                 t.data.mul_(1.0 - tau)
                 t.data.addcmul_(s.data, one, value=tau)
-                

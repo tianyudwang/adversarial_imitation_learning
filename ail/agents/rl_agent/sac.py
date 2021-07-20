@@ -12,7 +12,7 @@ from ail.common.pytorch_util import (
     count_vars,
     disable_gradient,
     enable_gradient,
-    obs_as_tensor
+    obs_as_tensor,
 )
 from ail.common.type_alias import TensorDict, GymEnv, GymSpace
 from ail.network.policies import StateDependentPolicy
@@ -24,7 +24,7 @@ class SAC(OffPolicyAgent):
     """
     Soft Actor-Critic (SAC)
     Paper: https://arxiv.org/abs/1801.01290
-    
+
     :param state_space: state space
     :param action_space: action space
     :param device: PyTorch device to which the values will be converted.
@@ -125,7 +125,7 @@ class SAC(OffPolicyAgent):
 
         # Sanity check for zip in soft_update.
         assert count_vars(self.critic_target) == count_vars(self.critic)
-                
+
         # Freeze target networks with respect to optimizers (only update via polyak averaging)
         disable_gradient(self.critic_target)
 
@@ -133,7 +133,6 @@ class SAC(OffPolicyAgent):
         # The entropy coefficient or entropy can be learned automatically
         # see Automating Entropy Adjustment for Maximum Entropy RL section
         # of https://arxiv.org/abs/1812.05905
-        # self.alpha = 1.0  # * Default initial value of ent_coef when learned
         self.lr_alpha = lr_alpha
 
         # Enforces an entropy constraint by varying alpha over the course of training.
@@ -158,8 +157,8 @@ class SAC(OffPolicyAgent):
         self.one = th.ones(1, device=self.device)  # a constant for quick soft update
 
     def __repr__(self):
-        return "SAC"    
-    
+        return "SAC"
+
     def info(self):
         """
         Count variables.
@@ -227,7 +226,7 @@ class SAC(OffPolicyAgent):
         end for
         """
         for gradient_step in range(self.num_gradient_steps):
-            self.learning_steps += 1    
+            self.learning_steps += 1
             # Random uniform sampling a batch of transitions, B = {(s, a, r, s',d)}, from buffer.
             replay_data = self.buffer.sample(self.batch_size)
             train_logs = self.update_sac(replay_data, gradient_step)
@@ -270,7 +269,7 @@ class SAC(OffPolicyAgent):
     def update_alpha(self, log_pis_new):
         """
         Optimize entropy coefficient (alpha)
-        L(alpha) = E_{at ∼ pi_t} [−alpha * log pi(a_t |s_t ) − alpha * H].        
+        L(alpha) = E_{at ∼ pi_t} [−alpha * log pi(a_t |s_t ) − alpha * H].
         ent_loss = E[-alpha * (log_pis) - alpha * target_ent]
                  = E [-alpha (log_pis + target_ent)]
                  = (-alpha * (log_pis + target_ent)).mean()
@@ -279,7 +278,7 @@ class SAC(OffPolicyAgent):
         As discussed in https://github.com/rail-berkeley/softlearning/issues/37
         """
         self.optim_alpha.zero_grad(set_to_none=self.optim_set_to_none)
-        
+
         with autocast(enabled=self.fp16):
             # Important: detach the variable from the graph
             # so we don't change it with other losses
