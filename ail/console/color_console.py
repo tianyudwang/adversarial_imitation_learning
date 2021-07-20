@@ -69,6 +69,14 @@ COLORS = {
     "back_dim_yellow": Style.DIM + Back.YELLOW,
     "back_dim_magneta": Style.DIM + Back.MAGENTA,
     "back_dim_cyan": Style.DIM + Back.CYAN,
+    
+    # Back bold
+    "back_bold_red": Style.BRIGHT + Back.RED,
+    "back_bold_green": Style.BRIGHT + Back.GREEN,
+    "back_bold_blue": Style.BRIGHT + Back.BLUE,
+    "back_bold_yellow": Style.BRIGHT + Back.YELLOW,
+    "back_bold_magneta": Style.BRIGHT + Back.MAGENTA,
+    "back_bold_cyan": Style.BRIGHT + Back.CYAN,
 }
 
 

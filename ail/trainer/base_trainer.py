@@ -216,8 +216,12 @@ class BaseTrainer(ABC):
             time_logs["time_elapsed "] = self.duration(self.start_time)
 
             print("-" * 41)
-            self.output_block(train_logs, tag="Train", color="invisible")
-            self.output_block(time_logs, tag="Time", color="invisible")
+            # self.output_block(train_logs, tag="Train", color="invisible")
+            # self.output_block(time_logs, tag="Time", color="invisible")
+            self.output_block(train_logs, tag="Train", color="back_bold_green")
+            self.output_block(time_logs, tag="Time", color="back_bold_cyan")
+            
+
             print("\n")
 
     def eval_logging(
@@ -254,9 +258,12 @@ class BaseTrainer(ABC):
         ) = get_stats(eval_returns)
 
         print("-" * 41)
-        self.output_block(train_logs, tag="Train", color="invisible")
-        self.output_block(eval_logs, tag="Evaluate", color="invisible")
-        self.output_block(time_logs, tag="Time", color="invisible")
+        # self.output_block(train_logs, tag="Train", color="invisible")
+        # self.output_block(eval_logs, tag="Evaluate", color="invisible")
+        # self.output_block(time_logs, tag="Time", color="invisible")
+        self.output_block(train_logs, tag="Train", color="back_bold_green")
+        self.output_block(eval_logs, tag="Evaluate", color="back_bold_red")
+        self.output_block(time_logs, tag="Time", color="back_bold_blue")
         print("\n")
 
         self.metric_to_tb(step, train_logs, eval_logs)
