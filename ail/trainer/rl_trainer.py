@@ -3,16 +3,40 @@ from pprint import pprint
 from time import time
 
 from torch.utils.tensorboard import SummaryWriter
-from ail.trainer.base_trainer import BaseTrainer
+
+from ail.agents.rl_agent.core import OnPolicyAgent, OffPolicyAgent
 from ail.common.type_alias import GymEnv
+from ail.trainer.base_trainer import BaseTrainer
+
 
 
 class RL_Trainer(BaseTrainer):
+    """
+    RL_Trainer with tensorboard integration.
+    
+    :param num_steps: number of steps to train
+    :param env: The environment must satisfy the OpenAI Gym API.
+    :param algo: The RL algorithm to train with.
+    :param algo_kwargs: kwargs to pass to the algorithm.
+    :param env_kwargs: Any kwargs appropriate for the gym env object
+        including custom wrapper.
+    :param max_ep_len: Total length of a trajectory
+        By default, equals to env's own time limit.
+    :param eval_interval: How often to evaluate current policy
+        By default, we enforce to create a copy of training env for evaluation.
+    :param save_freq: How often to save the current policy.
+    :param log_dir: path to log directory
+    :param log_interval: How often to output training info.
+    :param seed: random seed.
+    :param verbose: The verbosity level: 0 no output, 1 info, 2 debug.
+    :param use_wandb: Wether to use wandb for metrics visualization.
+    """
+    
     def __init__(
         self,
         num_steps: int,
         env: Union[GymEnv, str],
-        algo,
+        algo: Union[OnPolicyAgent, OffPolicyAgent],
         algo_kwargs: Dict[str, Any],
         env_kwargs: Optional[Dict[str, Any]] = None,
         max_ep_len=None,
@@ -65,6 +89,9 @@ class RL_Trainer(BaseTrainer):
         self.writer = SummaryWriter(log_dir=self.summary_dir)
 
     def run_training_loop(self):
+        """
+        Interactive with environment and train agent for num_steps.
+        """
         # Time to start training.
         self.start_time = time()
         # Episode's timestep.
@@ -77,8 +104,9 @@ class RL_Trainer(BaseTrainer):
         )
         for step in self.n_steps_pbar:
             # Pass to the algorithm to update state and episode timestep.
-            # return of algo.step() is next_obs
+            # * return of algo.step() is next_obs
             obs, t = self.algo.step(self.env, self.obs_as_tensor(obs), t, step)
+            
             # Update the algorithm whenever ready.
             if self.algo.is_update(step):
                 train_logs = self.algo.update()

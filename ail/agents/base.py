@@ -13,6 +13,20 @@ from ail.common.env_utils import get_obs_shape, get_flat_obs_dim, get_act_dim
 
 
 class BaseAgent(nn.Module):
+    """
+    Base class for all agents.
+    :param state_space: state space.
+    :param action_space: action space.
+    :param device: PyTorch device to which the values will be converted.
+    :param fp16: Whether to use float16 mixed precision training.
+    :param seed: random seed.
+    :optim_kwargs: arguments to be passed to the optimizer.
+        eg. : {
+            "optim_cls": adam,
+            "optim_set_to_none": True, # which set grad to None instead of zero.
+            }
+    """
+    
     def __init__(
         self,
         state_space: GymSpace,
@@ -55,5 +69,5 @@ class BaseAgent(nn.Module):
 
         # Optimizer kwargs.
         self.optim_kwargs = {} if optim_kwargs is None else optim_kwargs
-        self.optim_cls = OPT[self.optim_kwargs.get("optim_cls", "adam").lower()]
+        self.optim_cls = OPT[self.optim_kwargs.get("optim_cls", "adam").lower()].value
         self.optim_set_to_none = self.optim_kwargs.get("optim_set_to_none", False)

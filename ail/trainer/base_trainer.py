@@ -18,6 +18,23 @@ from ail.console.color_console import COLORS, Console
 
 
 class BaseTrainer(ABC):
+    """
+    Base Class for RL_Trainer and IRL_Trainer.
+    :param num_steps: number of steps to train
+    :param env: The environment must satisfy the OpenAI Gym API.
+    :param env_kwargs: Any kwargs appropriate for the gym env object
+        including custom wrapper.
+    :param max_ep_len: Total length of a trajectory
+        By default, equals to env's own time limit.
+    :param eval_interval: How often to evaluate current policy
+        By default, we enforce to create a copy of training env for evaluation.
+    :param save_freq: How often to save the current policy.
+    :param log_dir: path to log directory
+    :param log_interval: How often to output training info.
+    :param seed: random seed.
+    :param verbose: The verbosity level: 0 no output, 1 info, 2 debug.
+    :param use_wandb: Wether to use wandb for metrics visualization.
+    """
     def __init__(
         self,
         num_steps: int,

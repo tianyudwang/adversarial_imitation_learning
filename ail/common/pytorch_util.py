@@ -5,7 +5,7 @@ import torch as th
 from torch import nn
 from torch.nn.utils import spectral_norm
 
-from ail.common.type_alias import Activation, _str_to_activation
+from ail.common.type_alias import Activation, StrToActivation 
 from ail.console.color_console import Console
 
 
@@ -29,9 +29,9 @@ def build_mlp(
     """
     # String name to Activation function conversion
     if isinstance(activation, str):
-        activation = _str_to_activation[activation]
+        activation = StrToActivation[activation.lower()].value
     if isinstance(output_activation, str):
-        output_activation = _str_to_activation[output_activation]
+        output_activation = StrToActivation[output_activation.lower()].value
 
     layers = []
     for j in range(len(sizes) - 1):

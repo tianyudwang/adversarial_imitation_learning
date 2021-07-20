@@ -11,7 +11,7 @@ from torch.nn.utils import clip_grad_norm_
 from ail.agents.base import BaseAgent
 from ail.network.policies import StateIndependentPolicy
 from ail.network.value import mlp_value
-from ail.buffer.buffer_irl import BUFFER
+from ail.buffer.buffer_irl import BUFFER_TYPE
 
 from ail.common.utils import dataclass_quick_asdict
 from ail.common.pytorch_util import to_numpy, orthogonal_init
@@ -19,6 +19,21 @@ from ail.common.type_alias import GymSpace, EXTRA_SHAPES, EXTRA_DTYPES
 
 
 class BaseRLAgent(BaseAgent, ABC):
+    """
+    Base RL agent.
+    
+    :param state_space: state space.
+    :param action_space: action space.
+    :param device: PyTorch device to which the values will be converted.
+    :param fp16: Whether to use float16 mixed precision training.
+    :param seed: random seed.
+    :param gamma: Discount factor.
+    :param max_grad_norm: Maximum norm for the gradient clipping.
+    :param batch_size: size of the batch.
+    :param buffer_size: size of the buffer.
+    :optim_kwargs: arguments to be passed to the optimizer.
+    :param buffer_kwargs: arguments to be passed to the buffer.
+    """
     def __init__(
         self,
         state_space: GymSpace,
@@ -127,8 +142,8 @@ class BaseRLAgent(BaseAgent, ABC):
         extra_shapes = {k: shape_dict[k] for k in data if k in shape_dict}
         extra_dtypes = {k: dtypes_dict[k] for k in data if k in dtypes_dict}
 
-        buffer_cls = BUFFER[buffer_type.lower()]
-
+        buffer_cls = BUFFER_TYPE[buffer_type.lower()].value
+        
         self.buffer = buffer_cls(
             capacity=self.buffer_size,
             device=self.device,
@@ -168,6 +183,25 @@ class BaseRLAgent(BaseAgent, ABC):
 
 
 class OnPolicyAgent(BaseRLAgent):
+    """
+    On-policy RL Agent.
+    
+    :param state_space: state space.
+    :param action_space: action space.
+    :param device: PyTorch device to which the values will be converted.
+    :param fp16: Whether to use float16 mixed precision training.
+    :param seed: random seed.
+    :param gamma: Discount factor.
+    :param max_grad_norm: Maximum norm for the gradient clipping.
+    :param batch_size: size of the batch.
+    :param buffer_size: size of the buffer.
+    :param policy_kwargs: arguments to be passed to the policy on creation.
+    :optim_kwargs: arguments to be passed to the optimizer.
+    :param buffer_kwargs: arguments to be passed to the buffer.
+    :param init_buffer: Whether to create the buffer during initialization.
+    :param init_models: Whether to create the models during initialization.
+    """
+    
     def __init__(
         self,
         state_space,
@@ -240,6 +274,24 @@ class OnPolicyAgent(BaseRLAgent):
 
 
 class OffPolicyAgent(BaseRLAgent):
+    """
+    Off-Policy Agent.
+    
+    :param state_space: state space.
+    :param action_space: action space.
+    :param device: PyTorch device to which the values will be converted.
+    :param fp16: Whether to use float16 mixed precision training.
+    :param seed: random seed.
+    :param gamma: Discount factor.
+    :param max_grad_norm: Maximum norm for the gradient clipping.
+    :param batch_size: size of the batch.
+    :param buffer_size: size of the buffer.
+    :param policy_kwargs: arguments to be passed to the policy on creation.
+    :optim_kwargs: arguments to be passed to the optimizer.
+    :param buffer_kwargs: arguments to be passed to the buffer.
+    :param init_buffer: Whether to create the buffer during initialization.
+    :param init_models: Whether to create the models during initialization.
+    """
     def __init__(
         self,
         state_space: GymSpace,

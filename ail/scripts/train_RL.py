@@ -59,15 +59,15 @@ def run(args):
             # SAC only args
             lr_alpha=3e-4,
             start_steps=10_000,
-            tau=0.005,
+            tau=0.02,  # 0.005
             # poliy args: net arch, activation, lr
             policy_kwargs=dict(
                 pi=(128, 128),
                 qf=(128, 128),
                 activation="relu_inplace",
                 critic_type="twin",
-                lr_actor=3e-4,
-                lr_critic=3e-4,
+                lr_actor=7.3* 1e-4,
+                lr_critic=7.3* 1e-4,
             ),
         )
         algo_kwargs.update(sac_kwargs)
@@ -105,14 +105,11 @@ def run(args):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    # p.add_argument("--env_id", type=str, default="InvertedPendulum-v2")
-    # p.add_argument("--env_id", type=str, default="HalfCheetah-v2")
-    p.add_argument("--env_id", type=str, default="Hopper-v3")
-    # p.add_argument(
-    #     "--env_id", type=str, default="Hopper-v3",
-    #     choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
-    #     help="Envriment to train on",
-    # )
+    p.add_argument(
+        "--env_id", type=str, default="Hopper-v3",
+        choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
+        help="Envriment to train on",
+    )
     p.add_argument(
         "--algo",
         type=str,

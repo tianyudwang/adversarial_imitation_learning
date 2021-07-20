@@ -40,6 +40,8 @@ def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True
 class PPO(OnPolicyAgent):
     """
     Proximal Policy Optimization algorithm (PPO) (clip version)
+    Paper: https://arxiv.org/abs/1707.06347
+       
     :param state_space: state space.
     :param action_space: action space.
     :param device: PyTorch device to which the values will be converted.
@@ -129,6 +131,9 @@ class PPO(OnPolicyAgent):
         self.gae_lambda = gae_lambda
         self.coef_ent = coef_ent
 
+    def __repr__(self):
+        return "PPO"
+    
     def info(self)-> Dict:
         """
         Count variables.

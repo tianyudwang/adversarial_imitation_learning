@@ -22,6 +22,8 @@ class SAC(OffPolicyAgent):
 
     """
     Soft Actor-Critic (SAC)
+    Paper: https://arxiv.org/abs/1801.01290
+    
     :param state_space: state space
     :param action_space: action space
     :param device: PyTorch device to which the values will be converted.
@@ -151,6 +153,9 @@ class SAC(OffPolicyAgent):
         self.tau = tau
         self.one = th.ones(1, device=self.device)  # a constant for quick soft update
 
+    def __repr__(self):
+        return "SAC"    
+    
     def info(self):
         """
         Count variables.

@@ -1,3 +1,4 @@
+from enum import Enum
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple, Union
 
@@ -22,23 +23,21 @@ Activation = Union[str, nn.Module]
 
 # ----------------------------------------------------------------
 # string to object naming conventions
+class StrToActivation(Enum):
+    relu = nn.ReLU()
+    relu_inplace = nn.ReLU(inplace=True)
+    tanh = nn.Tanh()
+    leaky_relu = nn.LeakyReLU()
+    sigmoid = nn.Sigmoid()
+    selu = nn.SELU()
+    softplus = nn.Softplus()
+    identity = nn.Identity()
 
-_str_to_activation = {
-    "relu": nn.ReLU(),
-    "relu_inplace": nn.ReLU(inplace=True),
-    "tanh": nn.Tanh(),
-    "leaky_relu": nn.LeakyReLU(),
-    "sigmoid": nn.Sigmoid(),
-    "selu": nn.SELU(),
-    "softplus": nn.Softplus(),
-    "identity": nn.Identity(),
-}
 
-OPT = {
-    "adam": Adam,
-    "adamw": AdamW,
-    "adam_w": AdamW,
-}
+class OPT(Enum):
+    adam = Adam
+    adamw = AdamW
+    adam_w = AdamW
 
 
 # ----------------------------------------------------------------

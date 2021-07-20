@@ -1,4 +1,6 @@
 from typing import Dict, Mapping, Optional, Tuple, Union
+from enum import Enum
+
 
 import numpy as np
 import torch as th
@@ -442,8 +444,6 @@ class BaseBuffer:
 class ReplayBuffer(BaseBuffer):
     """Replay Buffer for Transitions."""
 
-    tag = "ReplayBuffer"
-
     def __init__(
         self,
         capacity: int,
@@ -471,6 +471,7 @@ class ReplayBuffer(BaseBuffer):
         :param obs_dtype: The dtype of the observation space.
         :param act_dtype: The dtype of the action space.
         """
+        
         super(ReplayBuffer, self).__init__(
             capacity,
             device,
@@ -491,12 +492,14 @@ class ReplayBuffer(BaseBuffer):
         self.sample_shapes.update(extra_shapes)
         self.dtypes.update(extra_dtypes)
         self._init_buffer()
+    
+    def __repr__(self):
+        return "ReplayBuffer"
+        
 
 
 class RolloutBuffer(BaseBuffer):
     """Rollout Buffer for Transitions."""
-
-    tag = "RolloutBuffer"
 
     def __init__(
         self,
@@ -525,6 +528,7 @@ class RolloutBuffer(BaseBuffer):
         :param obs_dtype: The dtype of the observation space.
         :param act_dtype: The dtype of the action space.
         """
+        
         super(RolloutBuffer, self).__init__(
             capacity,
             device,
@@ -546,11 +550,19 @@ class RolloutBuffer(BaseBuffer):
         self.sample_shapes.update(extra_shapes)
         self.dtypes.update(extra_dtypes)
         self._init_buffer()
+    
+    def __repr__(self):
+        return "RolloutBuffer"
+        
 
+class BUFFER_TYPE(Enum):
+    rollout = RolloutBuffer
+    replay = ReplayBuffer
+    rolloutbuffer = RolloutBuffer
+    replaybuffer= ReplayBuffer
+    rollout_buffer = RolloutBuffer
+    replay_buffer= ReplayBuffer
+    ROLLOUT_BUFFER = RolloutBuffer
+    REPLAY_BUFFER = ReplayBuffer
+    
 
-BUFFER = {
-    "rollout": RolloutBuffer,
-    "rolloutbuffer": RolloutBuffer,
-    "replay": ReplayBuffer,
-    "replaybuffer": ReplayBuffer,
-}
