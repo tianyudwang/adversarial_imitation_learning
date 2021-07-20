@@ -123,6 +123,9 @@ class SAC(OffPolicyAgent):
         # Set target param equalto main param. Using deep copy instead.
         self.critic_target = deepcopy(self.critic).to(self.device).eval()
 
+        # Sanity check for zip in soft_update.
+        assert count_vars(self.critic_target) == count_vars(self.critic)
+                
         # Freeze target networks with respect to optimizers (only update via polyak averaging)
         disable_gradient(self.critic_target)
 

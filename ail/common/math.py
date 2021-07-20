@@ -7,6 +7,8 @@ from torch import nn
 import torch.nn.functional as F
 from scipy.signal import lfilter
 
+from ail.common.utils import zip_strict
+
 
 LOG_2 = log(2)
 LOG2PI = log(2 * pi)
@@ -99,7 +101,11 @@ def squash_logprob_correction(actions: th.Tensor) -> th.Tensor:
 
 
 def soft_update(
-    target: nn.Module, source: nn.Module, tau: float, one: th.Tensor
+    target: nn.Module,
+    source: nn.Module,
+    tau: float,
+    one: th.Tensor,
+    safe_zip=False,
 ) -> None:
     """
     Perform a Polyak average update on ``target_params`` using ``params``
@@ -109,14 +115,23 @@ def soft_update(
     :param tau: the soft update coefficient controls the interpolation:
         ``tau=1`` corresponds to copying the parameters to the target ones
         whereas nothing happens when ``tau=0``.
+    :param one: dummy variable to equals to th.ones(1, device=device)
+        Since it's a constant should pre-define it on proper device.
+    :param safe_zip: if true, will raise error 
+        if source and target have different length of parameters.
     See https://github.com/DLR-RM/stable-baselines3/issues/93
     """
     with th.no_grad():
         # zip does not raise an exception if length of parameters does not match.
-        for t, s in zip(target.parameters(), source.parameters()):
-            # Use an in-place operations "mul_", "add_" to update target params,
-            # to prevent unnecessary copying
-            t.data.mul_(1.0 - tau)
-            t.data.addcmul_(s.data, one, value=tau)
-            # th.add(t.data, s.data, alpha=tau, out=t.data)
-            # t.data.add_(tau * s.data)
+        if safe_zip:
+            # ! This is slow.
+            for t, s in zip_strict(target.parameters(), source.parameters()):
+                t.data.mul_(1.0 - tau)
+                t.data.addcmul_(s.data, one, value=tau)
+        else:
+            # * Fast but safty not gurantee.
+            # * should check if source and target have the same parameters outside.
+            for t, s in zip(target.parameters(), source.parameters()):
+                t.data.mul_(1.0 - tau)
+                t.data.addcmul_(s.data, one, value=tau)
+                
