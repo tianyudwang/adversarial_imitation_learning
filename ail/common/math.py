@@ -7,8 +7,6 @@ from torch import nn
 import torch.nn.functional as F
 from scipy.signal import lfilter
 
-from ail.common.utils import zip_strict
-
 
 LOG_2 = log(2)
 LOG2PI = log(2 * pi)
@@ -115,7 +113,7 @@ def soft_update(
     """
     with th.no_grad():
         # zip does not raise an exception if length of parameters does not match.
-        for t, s in zip_strict(target.parameters(), source.parameters()):
+        for t, s in zip(target.parameters(), source.parameters()):
             # Use an in-place operations "mul_", "add_" to update target params,
             # to prevent unnecessary copying
             t.data.mul_(1.0 - tau)

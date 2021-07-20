@@ -61,6 +61,7 @@ def zip_strict(*iterables: Iterable) -> Iterable:
     # As in Stackoverflow #32954486, use
     # new object for "empty" in case we have
     # Nones in iterable.
+    # ! Slow
     sentinel = object()
     for combo in zip_longest(*iterables, fillvalue=sentinel):
         if sentinel in combo:
