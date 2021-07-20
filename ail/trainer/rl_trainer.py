@@ -1,6 +1,7 @@
 from typing import Union, Optional, Dict, Any
 from pprint import pprint
 from time import time
+import re
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -87,6 +88,9 @@ class RL_Trainer(BaseTrainer):
 
         # Log setting.
         self.writer = SummaryWriter(log_dir=self.summary_dir)
+        
+        DEVICE = "".join(re.findall("[a-zA-Z]+", str(self.device)))
+        self.n_steps_pbar.set_description(f"{self.algo} ({DEVICE})")
 
     def run_training_loop(self):
         """
@@ -99,13 +103,10 @@ class RL_Trainer(BaseTrainer):
         # Initialize the environment.
         obs = self.env.reset()
 
-        self.n_steps_pbar.set_description(
-            f"{self.algo.__class__.__name__} ({self.device})"
-        )
         for step in self.n_steps_pbar:
             # Pass to the algorithm to update state and episode timestep.
             # * return of algo.step() is next_obs
-            obs, t = self.algo.step(self.env, self.obs_as_tensor(obs), t, step)
+            obs, t = self.algo.step(self.env, obs, t, step)
             
             # Update the algorithm whenever ready.
             if self.algo.is_update(step):

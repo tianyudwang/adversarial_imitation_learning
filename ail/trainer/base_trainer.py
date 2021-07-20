@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from ail.common.env_utils import maybe_make_env
 from ail.common.running_stats import RunningStats
-from ail.common.pytorch_util import to_torch
+from ail.common.pytorch_util import obs_as_tensor 
 from ail.common.type_alias import GymEnv
 from ail.common.utils import set_random_seed, get_stats, countdown
 from ail.console.color_console import COLORS, Console
@@ -144,7 +144,7 @@ class BaseTrainer(ABC):
             done = False
 
             while not done:
-                obs = self.obs_as_tensor(obs)
+                obs = obs_as_tensor(obs, self.device)
                 if t < stochastic_eval_episodes:
                     act, _ = self.algo.explore(obs)
                 else:
@@ -216,8 +216,6 @@ class BaseTrainer(ABC):
             time_logs["time_elapsed "] = self.duration(self.start_time)
 
             print("-" * 41)
-            # self.output_block(train_logs, tag="Train", color="invisible")
-            # self.output_block(time_logs, tag="Time", color="invisible")
             self.output_block(train_logs, tag="Train", color="back_bold_green")
             self.output_block(time_logs, tag="Time", color="back_bold_cyan")
             
@@ -258,9 +256,6 @@ class BaseTrainer(ABC):
         ) = get_stats(eval_returns)
 
         print("-" * 41)
-        # self.output_block(train_logs, tag="Train", color="invisible")
-        # self.output_block(eval_logs, tag="Evaluate", color="invisible")
-        # self.output_block(time_logs, tag="Time", color="invisible")
         self.output_block(train_logs, tag="Train", color="back_bold_green")
         self.output_block(eval_logs, tag="Evaluate", color="back_bold_red")
         self.output_block(time_logs, tag="Time", color="back_bold_blue")
@@ -332,57 +327,6 @@ class BaseTrainer(ABC):
     # -----------------------
     # Helper functions.
     # -----------------------
-
-    def obs_as_tensor(
-        self, obs: Union[dict, np.ndarray, th.Tensor], copy: bool = False
-    ) -> Union[Dict[str, th.Tensor], th.Tensor]:
-        """
-        Moves the observation to the given device.
-        :param obs:
-        :param copy: Whether to copy or not the data
-            (may be useful to avoid changing things be reference)
-        :return: PyTorch tensor of the observation on a desired device.
-        """
-        if isinstance(obs, np.ndarray):
-            return to_torch(obs, self.device, copy)
-        elif isinstance(obs, th.Tensor):
-            return obs.to(self.device)
-        elif isinstance(obs, dict):
-            return {
-                key: to_torch(_obs, self.device, copy) for (key, _obs) in obs.items()
-            }
-        else:
-            raise Exception(f"Unrecognized type of observation {type(obs)}")
-
-    def to_torch(
-        self,
-        array: np.ndarray,
-        copy: bool = True,
-    ) -> th.Tensor:
-        """
-        Convert a numpy array to a PyTorch tensor.
-        Note: it copies the data by default
-        :param array:
-        :param copy: Whether to copy or not the data
-            (may be useful to avoid changing things be reference)
-        :return:
-        """
-        if copy:
-            return th.tensor(array, dtype=th.float32).to(self.device)
-        elif isinstance(array, np.ndarray):
-            return self.from_numpy(array)
-        else:
-            return th.as_tensor(array, dtype=th.float32).to(self.device)
-
-    def from_numpy(self, array: np.ndarray) -> th.Tensor:
-        """Convert numpy array to torch tensor  and send to device('cuda:0' or 'cpu')"""
-        return th.from_numpy(array).float().to(self.device)
-
-    @staticmethod
-    def to_numpy(tensor: th.Tensor) -> np.ndarray:
-        """Convert torch tensor to numpy array and send to CPU"""
-        return tensor.detach().cpu().numpy()
-
     @staticmethod
     def duration(start_time: float) -> str:
         return str(timedelta(seconds=int(time() - start_time)))

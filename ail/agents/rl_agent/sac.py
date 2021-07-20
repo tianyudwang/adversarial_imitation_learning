@@ -12,6 +12,7 @@ from ail.common.pytorch_util import (
     count_vars,
     disable_gradient,
     enable_gradient,
+    obs_as_tensor
 )
 from ail.common.type_alias import TensorDict, GymEnv, GymSpace
 from ail.network.policies import StateDependentPolicy
@@ -188,7 +189,7 @@ class SAC(OffPolicyAgent):
             #     th.as_tensor(action, dtype=th.float, device=self.device)
             # )
         else:
-            action, log_pi = self.explore(state)
+            action, log_pi = self.explore(obs_as_tensor(state, self.device))
 
         next_state, reward, done, info = env.step(action)
         mask = False if t == env._max_episode_steps else done

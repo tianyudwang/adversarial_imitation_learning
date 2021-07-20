@@ -1,4 +1,4 @@
-from typing import Tuple, List, Sequence, Union
+from typing import Tuple, List, Sequence, Union, Dict
 
 import numpy as np
 import torch as th
@@ -83,6 +83,30 @@ def init_gpu(use_gpu=True, gpu_id=0) -> th.device:
     return device
 
 
+def obs_as_tensor(
+    obs: Union[dict, np.ndarray, th.Tensor],
+    device: Union[th.device, str],
+    copy: bool = False,
+) -> Union[Dict[str, th.Tensor], th.Tensor]:
+        """
+        Moves the observation to the given device.
+        :param obs:
+        :param copy: Whether to copy or not the data
+            (may be useful to avoid changing things be reference)
+        :return: PyTorch tensor of the observation on a desired device.
+        """
+        if isinstance(obs, np.ndarray):
+            return to_torch(obs, device, copy)
+        elif isinstance(obs, th.Tensor):
+            return obs.to(device)
+        elif isinstance(obs, dict):
+            return {
+                key: to_torch(_obs, device, copy) for (key, _obs) in obs.items()
+            }
+        else:
+            raise Exception(f"Unrecognized type of observation {type(obs)}")
+
+
 def to_torch(
     array: Union[np.ndarray, Tuple, List],
     device: Union[th.device, str],
@@ -99,11 +123,19 @@ def to_torch(
     :return: torch tensor.
     """
     if copy:
-        return th.tensor(array, dtype=th.float32).to(device)
+        return th.tensor(array, dtype=th.float32, device=device)
     elif isinstance(array, np.ndarray):
-        return th.from_numpy(array).float().to(device)
+        return from_numpy(array, device=device)
     else:
-        return th.as_tensor(array, dtype=th.float32).to(device)
+        return th.as_tensor(array, dtype=th.float32, device=device)
+
+
+def from_numpy(
+    array: np.ndarray,
+    device: Union[th.device, str]
+) -> th.Tensor:
+    """Convert numpy array to torch tensor  and send to device('cuda:0' or 'cpu')"""
+    return th.from_numpy(array).float().to(device)
 
 
 def to_numpy(tensor: th.Tensor) -> np.ndarray:
@@ -111,9 +143,13 @@ def to_numpy(tensor: th.Tensor) -> np.ndarray:
     return tensor.detach().cpu().numpy()
 
 
-def asarray_shape2d(x:Union[th.Tensor, np.ndarray, float, int]) -> np.ndarray:
+def asarray_shape2d(
+    x: Union[th.Tensor, np.ndarray, float, int]
+) -> np.ndarray:
     """Convert input into numpy array and reshape so that n_dim = 2."""
     if isinstance(x, th.Tensor):
         return to_numpy(x).reshape(1, -1)
+    elif isinstance(x, np.ndarray) and x.ndim != 2:
+        return x.astype(np.float32).reshape(1, -1)
     else:
         return np.asarray(x, dtype=np.float32).reshape(1, -1)

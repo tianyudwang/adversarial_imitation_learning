@@ -6,7 +6,7 @@ from torch.cuda.amp import autocast
 from ail.agents.rl_agent.core import OnPolicyAgent
 from ail.common.math import normalize
 from ail.common.type_alias import TensorDict, GymEnv, GymSpace
-from ail.common.pytorch_util import asarray_shape2d, count_vars
+from ail.common.pytorch_util import asarray_shape2d, count_vars,  obs_as_tensor
 
 
 def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True):
@@ -157,7 +157,7 @@ class PPO(OnPolicyAgent):
         return: next_state, episode length
         """
         t += 1
-        action, log_pi = self.explore(state)
+        action, log_pi = self.explore(obs_as_tensor(state, self.device))
         next_state, reward, done, info = env.step(action)
         # TODO: may remove mask, test this
         # * (Yifan) Intuitively, mask make sence that agent keeps alive which is not done by env

@@ -14,6 +14,45 @@ from ail.agents import ALGO
 from ail.trainer.rl_trainer import RL_Trainer
 
 
+def CLI():
+    p = argparse.ArgumentParser()
+    p.add_argument(
+        "--env_id", type=str, default="InvertedPendulum-v2",
+        choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
+        help="Envriment to train on",
+    )
+    p.add_argument(
+        "--algo",
+        type=str,
+        default="sac",
+        choices=['ppo', 'sac',],
+        help="RL algo to use",
+    )
+    p.add_argument("--num_steps", type=int, default= 0.05 * 1e6)
+    p.add_argument("--rollout_length", type=int, default=None)
+    p.add_argument("--batch_size", type=int, default=256)
+    p.add_argument("--buffer_size", type=int, default=1 * 1e6)
+
+    p.add_argument("--eval_interval", type=int, default=5 * 1e3)
+    p.add_argument("--num_eval_episodes", type=int, default=10)
+    p.add_argument("--cuda", action="store_true")
+    p.add_argument("--fp16", action="store_true")
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--verbose", type=int, default=2)
+    p.add_argument("--debug", action="store_true")
+    p.add_argument("--profiling", "-prof", action="store_true", default=False)
+    p.add_argument("--use_wandb", "-wb", action="store_true", default=False)
+    
+    args = p.parse_args()
+
+    # Enforce type int
+    args.num_steps = int(args.num_steps)
+    args.batch_size = int(args.batch_size)
+    args.buffer_size = int(args.buffer_size)
+    args.device = "cuda" if args.cuda else "cpu"
+    return args
+    
+
 def run(args):
 
     algo_kwargs = dict(
@@ -120,41 +159,7 @@ if __name__ == "__main__":
     # ENVIRONMENT VARIABLE
     os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # modify to assign a meaningful name
     
-    p = argparse.ArgumentParser()
-    p.add_argument(
-        "--env_id", type=str, default="Hopper-v3",
-        choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
-        help="Envriment to train on",
-    )
-    p.add_argument(
-        "--algo",
-        type=str,
-        default="sac",
-        choices=['ppo', 'sac',],
-        help="RL algo to use",
-    )
-    p.add_argument("--num_steps", type=int, default= 2 * 1e6)
-    p.add_argument("--rollout_length", type=int, default=None)
-    p.add_argument("--batch_size", type=int, default=256)
-    p.add_argument("--buffer_size", type=int, default=1 * 1e6)
-
-    p.add_argument("--eval_interval", type=int, default=5 * 1e3)
-    p.add_argument("--num_eval_episodes", type=int, default=10)
-    p.add_argument("--cuda", action="store_true")
-    p.add_argument("--fp16", action="store_true")
-    p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--verbose", type=int, default=2)
-    p.add_argument("--debug", action="store_true")
-    p.add_argument("--profiling", "-prof", action="store_true", default=False)
-    p.add_argument("--use_wandb", "-wb", action="store_true", default=False)
-    
-    args = p.parse_args()
-
-    # Enforce type int
-    args.num_steps = int(args.num_steps)
-    args.batch_size = int(args.batch_size)
-    args.buffer_size = int(args.buffer_size)
-    args.device = "cuda" if args.cuda else "cpu"
+    args=CLI()
 
     if args.debug:
         import numpy as np
