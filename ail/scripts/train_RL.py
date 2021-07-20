@@ -1,7 +1,6 @@
 import os
 import argparse
 from datetime import datetime
-from torch.nn.modules.module import T
 import yaml
 
 try:
@@ -99,26 +98,34 @@ def run(args):
         log_dir=log_dir,
         log_interval=10_000,
         verbose=args.verbose,
-        use_wandb=args.use_wandb,
+        use_wandb=args.use_wandb, # TODO: not implemented wandb intergration
     )
     trainer.run_training_loop()
 
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--env_id", type=str, default="InvertedPendulum-v2")
-    # p.add_argument("--env_id", type=str, default="HalfCheetah-v2")
-    # p.add_argument("--env_id", type=str, default="Hopper-v3")
     # p.add_argument("--env_id", type=str, default="InvertedPendulum-v2")
-
-    p.add_argument("--algo", type=str, default="sac")
-
-    p.add_argument("--num_steps", type=int, default=0.05 * 1e6)
+    # p.add_argument("--env_id", type=str, default="HalfCheetah-v2")
+    p.add_argument("--env_id", type=str, default="Hopper-v3")
+    # p.add_argument(
+    #     "--env_id", type=str, default="Hopper-v3",
+    #     choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
+    #     help="Envriment to train on",
+    # )
+    p.add_argument(
+        "--algo",
+        type=str,
+        default="sac",
+        choices=['ppo', 'sac',],
+        help="RL algo to use",
+    )
+    p.add_argument("--num_steps", type=int, default= 2 * 1e6)
     p.add_argument("--rollout_length", type=int, default=None)
     p.add_argument("--batch_size", type=int, default=256)
-    p.add_argument("--buffer_size", type=int, default=3 * 1e6)
+    p.add_argument("--buffer_size", type=int, default=1 * 1e6)
 
-    p.add_argument("--eval_interval", type=int, default=0.5 * 1e3)
+    p.add_argument("--eval_interval", type=int, default=5 * 1e3)
     p.add_argument("--num_eval_episodes", type=int, default=10)
     p.add_argument("--cuda", action="store_true")
     p.add_argument("--fp16", action="store_true")
