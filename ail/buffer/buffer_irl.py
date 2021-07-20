@@ -555,7 +555,7 @@ class RolloutBuffer(BaseBuffer):
         return "RolloutBuffer"
         
 
-class BUFFER_TYPE(Enum):
+class BufferType(Enum):
     rollout = RolloutBuffer
     replay = ReplayBuffer
     rolloutbuffer = RolloutBuffer

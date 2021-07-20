@@ -11,7 +11,7 @@ from torch.nn.utils import clip_grad_norm_
 from ail.agents.base import BaseAgent
 from ail.network.policies import StateIndependentPolicy
 from ail.network.value import mlp_value
-from ail.buffer.buffer_irl import BUFFER_TYPE
+from ail.buffer.buffer_irl import BufferType
 
 from ail.common.utils import dataclass_quick_asdict
 from ail.common.pytorch_util import to_numpy, orthogonal_init
@@ -142,7 +142,7 @@ class BaseRLAgent(BaseAgent, ABC):
         extra_shapes = {k: shape_dict[k] for k in data if k in shape_dict}
         extra_dtypes = {k: dtypes_dict[k] for k in data if k in dtypes_dict}
 
-        buffer_cls = BUFFER_TYPE[buffer_type.lower()].value
+        buffer_cls = BufferType[buffer_type.lower()].value
         
         self.buffer = buffer_cls(
             capacity=self.buffer_size,

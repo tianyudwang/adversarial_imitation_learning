@@ -18,14 +18,15 @@ def build_mlp(
     """
     Build a feedforward neural network.
     given sizes of each layer.
+    
     :param sizes: Sizes of hidden layers.
     :param activation: Activation function.
     :param output_activation: Output Activation function.
         Default nn.Identity().
     :param use_spectral_norm: Apply spectral norm.
-        Useful when training a GAN
-    :returns: (Neural Network with fully-connected linear layers and
-        activation layers)
+        Useful when training a GAN.
+    :returns: Neural Network with fully-connected linear layers and
+        activation layers.
     """
     # String name to Activation function conversion
     if isinstance(activation, str):
@@ -44,13 +45,12 @@ def build_mlp(
 
 
 def count_vars(module) -> int:
+    """Count number of parameters in neural network."""
     return sum([np.prod(p.shape) for p in module.parameters()])
 
 
 def orthogonal_init(module: nn.Module, gain: float = 1) -> None:
-    """
-    Orthogonal initialization (used in PPO and A2C)
-    """
+    """Orthogonal initialization. (used in PPO and A2C)"""
     if isinstance(module, (nn.Linear, nn.Conv2d)):
         nn.init.orthogonal_(module.weight, gain=gain)
         if module.bias is not None:
@@ -58,24 +58,22 @@ def orthogonal_init(module: nn.Module, gain: float = 1) -> None:
 
 
 def disable_gradient(net: nn.Module) -> None:
-    """Freeze the gradient in network"""
+    """Freeze the gradient in network."""
     for param in net.parameters():
         param.requires_grad = False
 
 
 def enable_gradient(net: nn.Module) -> None:
-    """Enable gradient in network"""
+    """Enable gradient in network."""
     for param in net.parameters():
         param.requires_grad = True
 
 
 def init_gpu(use_gpu=True, gpu_id=0) -> th.device:
-    """init device('cuda:0' or 'cpu')"""
-    # (Yifan): I modify it to return device instead of setting a global variable
-    # (Yifan): I think it's better to have device as an input argument
+    """Initialize device. ('cuda:0' or 'cpu')"""
     if th.cuda.is_available() and use_gpu:
         device = th.device("cuda:" + str(gpu_id))
-        Console.info(f"Using GPU id {gpu_id}\n")
+        Console.info(f"Using GPU id {gpu_id}.\n")
     else:
         device = th.device("cpu")
         if not th.cuda.is_available():
@@ -92,12 +90,13 @@ def to_torch(
 ) -> th.Tensor:
     """
     Convert a numpy array to a PyTorch tensor.
-    Note: it copies the data by default
+    Note: it copies the data by default.
+    
     :param array:
-    :param device: PyTorch device to which the values will be converted
-    :param copy: Whether to copy or not the data
+    :param device: PyTorch device to which the values will be converted.
+    :param copy: Whether to copy or not the data.
         (may be useful to avoid changing things be reference)
-    :return: torch tensor
+    :return: torch tensor.
     """
     if copy:
         return th.tensor(array, dtype=th.float32).to(device)
@@ -108,11 +107,12 @@ def to_torch(
 
 
 def to_numpy(tensor: th.Tensor) -> np.ndarray:
-    """Convert torch tensor to numpy array and send to CPU"""
+    """Convert torch tensor to numpy array and send to CPU."""
     return tensor.detach().cpu().numpy()
 
 
-def asarray_shape2d(x) -> np.ndarray:
+def asarray_shape2d(x:Union[th.Tensor, np.ndarray, float, int]) -> np.ndarray:
+    """Convert input into numpy array and reshape so that n_dim = 2."""
     if isinstance(x, th.Tensor):
         return to_numpy(x).reshape(1, -1)
     else:

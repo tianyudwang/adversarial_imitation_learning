@@ -16,7 +16,7 @@ LOG2PI = log(2 * pi)
 
 def pure_discount_cumsum(x, discount) -> list:
     """
-    Discount cumsum implemented in pure python
+    Discount cumsum implemented in pure python.
     (For an input of size N,
     it requires O(N) operations and takes O(N) time steps to complete.)
     :param x: vector [x0, x1, x2]
@@ -31,7 +31,7 @@ def pure_discount_cumsum(x, discount) -> list:
 def discount_cumsum(x, discount) -> np.ndarray:
     """
     magic from rllab for computing discounted cumulative sums of vectors.
-    Note this is a faster when vector is large (e.g: len(x) >= 1e3)
+    Note this is a faster when vector is large. (e.g: len(x) >= 1e3)
     :param x: vector [x0, x1, x2]
     :param discount: float
     :return:[x0 + discount * x1 + discount^2 * x2,   x1 + discount * x2, ... , xn]
@@ -42,14 +42,17 @@ def discount_cumsum(x, discount) -> np.ndarray:
 
 
 def normalize(x, mean, std, eps=1e-8):
+    """Normalize or standardize."""
     return (x - mean) / (std + eps)
 
 
 def unnormalize(x, mean, std):
+    """Unnormalize or Unstandardize."""
     return x * std + mean
 
 
 def reparameterize(means: th.Tensor, log_stds: th.Tensor):
+    """Reparameterize Trick."""
     noises = th.randn_like(means)
     us = means + noises * log_stds.exp()
     actions = th.tanh(us)
@@ -57,6 +60,7 @@ def reparameterize(means: th.Tensor, log_stds: th.Tensor):
 
 
 def atanh(x: th.Tensor):
+    """Numerical stable atanh."""
     # pytorch's atanh does not clamp the value learning to Nan/inf
     return 0.5 * (th.log(1 + x + 1e-6) - th.log(1 - x + 1e-6))
 
@@ -67,6 +71,7 @@ def evaluate_lop_pi(means: th.Tensor, log_stds: th.Tensor, actions: th.Tensor):
 
 
 def calculate_log_pi(log_stds, noises, actions):
+    """Calculate log probability of squash Gaussian."""
     gaussian_log_probs = (-0.5 * noises.pow(2) - log_stds).sum(
         dim=-1, keepdim=True
     ) - 0.5 * LOG2PI * log_stds.size(-1)
@@ -78,7 +83,7 @@ def calculate_log_pi(log_stds, noises, actions):
 
 def squash_logprob_correction(actions: th.Tensor) -> th.Tensor:
     """
-    Squash correction (from original SAC implementation)
+    Squash correction. (from original SAC implementation)
     log(1 - tanh(x)^2)
     # TODO: mark 1e-6
     this code is more numerically stable.

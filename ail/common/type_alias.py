@@ -24,6 +24,7 @@ Activation = Union[str, nn.Module]
 # ----------------------------------------------------------------
 # string to object naming conventions
 class StrToActivation(Enum):
+    """Torch activation function."""
     relu = nn.ReLU()
     relu_inplace = nn.ReLU(inplace=True)
     tanh = nn.Tanh()
@@ -35,6 +36,7 @@ class StrToActivation(Enum):
 
 
 class OPT(Enum):
+    """Torch optimizers."""
     adam = Adam
     adamw = AdamW
     adam_w = AdamW
@@ -44,6 +46,7 @@ class OPT(Enum):
 # Buffer shape and dtype
 @dataclass(frozen=True, eq=False)
 class Extra_shape:
+    """Shape of extra data store in buffer."""
     advs: Tuple[int, ...] = (1,)
     rets: Tuple[int, ...] = (1,)
     vals: Tuple[int, ...] = (1,)
@@ -52,6 +55,7 @@ class Extra_shape:
 
 @dataclass(frozen=True, eq=False)
 class Extra_dtypes:
+    """Dtypes of extra data store in buffer."""
     advs: np.dtype = np.float32
     rets: np.dtype = np.float32
     vals: np.dtype = np.float32

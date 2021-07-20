@@ -10,7 +10,7 @@ from ail.network.value import StateFunction, StateActionFunction
 from ail.common.type_alias import Activation
 
 
-class Arch(Enum):
+class ArchType(Enum):
     """Arch types of Discriminator"""
 
     s = auto()
@@ -83,7 +83,7 @@ class DiscrimNet(nn.Module, ABC):
 
     def _init_model(self, disc_kwargs):
         disc_type = disc_kwargs.get("disc_type", "")
-        if disc_type == Arch.s:
+        if disc_type == ArchType.s:
             self.hidden_units_r = self.disc_kwargs.get(
                 "hidden_units_r", self.hidden_units
             )
@@ -104,7 +104,7 @@ class DiscrimNet(nn.Module, ABC):
                 self.spectral_norm,
             )
 
-        elif disc_type == Arch.sa:
+        elif disc_type == ArchType.sa:
             self.f = StateActionFunction(
                 self.state_dim,
                 self.action_dim,
@@ -113,9 +113,9 @@ class DiscrimNet(nn.Module, ABC):
                 self.spectral_norm,
             )
 
-        elif disc_type == Arch.ss:
+        elif disc_type == ArchType.ss:
             raise NotImplementedError()
-        elif disc_type == Arch.sas:
+        elif disc_type == ArchType.sas:
             raise NotImplementedError()
         else:
             raise NotImplementedError(
@@ -175,7 +175,7 @@ class AIRLStateDiscrim(DiscrimNet):
         disc_kwargs: Optional[Dict[str, Any]] = None,
     ):
         if disc_kwargs is None:
-            disc_kwargs = {"disc_type", Arch.s}
+            disc_kwargs = {"disc_type", ArchType.s}
 
         super().__init__(
             state_dim, None, hidden_units, hidden_activation, gamma, disc_kwargs
@@ -244,7 +244,7 @@ class AIRLStateActionDiscrim(DiscrimNet):
         disc_kwargs: Optional[Dict[str, Any]] = None,
     ):
         if disc_kwargs is None:
-            disc_kwargs = {"disc_type", Arch.sa}
+            disc_kwargs = {"disc_type", ArchType.sa}
 
         super().__init__(
             state_dim, action_dim, hidden_units, hidden_activation, gamma, disc_kwargs

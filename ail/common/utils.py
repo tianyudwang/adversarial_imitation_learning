@@ -9,6 +9,7 @@ import torch as th
 
 
 def set_random_seed(seed: int) -> None:
+    """Set random seed to both numpy and torch."""
     random.seed(seed)
     np.random.seed(seed)
     th.manual_seed(seed)
@@ -16,6 +17,7 @@ def set_random_seed(seed: int) -> None:
 
 
 def countdown(t_sec) -> None:
+    """Countdown t seconds."""
     while t_sec:
         mins, secs = divmod(t_sec, 60)
         time_format = f"{mins: 02d}:{secs: 02d}"

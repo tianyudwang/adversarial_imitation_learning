@@ -100,10 +100,26 @@ def run(args):
         verbose=args.verbose,
         use_wandb=args.use_wandb, # TODO: not implemented wandb intergration
     )
-    trainer.run_training_loop()
+    
+    if args.profiling:
+        import cProfile
+        import pstats
+
+        with cProfile.Profile() as pr:
+            trainer.run_training_loop()
+
+        stats = pstats.Stats(pr)
+        stats.sort_stats(pstats.SortKey.TIME)
+        stats.dump_stats(filename="run_profiling.prof")
+        stats.print_stats()
+    else:
+        trainer.run_training_loop()
 
 
 if __name__ == "__main__":
+    # ENVIRONMENT VARIABLE
+    os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # modify to assign a meaningful name
+    
     p = argparse.ArgumentParser()
     p.add_argument(
         "--env_id", type=str, default="Hopper-v3",
@@ -128,7 +144,10 @@ if __name__ == "__main__":
     p.add_argument("--fp16", action="store_true")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--verbose", type=int, default=2)
+    p.add_argument("--debug", action="store_true")
+    p.add_argument("--profiling", "-prof", action="store_true", default=False)
     p.add_argument("--use_wandb", "-wb", action="store_true", default=False)
+    
     args = p.parse_args()
 
     # Enforce type int
@@ -137,4 +156,10 @@ if __name__ == "__main__":
     args.buffer_size = int(args.buffer_size)
     args.device = "cuda" if args.cuda else "cpu"
 
+    if args.debug:
+        import numpy as np
+        import torch as th
+        np.seterr(all='raise')
+        th.autograd.set_detect_anomaly(True)
+        
     run(args)

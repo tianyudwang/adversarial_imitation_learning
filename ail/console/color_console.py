@@ -73,7 +73,7 @@ COLORS = {
 
 
 class CustomFormatter(logging.Formatter):
-    """Logging Formatter to add colors and count warning / errors"""
+    """Logging Formatter to add colors and count warning / errors."""
 
     def __init__(self):
         super().__init__()
