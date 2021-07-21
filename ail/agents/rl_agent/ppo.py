@@ -245,7 +245,7 @@ class PPO(OnPolicyAgent):
         with autocast(enabled=self.fp16):
             loss_critic = (self.critic(states) - targets).pow_(2).mean()
         self.one_gradient_step(loss_critic, self.optim_critic, self.critic)
-        return loss_critic
+        return loss_critic.detach()
 
     def update_actor(
         self,
@@ -300,8 +300,8 @@ class PPO(OnPolicyAgent):
             approx_kl = ((ratios - 1) - log_ratios).mean()
             clipped = ratios.gt(1 + self.clip_eps) | ratios.lt(1 - self.clip_eps)
             clip_frac = th.as_tensor(clipped, dtype=th.float32).mean()
-            pi_info = {"kl": approx_kl, "ent": approx_ent, "cf": clip_frac}
-        return loss_actor, pi_info
+            pi_info = {"kl": approx_kl, "ent": approx_ent.detach(), "cf": clip_frac}
+        return loss_actor.detach(), pi_info
 
     def save_models(self, save_dir: str) -> None:
         """

@@ -40,7 +40,7 @@ class BaseIRLAgent(BaseAgent, ABC):
 
         if buffer_kwargs is None:
             buffer_kwargs = {}
-        
+
         # self.gen_algo = gen(**gen_kwargs)
         # self.disc = disc(**disc_kwargs)
         # self.lr_disc = lr_disc
@@ -51,11 +51,12 @@ class BaseIRLAgent(BaseAgent, ABC):
         if isinstance(buffer_exp, ReplayBuffer):
             self.buffer_exp = buffer_exp
         elif isinstance(buffer_exp, str):
-            assert len(buffer_kwargs) > 0, "Need specifies buffer_kwargs for replay buffer."
+            assert (
+                len(buffer_kwargs) > 0
+            ), "Need specifies buffer_kwargs for replay buffer."
             self.buffer_exp = BufferType[buffer_exp].from_data(**buffer_kwargs)
         else:
             raise ValueError(f"Unsupported buffer type: {buffer_exp}")
-        
 
     @abstractmethod
     def train_generator(self):

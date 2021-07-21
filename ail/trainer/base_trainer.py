@@ -96,21 +96,22 @@ class BaseTrainer(ABC):
         for d in [self.log_dir, self.summary_dir, self.model_dir]:
             if not os.path.exists(d):
                 os.makedirs(d, exist_ok=True)
-        
+
         # Check if use wandb
         if use_wandb:
-            try: 
+            try:
                 import wandb
+
                 self.use_wandb = True
             except ImportError:
                 Console.warning(
-                "`wandb` Module Not Found. You can do `pip install wandb` "
-                "If you want to use it. Fall back to tensorboard logging"
+                    "`wandb` Module Not Found. You can do `pip install wandb` "
+                    "If you want to use it. Fall back to tensorboard logging"
                 )
                 self.use_wandb = False
         else:
             self.use_wandb = False
-                
+
         # Placeholder for tensorboard SummaryWriter.
         self.writer = None
 

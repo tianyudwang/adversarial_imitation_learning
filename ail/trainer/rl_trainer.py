@@ -98,9 +98,10 @@ class RL_Trainer(BaseTrainer):
 
         if self.use_wandb:
             import wandb
+
             if wandb_kwargs is None:
                 wandb_kwargs = {}
-                
+
             if wandb_kwargs.get("log_param", True):
                 # wandb magic to track gradients.
                 wandb.watch(
@@ -110,8 +111,7 @@ class RL_Trainer(BaseTrainer):
                 )
             # Sync with tensorboard.
             wandb.tensorboard.patch(root_logdir=self.summary_dir, pytorch=True)
-                    
-        
+
         # Log setting.
         self.writer = SummaryWriter(log_dir=self.summary_dir)
 

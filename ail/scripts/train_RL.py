@@ -17,8 +17,9 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 try:
     from dotenv import load_dotenv, find_dotenv  # noqa
+
     load_dotenv(find_dotenv())
-    
+
 except ImportError:
     pass
 
@@ -36,7 +37,10 @@ def CLI():
         "--algo",
         type=str,
         default="sac",
-        choices=["ppo","sac",],
+        choices=[
+            "ppo",
+            "sac",
+        ],
         help="RL algo to use",
     )
     p.add_argument("--num_steps", type=int, default=0.5 * 1e6)
@@ -57,14 +61,14 @@ def CLI():
     args = p.parse_args()
 
     args.device = "cuda" if args.cuda else "cpu"
-    
+
     # Enforce type int
     args.num_steps = int(args.num_steps)
     args.batch_size = int(args.batch_size)
     args.buffer_size = int(args.buffer_size)
     # How often (in terms of steps) to output training info.
     args.log_interval = args.batch_size * args.log_every_n_updates
-    
+
     return args
 
 
@@ -133,7 +137,6 @@ def run(args):
     else:
         raise ValueError()
 
-
     time = datetime.now().strftime("%Y%m%d-%H%M")
     exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{time}")
     log_dir = os.path.join("runs", exp_name)
@@ -141,8 +144,13 @@ def run(args):
         os.makedirs(log_dir, exist_ok=True)
 
     # Mainly for wandb.watch function
-    wandb_kwargs = dict(log_param=True, log_type="gradients", log_freq=1_000)    
-    
+    wandb_kwargs = dict(
+        # strategy="hist",  # TODO: may implment this
+        log_param=True,
+        log_type="gradients",
+        log_freq=100,
+    )
+
     config = dict(
         num_steps=args.num_steps,
         env=args.env_id,
@@ -160,7 +168,7 @@ def run(args):
         use_wandb=args.use_wandb,  # TODO: not implemented wandb intergration
         wandb_kwargs=wandb_kwargs,
     )
-    
+
     # Saving hyperparams to yaml file
     with open(os.path.join(log_dir, "hyperparams.yaml"), "w") as f:
         yaml.dump(algo_kwargs, f)
@@ -170,6 +178,7 @@ def run(args):
     if args.use_wandb:
         try:
             import wandb
+
             # Save API key for convenience or you have to login every time
             wandb.login()
             wandb.init(
@@ -183,8 +192,8 @@ def run(args):
             config = wandb.config
         except ImportError:
             print("`wandb` Module Not Found")
-            sys.exit(0)    
-    
+            sys.exit(0)
+
     trainer = RL_Trainer(**config)
 
     if args.profiling:
@@ -207,7 +216,7 @@ if __name__ == "__main__":
     os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # modify to assign a meaningful name
 
     args = CLI()
-    
+
     if args.debug:
         import numpy as np
 
@@ -218,5 +227,5 @@ if __name__ == "__main__":
         # TODO: investigate this
         # os.environ["OMP_NUM_THREADS"] = "1"
         # torch backends
-        th.backends.cudnn.benchmark = True
+        th.backends.cudnn.benchmark = True  # ? Does this useful for non-convolutions?
     run(args)
