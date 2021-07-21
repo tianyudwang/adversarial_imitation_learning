@@ -1,7 +1,7 @@
-from ail.agents.base_agent import BaseAgent
+from ail.agents.irl_agent.irl_core import BaseIRLAgent
 
 
-class AIRL(BaseAgent):
+class AIRL(BaseIRLAgent):
     def __init__(self, agent_flags):
         super(AIRL, self).__init__()
 

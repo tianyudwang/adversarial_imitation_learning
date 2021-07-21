@@ -1,10 +1,12 @@
 import os
 from abc import ABC, abstractmethod
-from typing import Union, Optional, Dict, Any
+from typing import Union, Optional, Tuple, Dict, Any
 from functools import partial
 from math import sqrt
 
+import numpy as np
 import torch as th
+from torch import nn
 from torch.nn.utils import clip_grad_norm_
 
 
@@ -75,13 +77,13 @@ class BaseRLAgent(BaseAgent, ABC):
     def info(self) -> Dict[Any, Any]:
         return {}
 
-    def explore(self, state: th.Tensor):
+    def explore(self, state: th.Tensor) -> Tuple[np.ndarray, th.Tensor]:
         assert isinstance(state, th.Tensor)
         with th.no_grad():
             action, log_pi = self.actor.sample(state.unsqueeze_(0))
         return to_numpy(action)[0], log_pi
 
-    def exploit(self, state):
+    def exploit(self, state) -> np.ndarray:
         assert isinstance(state, th.Tensor)
 
         with th.no_grad():
@@ -89,19 +91,19 @@ class BaseRLAgent(BaseAgent, ABC):
         return to_numpy(action)[0]
 
     @abstractmethod
-    def is_update(self, step):
+    def is_update(self, step) -> bool:
         raise NotImplementedError()
 
     @abstractmethod
-    def update(self, *args, **kwargs):
+    def update(self, *args, **kwargs) -> Dict[str, Any]:
         raise NotImplementedError()
 
     @abstractmethod
-    def save_models(self, save_dir):
+    def save_models(self, save_dir) -> None:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
-    def _init_models_componet(self, policy_kwargs: Dict[str, Any]):
+    def _init_models_componet(self, policy_kwargs: Dict[str, Any]) -> None:
         """Check if the core componet exits in policy kwargs."""
         assert policy_kwargs is not None, "policy_kwargs cannot be None."
         assert isinstance(
@@ -131,8 +133,9 @@ class BaseRLAgent(BaseAgent, ABC):
         self.lr_actor = policy_kwargs["lr_actor"]
         self.lr_critic = policy_kwargs["lr_critic"]
 
-    def _init_buffer(self, buffer_type: str):
+    def _init_buffer(self, buffer_type: str) -> None:
         """Initialize the rollout/replay buffer."""
+        assert isinstance(buffer_type, str), "buffer_type should be a string"
         data = self.buffer_kwargs.get("extra_data", [])
         if not isinstance(data, (list, tuple)):
             data = [data]
@@ -156,7 +159,11 @@ class BaseRLAgent(BaseAgent, ABC):
         )
 
     # Helper methods
-    def weight_initiation(self):
+    def weight_initiation(self) -> None:
+        """
+        Support weight initialization
+            orthogonal only for now  # TODO: add more weight initialization methods
+        """
         # Originally from openai/baselines (default gains/init_scales).
         module_gains = {
             self.actor: sqrt(2),
@@ -165,8 +172,13 @@ class BaseRLAgent(BaseAgent, ABC):
         for module, gain in module_gains.items():
             module.apply(partial(orthogonal_init, gain=gain))
 
-    def one_gradient_step(self, loss, opt, net):
-        """take one gradient step with grad clipping.(AMP support)"""
+    def one_gradient_step(
+        self,
+        loss: th.Tensor,
+        opt: th.optim.Optimizer,
+        net: nn.Module,
+    ) -> None:
+        """Take one gradient step with grad clipping.(AMP support)"""
         if self.fp16:
             # AMP.
             self.scaler.scale(loss).backward()

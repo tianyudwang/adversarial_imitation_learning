@@ -1,5 +1,6 @@
 from typing import Union, Optional, Tuple, Dict, Any
 
+import numpy as np
 import torch as th
 from torch.cuda.amp import autocast
 
@@ -146,8 +147,12 @@ class PPO(OnPolicyAgent):
         return step % self.batch_size == 0
 
     def step(
-        self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
-    ):
+        self, 
+        env: GymEnv,
+        state: th.Tensor,
+        t: th.Tensor,
+        step: Optional[int] = None
+    ) -> Tuple[np.ndarray, int]:
         """
         Intereact with environment and store the transition.
         return: next_state, episode length
@@ -178,7 +183,7 @@ class PPO(OnPolicyAgent):
 
         return next_state, t
 
-    def update(self):
+    def update(self, log: bool=False) -> Dict[str, Any]:
         """
         A general road map for updating the model.
         Obtain the training batch and perform update.
@@ -188,9 +193,12 @@ class PPO(OnPolicyAgent):
         rollout_data = self.buffer.get()
         self.buffer.reset()
         train_logs = self.update_ppo(rollout_data)
-        return train_logs
+        if log:
+            return train_logs
+        else:
+            return {}
 
-    def update_ppo(self, data: TensorDict):
+    def update_ppo(self, data: TensorDict) -> Dict[str, Any]:
         """
         Update the actor and critic.
         :param data: a batch of randomly sampled transitions
@@ -220,17 +228,17 @@ class PPO(OnPolicyAgent):
 
         # Return log changes(key used for logging name).
         return {
-            "actor_loss": loss_actor.item(),
-            "critic_loss": loss_critic.item(),
-            "approx_kl": pi_info["kl"].item(),
-            "entropy": pi_info["ent"].item(),
-            "clip_fraction": pi_info["cf"].item(),
+            "actor_loss": loss_actor,
+            "critic_loss": loss_critic,
+            "approx_kl": pi_info["kl"],
+            "entropy": pi_info["ent"],
+            "clip_fraction": pi_info["cf"],
             "pi_lr": self.lr_actor,
             "vf_lr": self.lr_critic,
             "learn_steps_ppo": self.learning_steps_ppo,
         }
 
-    def update_critic(self, states: th.Tensor, targets: th.Tensor):
+    def update_critic(self, states: th.Tensor, targets: th.Tensor) -> th.Tensor:
         """
         Update critic. (value function approximation)
         :param states:
@@ -299,7 +307,7 @@ class PPO(OnPolicyAgent):
             pi_info = {"kl": approx_kl, "ent": approx_ent, "cf": clip_frac}
         return loss_actor, pi_info
 
-    def save_models(self, save_dir: str):
+    def save_models(self, save_dir: str) -> None:
         """
         Save the model. (Only save actor to reduce workloads)
         """

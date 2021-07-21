@@ -30,7 +30,8 @@ class BaseTrainer(ABC):
         By default, we enforce to create a copy of training env for evaluation.
     :param save_freq: How often to save the current policy.
     :param log_dir: path to log directory
-    :param log_interval: How often to output training info.
+    :param log_interval: How often (in terms of steps) to output training info.
+        Recommend batch_size * log_every_n_updates
     :param seed: random seed.
     :param verbose: The verbosity level: 0 no output, 1 info, 2 debug.
     :param use_wandb: Wether to use wandb for metrics visualization.
@@ -99,6 +100,16 @@ class BaseTrainer(ABC):
         self.use_wandb = use_wandb
         self.writer = None
 
+        self.tb_tags = {
+            "actor_loss": "loss/actor",
+            "critic_loss": "loss/critic",
+            "entropy_loss": "loss/entropy",
+            "entropy": "info/actor/entropy",
+            "entropy_coef": "info/actor/entropy_coef",
+            "approx_kl": "info/actor/approx_kl",
+            "clip_fraction": "info/actor/clip_fraction",
+        }
+
         # Log and Saving.
         self.save_freq = save_freq
         self.eval_interval = eval_interval
@@ -111,7 +122,6 @@ class BaseTrainer(ABC):
         self.n_steps_pbar = tqdm(range(1, num_steps + 1))
         self.best_ret = -float("inf")
         self.rs = RunningStats()
-        self.train_count = 0
 
         # Other parameters.
         self.num_steps = num_steps
@@ -218,8 +228,7 @@ class BaseTrainer(ABC):
 
             print("-" * 41)
             self.output_block(train_logs, tag="Train", color="back_bold_green")
-            self.output_block(time_logs, tag="Time", color="back_bold_cyan")
-
+            self.output_block(time_logs, tag="Time", color="back_bold_blue")
             print("\n")
 
     def eval_logging(
@@ -269,8 +278,8 @@ class BaseTrainer(ABC):
         print("".join([COLORS[color], f"| {tag + '/': <10}{'|': >29}"]))
         for k, v in logs.items():
             a = f"|  {k: <15}\t{'| '}"
-            if isinstance(v, float):
-                b = f"{v: <12.3e}\t|" if abs(v) < 1e-4 else f"{v: <12.3f}\t|"
+            if isinstance(v, (float, th.Tensor, np.ndarray)):
+                b = f"{v: <12.3e}\t|" if abs(v) < 1e-4 else f"{v: <12.4f}\t|"
             else:
                 b = f"{v: <12}\t|"
             print("".join([a, b]))
@@ -281,7 +290,10 @@ class BaseTrainer(ABC):
     # -----------------------
 
     def metric_to_tb(
-        self, step: int, train_logs: Dict[str, Any], eval_logs: Dict[str, Any]
+        self,
+        step: int,
+        train_logs: Dict[str, Any],
+        eval_logs: Dict[str, Any],
     ) -> None:
         # Train logs
         self.writer.add_scalar(
@@ -303,21 +315,13 @@ class BaseTrainer(ABC):
             "return/test/ep_rew_std", eval_logs.get("std_return"), step
         )
 
-    def info_to_tb(self, train_logs: Dict[str, Any], epoch: int) -> None:
+    def info_to_tb(self, train_logs: Dict[str, Any], step: int) -> None:
         """Logging to tensorboard or wandb (if sync)"""
         assert train_logs is not None, "train log can not be `None`"
         if len(train_logs) > 0:
-            self.writer.add_scalar("loss/actor", train_logs.get("actor_loss"), epoch)
-            self.writer.add_scalar("loss/critic", train_logs.get("critic_loss"), epoch)
-            self.writer.add_scalar(
-                "info/actor/approx_kl", train_logs.get("approx_kl"), epoch
-            )
-            self.writer.add_scalar(
-                "info/actor/entropy", train_logs.get("entropy"), epoch
-            )
-            self.writer.add_scalar(
-                "info/actor/clip_fraction", train_logs["clip_fraction"], epoch
-            )
+            for k, v in train_logs.items():
+                if k in self.tb_tags:
+                    self.writer.add_scalar(self.tb_tags[k], v, step)
 
     def save_models(self, save_dir: str, verbose: bool = False, **kwargs) -> None:
         # use algo.sav_mdoels directly for now
@@ -327,6 +331,17 @@ class BaseTrainer(ABC):
     # -----------------------
     # Helper functions.
     # -----------------------
+    @staticmethod
+    def convert_logs(logs: Dict[str, th.Tensor]):
+        for k, v in logs.items():
+            if isinstance(v, float):
+                continue
+            elif isinstance(v, np.ndarray):
+                logs[k] = np.mean(v)
+            else:
+                logs[k] = th.as_tensor(v, dtype=th.float32).mean()
+        return logs
+
     @staticmethod
     def duration(start_time: float) -> str:
         return str(timedelta(seconds=int(time() - start_time)))

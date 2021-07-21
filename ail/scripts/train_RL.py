@@ -33,11 +33,11 @@ def CLI():
         ],
         help="RL algo to use",
     )
-    p.add_argument("--num_steps", type=int, default=0.05 * 1e6)
+    p.add_argument("--num_steps", type=int, default=0.5 * 1e6)
     p.add_argument("--rollout_length", type=int, default=None)
     p.add_argument("--batch_size", type=int, default=256)
     p.add_argument("--buffer_size", type=int, default=1 * 1e6)
-
+    p.add_argument("--log_every_n_updates", "-lg", type=int, default=20)
     p.add_argument("--eval_interval", type=int, default=5 * 1e3)
     p.add_argument("--num_eval_episodes", type=int, default=10)
     p.add_argument("--cuda", action="store_true")
@@ -55,6 +55,9 @@ def CLI():
     args.batch_size = int(args.batch_size)
     args.buffer_size = int(args.buffer_size)
     args.device = "cuda" if args.cuda else "cpu"
+
+    args.log_interval = args.batch_size * args.log_every_n_updates
+
     return args
 
 
@@ -102,8 +105,12 @@ def run(args):
             buffer_kwargs=dict(with_reward=True, extra_data=["log_pis"]),
             # SAC only args
             lr_alpha=3e-4,
-            start_steps=10_000,
+            log_alpha_init=1.0,
             tau=0.02,  # 0.005
+            start_steps=10_000,
+            # * encourage to sync following two params to reduce overhead
+            num_gradient_steps=1,  # ! slow O(n)
+            target_update_interval=1,
             # poliy args: net arch, activation, lr
             policy_kwargs=dict(
                 pi=(128, 128),
@@ -140,7 +147,7 @@ def run(args):
         num_eval_episodes=args.num_eval_episodes,
         save_freq=50_000,
         log_dir=log_dir,
-        log_interval=10_000,
+        log_interval=args.log_interval,
         verbose=args.verbose,
         use_wandb=args.use_wandb,  # TODO: not implemented wandb intergration
     )

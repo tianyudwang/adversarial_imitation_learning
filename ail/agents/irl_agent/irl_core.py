@@ -42,3 +42,12 @@ class BaseIRLAgent(BaseAgent, ABC):
         # Expert's buffer.
         self.batch_size = batch_size
         self.buffer_exp = buffer_exp
+
+    @abstractmethod
+    def train_generator(self):
+        """Train generator (RL policy)"""
+        raise NotImplementedError()
+
+    def train_generator(self):
+        """Train discriminator"""
+        raise NotImplementedError()

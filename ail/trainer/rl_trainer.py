@@ -1,4 +1,5 @@
 from typing import Union, Optional, Dict, Any
+from collections import defaultdict
 from pprint import pprint
 from time import time
 import re
@@ -102,20 +103,37 @@ class RL_Trainer(BaseTrainer):
         # Initialize the environment.
         obs = self.env.reset()
 
+        # log = []
         for step in self.n_steps_pbar:
             # Pass to the algorithm to update state and episode timestep.
             # * return of algo.step() is next_obs
             obs, t = self.algo.step(self.env, obs, t, step)
-
+            
             # Update the algorithm whenever ready.
             if self.algo.is_update(step):
-                train_logs = self.algo.update()
-                self.train_logging(train_logs, step)
-                self.train_count += 1
-                # Log changes from training updates.
-                # TODO: set a better interval to log to reduce overhead.
-                if self.train_count % 2 == 0:  # ! naive one: half
+                
+                if self.is_train_logging(step):
+                    train_logs = self.algo.update(log=True)
+                    train_logs = self.convert_logs(train_logs)
+                    # Log changes from training updates.
+                    self.train_logging(train_logs, step)
+                    # TODO: Set a better log strategy to reduce overhead. Current downsampling.
+                    # TODO: Summarization / histogram.
                     self.info_to_tb(train_logs, step)
+                    # TODO: Set a better log strategy to reduce overhead. Current downsampling.
+                    # TODO: implement two more logging strategies: Summarization / histogram.
+                    # log.append(train_logs)
+                    # if len(log) == 5:
+                    #     summary = defaultdict(list)
+                    #     for info in log:
+                    #         for k, v in info.items():
+                    #             summary[k].append(v)
+                    #     summary = self.convert_logs(summary)
+                    #     ic(summary)
+                    #     self.info_to_tb(summary, step)
+                    #     log.clear()
+                else:
+                    self.algo.update(log=False)
 
             # Evaluate regularly.
             if step % self.eval_interval == 0:

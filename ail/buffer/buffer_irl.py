@@ -9,6 +9,15 @@ from ail.common.type_alias import GymEnv
 
 
 class Buffer:
+    __slots__ = [
+        "capacity",
+        "sample_shapes",
+        "_arrays",
+        "stored_keys",
+        "_n_data",
+        "_idx",
+        "device",
+    ]
     """
     A FIFO ring buffer for NumPy arrays of a fixed shape and dtype.
     Supports random sampling with replacement.
@@ -110,7 +119,10 @@ class Buffer:
         return buf
 
     def store(
-        self, data: Dict[str, np.ndarray], truncate_ok: bool = False, missing_ok=True
+        self,
+        data: Dict[str, np.ndarray],
+        truncate_ok: bool = False,
+        missing_ok: bool = True,
     ) -> None:
         """
         Stores new data samples, replacing old samples with FIFO priority.
@@ -178,19 +190,19 @@ class Buffer:
             Otherwise, store only the final `self.capacity` transitions.
         Note: serve as singe pair store
         """
-        # sample should has shape (1, n):
+        # * Sample should has shape (1, n):
         # 1 is the number of samples, n is the dimension of that sample
         n_samples = np.unique([arr.shape[0] for arr in data.values()])
         assert len(n_samples) == 1
+
         n_samples = n_samples[0]
         assert n_samples <= self.capacity - self._idx
         idx_hi = self._idx + n_samples
+
         for k in data.keys():
             if not truncate_ok:
-
                 if self._n_data + n_samples > self.capacity:
                     raise ValueError("exceed buffer capacity")
-
             self._arrays[k][self._idx : idx_hi] = data[k]
         self._idx = idx_hi % self.capacity
         self._n_data = int(min(self._n_data + n_samples, self.capacity))
@@ -204,11 +216,17 @@ class Buffer:
         # TODO: ERE (https://arxiv.org/pdf/1906.04009.pdf)
         assert isinstance(n_samples, int)
         assert self.size() != 0, "Buffer is empty"
-        # uniform sampling
+        # Uniform sampling
         ind = np.random.randint(self.size(), size=n_samples)
         return {k: self.to_torch(buffer[ind]) for k, buffer in self._arrays.items()}
 
     def get(self, n_samples: Optional[int] = None) -> Dict[str, th.Tensor]:
+        """
+        Returns samples in the buffer with order preserved.
+        :param: n_samples: The number of samples to return.
+            By default, return all samples in the buffer, if n_samples is None.
+        return: Tensor Dict
+        """
         if n_samples is None:
             assert self.size() == self.capacity, "Buffer is not full"
             return self._get_samples()
@@ -220,10 +238,9 @@ class Buffer:
     def _get_samples(self, batch_idxes: Union[np.ndarray, slice] = None):
         """Get a batch size or whole buffer size with order preserved."""
         batch_idxes = slice(0, self.capacity) if batch_idxes is None else batch_idxes
-        out = {
+        return {
             k: self.to_torch(buffer[batch_idxes]) for k, buffer in self._arrays.items()
         }
-        return out
 
     def to_torch(self, array: np.ndarray, copy: bool = True, **kwargs) -> th.Tensor:
         """
@@ -247,6 +264,8 @@ class Buffer:
 
 
 class BaseBuffer:
+    __slots__ = ["capacity", "sample_shapes", "dtypes", "device", "_buffer"]
+
     """
     Base class that represent a buffer (rollout or replay)
 
@@ -388,6 +407,10 @@ class BaseBuffer:
         return self._buffer.sample(n_samples)
 
     def get(self, n_samples: Optional[int] = None):
+        """
+        Obtain a batch of samples with size = n_samples. (order preserved)
+            By default, return all samples in the buffer, if n_samples is None.
+        """
         out = self._buffer.get(n_samples)
         return out
 

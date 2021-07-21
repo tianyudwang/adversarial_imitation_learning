@@ -1,7 +1,7 @@
 from math import sqrt
 
 
-class RunningStats(object):
+class RunningStats:
     """Based on (https://www.johndcook.com/standard_deviation.html)."""
 
     __slots__ = ["n", "old_m", "new_m", "old_s", "new_s"]

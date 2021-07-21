@@ -1,4 +1,5 @@
-from typing import Union, Optional, Dict, Any
+from typing import Union, Optional, Tuple, Dict, Any
+from collections import defaultdict
 from copy import deepcopy
 
 import numpy as np
@@ -214,7 +215,7 @@ class SAC(OffPolicyAgent):
             next_state = env.reset()
         return next_state, t
 
-    def update(self) -> Dict[str, Any]:
+    def update(self, log: bool = False) -> Dict[str, Any]:
         """
         A general Roadmap
         for each gradient step do
@@ -225,14 +226,19 @@ class SAC(OffPolicyAgent):
             -Update target network weights every n gradient steps
         end for
         """
+        train_logs = defaultdict(list)
         for gradient_step in range(self.num_gradient_steps):
             self.learning_steps += 1
             # Random uniform sampling a batch of transitions, B = {(s, a, r, s',d)}, from buffer.
             replay_data = self.buffer.sample(self.batch_size)
-            train_logs = self.update_sac(replay_data, gradient_step)
+            info = self.update_sac(replay_data, gradient_step)
+            if log:
+                for k in info.keys():
+                    train_logs[k].append(info[k])
+
         return train_logs
 
-    def update_sac(self, data: TensorDict, gradient_step: int) -> TensorDict:
+    def update_sac(self, data: TensorDict, gradient_step: int) -> Dict[str, Any]:
         """
         Update the actor and critic and target network as well.
         :param data: a batch of randomly sampled transitions
@@ -250,23 +256,31 @@ class SAC(OffPolicyAgent):
         actions_new, log_pis_new = self.actor.sample(states)
 
         # Update and obtain the entropy coefficient.
-        self.update_alpha(log_pis_new)
+        loss_alpha = self.update_alpha(log_pis_new)
 
         # First run one gradient descent step for Q1 and Q2
-        self.update_critic(states, actions, rewards, dones, next_states)
+        loss_critic = self.update_critic(states, actions, rewards, dones, next_states)
 
         # Freeze Q-networks so we don't waste computational effort
         # computing gradients for them during the policy learning step.
         disable_gradient(self.critic)
-        self.update_actor(states, actions_new, log_pis_new)
+        loss_actor = self.update_actor(states, actions_new, log_pis_new)
         enable_gradient(self.critic)
 
         # Update target networks by polyak averaging.
         if gradient_step % self.target_update_interval == 0:
             self.update_target()
-        return {}  # TODO: add train logs
+        return {
+            "actor_loss": loss_actor,
+            "critic_loss": loss_critic,
+            "entropy_loss": loss_alpha,
+            "entropy_coef": self.alpha,
+            "pi_lr": self.lr_actor,
+            "vf_lr": self.lr_critic,
+            "ent_lr":self.lr_alpha,
+        }
 
-    def update_alpha(self, log_pis_new):
+    def update_alpha(self, log_pis_new: th.Tensor) -> th.Tensor:
         """
         Optimize entropy coefficient (alpha)
         L(alpha) = E_{at ∼ pi_t} [−alpha * log pi(a_t |s_t ) − alpha * H].
@@ -288,11 +302,16 @@ class SAC(OffPolicyAgent):
                 self.log_alpha * (self.target_entropy + log_pis_new).detach()
             ).mean()
         self.one_gradient_step(loss_alpha, self.optim_alpha, self.log_alpha)
+        return loss_alpha.detach()
 
-        # loss_alpha.backward()
-        # self.optim_alpha.step()
-
-    def update_critic(self, states, actions, rewards, dones, next_states):
+    def update_critic(
+        self,
+        states: th.Tensor,
+        actions: th.Tensor,
+        rewards: th.Tensor,
+        dones: th.Tensor,
+        next_states: th.Tensor,
+    ) -> Tuple[th.Tensor, Dict[str, Any]]:
         """Update Q-functions by one step of gradient"""
         self.optim_critic.zero_grad(set_to_none=self.optim_set_to_none)
 
@@ -319,13 +338,11 @@ class SAC(OffPolicyAgent):
             loss_critic2 = (curr_qs2 - target_qs).pow_(2).mean()
             loss_critic = loss_critic1 + loss_critic2
         self.one_gradient_step(loss_critic, self.optim_critic, self.critic)
-
-        # (loss_critic1 + loss_critic2).backward()
-        # self.optim_critic.step()
+        return loss_critic.detach()
 
     def update_actor(
         self, states: th.Tensor, actions_new: th.Tensor, log_pis_new: th.Tensor
-    ):
+    ) -> th.Tensor:
         """
         Update policy by one step of gradient
         :param states: states from the replay buffer
@@ -339,9 +356,7 @@ class SAC(OffPolicyAgent):
             qs = th.min(qs1, qs2)
             loss_actor = (self.alpha * log_pis_new - qs).mean()
         self.one_gradient_step(loss_actor, self.optim_actor, self.actor)
-
-        # loss_actor.backward()
-        # self.optim_actor.step()
+        return loss_actor.detach()
 
     def update_target(self):
         """update the target network by polyak averaging."""
