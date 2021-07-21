@@ -1,7 +1,12 @@
 import os
+import sys
 import argparse
 from datetime import datetime
+
 import yaml
+import torch as th
+
+from ail.trainer import RL_Trainer
 
 try:
     from icecream import install  # noqa
@@ -10,8 +15,12 @@ try:
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noq
 
-from ail.agents import ALGO
-from ail.trainer import RL_Trainer
+try:
+    from dotenv import load_dotenv, find_dotenv  # noqa
+    load_dotenv(find_dotenv())
+    
+except ImportError:
+    pass
 
 
 def CLI():
@@ -27,10 +36,7 @@ def CLI():
         "--algo",
         type=str,
         default="sac",
-        choices=[
-            "ppo",
-            "sac",
-        ],
+        choices=["ppo","sac",],
         help="RL algo to use",
     )
     p.add_argument("--num_steps", type=int, default=0.5 * 1e6)
@@ -45,24 +51,25 @@ def CLI():
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--verbose", type=int, default=2)
     p.add_argument("--debug", action="store_true")
-    p.add_argument("--profiling", "-prof", action="store_true", default=False)
-    p.add_argument("--use_wandb", "-wb", action="store_true", default=False)
+    p.add_argument("--profiling", "-prof", action="store_true")
+    p.add_argument("--use_wandb", "-wb", action="store_true")
 
     args = p.parse_args()
 
+    args.device = "cuda" if args.cuda else "cpu"
+    
     # Enforce type int
     args.num_steps = int(args.num_steps)
     args.batch_size = int(args.batch_size)
     args.buffer_size = int(args.buffer_size)
-    args.device = "cuda" if args.cuda else "cpu"
-
+    # How often (in terms of steps) to output training info.
     args.log_interval = args.batch_size * args.log_every_n_updates
-
+    
     return args
 
 
 def run(args):
-
+    """Training Configuration"""
     algo_kwargs = dict(
         # common args
         device=args.device,
@@ -126,19 +133,20 @@ def run(args):
     else:
         raise ValueError()
 
+
     time = datetime.now().strftime("%Y%m%d-%H%M")
-    log_dir = os.path.join("runs", args.env_id, args.algo, f"seed{args.seed}-{time}")
+    exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{time}")
+    log_dir = os.path.join("runs", exp_name)
     if not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
 
-    # Saving hyperparams to yaml file
-    with open(os.path.join(log_dir, "hyperparams.yaml"), "w") as f:
-        yaml.dump(algo_kwargs, f)
-
-    trainer = RL_Trainer(
+    # Mainly for wandb.watch function
+    wandb_kwargs = dict(log_param=True, log_type="gradients", log_freq=1_000)    
+    
+    config = dict(
         num_steps=args.num_steps,
         env=args.env_id,
-        algo=ALGO[args.algo],
+        algo=args.algo,
         algo_kwargs=algo_kwargs,
         env_kwargs=None,
         max_ep_len=args.rollout_length,
@@ -150,7 +158,34 @@ def run(args):
         log_interval=args.log_interval,
         verbose=args.verbose,
         use_wandb=args.use_wandb,  # TODO: not implemented wandb intergration
+        wandb_kwargs=wandb_kwargs,
     )
+    
+    # Saving hyperparams to yaml file
+    with open(os.path.join(log_dir, "hyperparams.yaml"), "w") as f:
+        yaml.dump(algo_kwargs, f)
+
+    # Log with tensorboard and sync to wandb dashboard as well
+    # https://docs.wandb.ai/guides/integrations/tensorboard
+    if args.use_wandb:
+        try:
+            import wandb
+            # Save API key for convenience or you have to login every time
+            wandb.login()
+            wandb.init(
+                project="AIL",
+                notes="tweak baseline",
+                tags=["baseline"],
+                config=config,  # Hyparams & meta data
+            )
+            wandb.run.name = exp_name
+            # make sure to use the same config as passed to wandb
+            config = wandb.config
+        except ImportError:
+            print("`wandb` Module Not Found")
+            sys.exit(0)    
+    
+    trainer = RL_Trainer(**config)
 
     if args.profiling:
         import cProfile
@@ -172,12 +207,16 @@ if __name__ == "__main__":
     os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # modify to assign a meaningful name
 
     args = CLI()
-
+    
     if args.debug:
         import numpy as np
-        import torch as th
 
         np.seterr(all="raise")
         th.autograd.set_detect_anomaly(True)
 
+    if args.cuda:
+        # TODO: investigate this
+        # os.environ["OMP_NUM_THREADS"] = "1"
+        # torch backends
+        th.backends.cudnn.benchmark = True
     run(args)

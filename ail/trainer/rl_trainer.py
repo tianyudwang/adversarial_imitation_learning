@@ -6,6 +6,7 @@ import re
 
 from torch.utils.tensorboard import SummaryWriter
 
+from ail.agents import ALGO
 from ail.agents.rl_agent.rl_core import OnPolicyAgent, OffPolicyAgent
 from ail.common.type_alias import GymEnv
 from ail.trainer import BaseTrainer
@@ -31,6 +32,7 @@ class RL_Trainer(BaseTrainer):
     :param seed: random seed.
     :param verbose: The verbosity level: 0 no output, 1 info, 2 debug.
     :param use_wandb: Wether to use wandb for metrics visualization.
+    :param wandb_kwargs: kwargs to pass to wandb.init.
     """
 
     def __init__(
@@ -49,6 +51,7 @@ class RL_Trainer(BaseTrainer):
         log_interval: int = 10_000,
         verbose: int = 2,
         use_wandb: bool = False,
+        wandb_kwargs: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         super().__init__(
@@ -72,11 +75,18 @@ class RL_Trainer(BaseTrainer):
             print("-" * 10, f"{algo}", "-" * 10)
             pprint(algo_kwargs)
 
-        self.algo = algo(
-            self.env.observation_space,
-            self.env.action_space,
-            **algo_kwargs,
-        )
+        if isinstance(algo, str):
+            self.algo = ALGO[algo.lower()](
+                self.env.observation_space,
+                self.env.action_space,
+                **algo_kwargs,
+            )
+        else:
+            self.algo = algo(
+                self.env.observation_space,
+                self.env.action_space,
+                **algo_kwargs,
+            )
 
         # number of variables and net arch.
         if self.verbose > 1:
@@ -86,6 +96,22 @@ class RL_Trainer(BaseTrainer):
         # Sync same device with algo.
         self.device = self.algo.device
 
+        if self.use_wandb:
+            import wandb
+            if wandb_kwargs is None:
+                wandb_kwargs = {}
+                
+            if wandb_kwargs.get("log_param", True):
+                # wandb magic to track gradients.
+                wandb.watch(
+                    self.algo,
+                    log=wandb_kwargs.get("log_type", "gradients"),
+                    log_freq=wandb_kwargs.get("log_freq", 1000),
+                )
+            # Sync with tensorboard.
+            wandb.tensorboard.patch(root_logdir=self.summary_dir, pytorch=True)
+                    
+        
         # Log setting.
         self.writer = SummaryWriter(log_dir=self.summary_dir)
 
