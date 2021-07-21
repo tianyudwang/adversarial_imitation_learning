@@ -277,7 +277,7 @@ class SAC(OffPolicyAgent):
             "entropy_coef": self.alpha,
             "pi_lr": self.lr_actor,
             "vf_lr": self.lr_critic,
-            "ent_lr":self.lr_alpha,
+            "ent_lr": self.lr_alpha,
         }
 
     def update_alpha(self, log_pis_new: th.Tensor) -> th.Tensor:

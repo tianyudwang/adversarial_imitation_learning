@@ -108,17 +108,16 @@ class RL_Trainer(BaseTrainer):
             # Pass to the algorithm to update state and episode timestep.
             # * return of algo.step() is next_obs
             obs, t = self.algo.step(self.env, obs, t, step)
-            
+
             # Update the algorithm whenever ready.
             if self.algo.is_update(step):
-                
+
                 if self.is_train_logging(step):
                     train_logs = self.algo.update(log=True)
                     train_logs = self.convert_logs(train_logs)
-                    # Log changes from training updates.
+                    # Print changes from training updates.
                     self.train_logging(train_logs, step)
-                    # TODO: Set a better log strategy to reduce overhead. Current downsampling.
-                    # TODO: Summarization / histogram.
+                    # Logging changes to tensorboard.
                     self.info_to_tb(train_logs, step)
                     # TODO: Set a better log strategy to reduce overhead. Current downsampling.
                     # TODO: implement two more logging strategies: Summarization / histogram.

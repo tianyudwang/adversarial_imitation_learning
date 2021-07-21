@@ -147,11 +147,7 @@ class PPO(OnPolicyAgent):
         return step % self.batch_size == 0
 
     def step(
-        self, 
-        env: GymEnv,
-        state: th.Tensor,
-        t: th.Tensor,
-        step: Optional[int] = None
+        self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
     ) -> Tuple[np.ndarray, int]:
         """
         Intereact with environment and store the transition.
@@ -183,7 +179,7 @@ class PPO(OnPolicyAgent):
 
         return next_state, t
 
-    def update(self, log: bool=False) -> Dict[str, Any]:
+    def update(self, log: bool = False) -> Dict[str, Any]:
         """
         A general road map for updating the model.
         Obtain the training batch and perform update.
