@@ -11,7 +11,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noq
 
 from ail.agents import ALGO
-from ail.trainer.rl_trainer import RL_Trainer
+from ail.trainer import RL_Trainer
 
 
 def CLI():

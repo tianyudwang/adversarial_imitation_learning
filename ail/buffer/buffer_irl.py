@@ -1,7 +1,6 @@
 from typing import Dict, Mapping, Optional, Tuple, Union
 from enum import Enum
 
-
 import numpy as np
 import torch as th
 

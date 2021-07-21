@@ -4,7 +4,7 @@ import gym
 import numpy as np
 import torch as th
 
-from ail.buffer.buffer_irl import RolloutBuffer
+from ail.buffer import RolloutBuffer
 
 env = gym.make("Pendulum-v0")
 

@@ -13,7 +13,7 @@ from torch.nn.utils import clip_grad_norm_
 from ail.agents.base import BaseAgent
 from ail.network.policies import StateIndependentPolicy
 from ail.network.value import mlp_value
-from ail.buffer.buffer_irl import BufferType
+from ail.buffer import BufferType
 
 from ail.common.utils import dataclass_quick_asdict
 from ail.common.pytorch_util import to_numpy, orthogonal_init

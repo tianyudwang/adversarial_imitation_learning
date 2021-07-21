@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from ail.agents.rl_agent.rl_core import OnPolicyAgent, OffPolicyAgent
 from ail.common.type_alias import GymEnv
-from ail.trainer.base_trainer import BaseTrainer
+from ail.trainer import BaseTrainer
 
 
 class RL_Trainer(BaseTrainer):
