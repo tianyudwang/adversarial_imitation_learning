@@ -13,7 +13,7 @@ try:
 
     install()
 except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noq
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 try:
     from dotenv import load_dotenv, find_dotenv  # noqa
@@ -52,6 +52,7 @@ def CLI():
     p.add_argument("--num_eval_episodes", type=int, default=10)
     p.add_argument("--cuda", action="store_true")
     p.add_argument("--fp16", action="store_true")
+    p.add_argument("--optim_cls", type=str, default="adam")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--verbose", type=int, default=2)
     p.add_argument("--debug", action="store_true")
@@ -81,7 +82,7 @@ def run(args):
         seed=args.seed,
         gamma=0.99,
         max_grad_norm=None,
-        optim_kwargs=dict(optim_cls="adamW", optim_set_to_none=True),
+        optim_kwargs=dict(optim_cls=args.optim_cls, optim_set_to_none=True),
     )
 
     if args.algo.lower() == "ppo":

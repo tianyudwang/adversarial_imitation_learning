@@ -55,9 +55,6 @@ class BaseIRLAgent(BaseAgent, ABC):
         gen_cls = ALGO[gen_algo] if isinstance(gen_algo, str) else gen_algo
         self.gen = gen_cls(**gen_kwargs)
             
-        
-        
-
     @abstractmethod
     def train_generator(self):
         """Train generator (RL policy)"""

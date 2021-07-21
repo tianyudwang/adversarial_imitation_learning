@@ -34,8 +34,8 @@ class DiscrimNet(nn.Module, ABC):
     • r(s, a) = ln D = −softplus(−h),
     • r(s, a) = −h exp(h) (introduced in FAIRL)
     # TODO: clip rewards with the absolute values higher than max reward magnitude
-    # ! The GAIL paper uses the inverse convention in which
-    # ! D denotes the probability as being classified as non-expert.
+    # * The GAIL paper uses the inverse convention in which
+    # * D denotes the probability as being classified as non-expert.
 
     The objective of the discriminator is to
     minimize cross-entropy loss

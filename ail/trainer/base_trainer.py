@@ -338,10 +338,11 @@ class BaseTrainer(ABC):
                 if k in self.tb_tags:
                     self.writer.add_scalar(self.tb_tags[k], v, step)
 
-    def save_models(self, save_dir: str, verbose: bool = False, **kwargs) -> None:
+    def save_models(self, save_dir: str, **kwargs) -> None:
         # use algo.sav_mdoels directly for now
-        Console.info(f"Saving model under {save_dir}")
-        self.algo.save_models(save_dir, verbose)
+        if self.verbose >= 1:
+            Console.info(f"Saving model under {save_dir}")
+        self.algo.save_models(save_dir)
 
     # -----------------------
     # Helper functions.
