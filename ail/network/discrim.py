@@ -269,3 +269,10 @@ class AIRLStateActionDiscrim(DiscrimNet):
         with th.no_grad():
             r = self.forward(state, **kwargs)
         return r
+
+
+class DiscrimType(Enum):
+    gail = GAILDiscrim
+    airl = AIRLStateDiscrim
+    airl_so = AIRLStateDiscrim
+    airl_sa = AIRLStateActionDiscrim

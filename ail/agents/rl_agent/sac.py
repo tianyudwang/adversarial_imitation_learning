@@ -1,6 +1,7 @@
 from typing import Union, Optional, Tuple, Dict, Any
 from collections import defaultdict
 from copy import deepcopy
+import os
 
 import numpy as np
 import torch as th
@@ -367,4 +368,4 @@ class SAC(OffPolicyAgent):
         super().save_models(save_dir)
         # TODO: (Yifan) implement this.
         # Only save actor to reduce workloads
-        # th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))
+        th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))

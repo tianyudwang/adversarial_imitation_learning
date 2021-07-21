@@ -340,8 +340,8 @@ class BaseTrainer(ABC):
 
     def save_models(self, save_dir: str, verbose: bool = False, **kwargs) -> None:
         # use algo.sav_mdoels directly for now
-        # self.algo.save_models(save_dir, verbose)
-        pass
+        Console.info(f"Saving model under {save_dir}")
+        self.algo.save_models(save_dir, verbose)
 
     # -----------------------
     # Helper functions.

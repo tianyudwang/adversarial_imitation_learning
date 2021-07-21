@@ -43,7 +43,7 @@ def CLI():
         ],
         help="RL algo to use",
     )
-    p.add_argument("--num_steps", type=int, default=0.5 * 1e6)
+    p.add_argument("--num_steps", type=int, default=2 * 1e6)
     p.add_argument("--rollout_length", type=int, default=None)
     p.add_argument("--batch_size", type=int, default=256)
     p.add_argument("--buffer_size", type=int, default=1 * 1e6)
@@ -81,7 +81,7 @@ def run(args):
         seed=args.seed,
         gamma=0.99,
         max_grad_norm=None,
-        optim_kwargs=dict(optim_cls="adam", optim_set_to_none=False),
+        optim_kwargs=dict(optim_cls="adamW", optim_set_to_none=True),
     )
 
     if args.algo.lower() == "ppo":

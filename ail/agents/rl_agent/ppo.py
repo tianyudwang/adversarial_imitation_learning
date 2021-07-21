@@ -1,4 +1,5 @@
 from typing import Union, Optional, Tuple, Dict, Any
+import os
 
 import numpy as np
 import torch as th
@@ -308,5 +309,4 @@ class PPO(OnPolicyAgent):
         Save the model. (Only save actor to reduce workloads)
         """
         super().save_models(save_dir)
-        # TODO: implement save actor
-        # th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))
+        th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))
