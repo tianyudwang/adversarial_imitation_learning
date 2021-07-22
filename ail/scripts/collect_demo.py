@@ -20,8 +20,6 @@ from ail.common.env_utils import maybe_make_env
 from ail.common.utils import set_random_seed
 from ail.common.pytorch_util import asarray_shape2d,
 
-# os.environ["LD_LIBRARY_PATH"] = "$LD_LIBRARY_PATH:/home/yiw084/.mujoco/mujoco200/bin"
-
 
 def collect_demo(
     env, algo, buffer_size: int, device, seed=0, render=False, sb3_model=None

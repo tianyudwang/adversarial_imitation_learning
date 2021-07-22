@@ -20,12 +20,12 @@ class GAIL(BaseIRLAgent):
         batch_size: int,
         buffer_exp: Union[ReplayBuffer, str],
         buffer_kwargs: Dict[str, Any],
-        gen_algo:Union[OnPolicyAgent, OffPolicyAgent, str],
+        gen_algo: Union[OnPolicyAgent, OffPolicyAgent, str],
         gen_kwargs: Dict[str, Any],
         disc_cls: Union[DiscrimNet, str],
         disc_kwargs: Dict[str, Any],
         lr_disc: float,
-        optim_kwargs: Optional[Dict[str, Any]]=None,    
+        optim_kwargs: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             state_space,
@@ -40,26 +40,23 @@ class GAIL(BaseIRLAgent):
             gen_kwargs,
             optim_kwargs,
         )
-        
+
         if disc_cls is None:
             disc_cls = "gail"
-        
+
         if disc_kwargs is None:
             disc_kwargs = {}  # * hidden, activation,
-            
+
         # Discriminator
         if isinstance(disc_cls, str):
             assert (
-                disc_cls.lower() =="gail"
+                disc_cls.lower() == "gail"
             ), "GAIL only support string Discriminator type: gail"
-            disc_cls = DiscrimType[disc_cls.lower()].value  
-        
+            disc_cls = DiscrimType[disc_cls.lower()].value
+
         self.disc = disc_cls(self.obs_dim, self.act_dim, **disc_kwargs)
         self.lr_disc = lr_disc
         self.optim_disc = self.optim_cls(self.disc.parameters(), lr=self.lr_disc)
-
-
-
 
     def train_discriminator(self):
         pass

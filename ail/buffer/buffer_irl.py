@@ -261,7 +261,7 @@ class Buffer:
     def to_numpy(tensor: th.Tensor) -> np.ndarray:
         """Convert torch tensor to numpy array and send to CPU."""
         return tensor.detach().cpu().numpy()
-    
+
     def save(self, save_dir: str) -> None:
         dir_name = os.path.dirname(save_dir)
         if not os.path.exists(dir_name):
@@ -274,7 +274,6 @@ class Buffer:
             done=self._array["dones"],
             nxet_obs=self._array["nxt_obs"],
         )
-        
 
 
 class BaseBuffer:
@@ -475,7 +474,7 @@ class BaseBuffer:
         instance._init_buffer()
         instance.store(transitions, truncate_ok=truncate_ok)
         return instance
-    
+
     def save(self, save_dir) -> None:
         """Save trainsitions to save_dir."""
         self._buffer.save(save_dir)

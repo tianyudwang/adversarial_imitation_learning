@@ -11,7 +11,6 @@ from ail.common.type_alias import GymSpace
 from ail.network.discrim import DiscrimNet
 
 
-
 class BaseIRLAgent(BaseAgent, ABC):
     def __init__(
         self,
@@ -23,7 +22,7 @@ class BaseIRLAgent(BaseAgent, ABC):
         batch_size: int,
         buffer_exp: Union[ReplayBuffer, str],
         buffer_kwargs: Dict[str, Any],
-        gen_algo:Union[OnPolicyAgent, OffPolicyAgent, str],
+        gen_algo: Union[OnPolicyAgent, OffPolicyAgent, str],
         gen_kwargs: Dict[str, Any],
         optim_kwargs: Optional[Dict[str, Any]],
     ):
@@ -50,11 +49,11 @@ class BaseIRLAgent(BaseAgent, ABC):
             self.buffer_exp = BufferType[buffer_exp].from_data(**buffer_kwargs)
         else:
             raise ValueError(f"Unsupported buffer type: {buffer_exp}")
-    
+
         # Generator
         gen_cls = ALGO[gen_algo] if isinstance(gen_algo, str) else gen_algo
         self.gen = gen_cls(**gen_kwargs)
-            
+
     @abstractmethod
     def train_generator(self):
         """Train generator (RL policy)"""

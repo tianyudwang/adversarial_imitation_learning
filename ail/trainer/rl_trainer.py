@@ -168,5 +168,5 @@ class RL_Trainer(BaseTrainer):
             # Saving the model.
             if self.is_saving_model(step):
                 self.save_models(os.path.join(self.model_dir, f"step{step}"))
-            
+
         self.finish_logging()
