@@ -8,7 +8,7 @@ from torch.cuda.amp import autocast
 from ail.agents.rl_agent.rl_core import OnPolicyAgent
 from ail.common.math import normalize
 from ail.common.type_alias import TensorDict, GymEnv, GymSpace
-from ail.common.pytorch_util import asarray_shape2d, count_vars, obs_as_tensor
+from ail.common.pytorch_util import asarray_shape2d, obs_as_tensor
 
 
 def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True):
@@ -136,13 +136,6 @@ class PPO(OnPolicyAgent):
     def __repr__(self):
         return "PPO"
 
-    def info(self) -> Dict:
-        """
-        Count variables.
-        (protip): try to get a feel for how different size networks behave!
-        """
-        return {module: count_vars(module) for module in [self.actor, self.critic]}
-
     def is_update(self, step: int) -> bool:
         """wheter to pefrom update"""
         return step % self.batch_size == 0
@@ -157,7 +150,7 @@ class PPO(OnPolicyAgent):
         t += 1
         action, log_pi = self.explore(obs_as_tensor(state, self.device))
         next_state, reward, done, info = env.step(action)
-        # TODO: may remove mask, test this
+
         # * (Yifan) Intuitively, mask make sence that agent keeps alive which is not done by env
         mask = False if t == env._max_episode_steps else done
 
@@ -180,7 +173,7 @@ class PPO(OnPolicyAgent):
 
         return next_state, t
 
-    def update(self, log: bool = False) -> Dict[str, Any]:
+    def update(self, log_this_batch: bool = False) -> Dict[str, Any]:
         """
         A general road map for updating the model.
         Obtain the training batch and perform update.
@@ -188,14 +181,15 @@ class PPO(OnPolicyAgent):
         """
         self.learning_steps += 1
         rollout_data = self.buffer.get()
+        # Clear buffer after getting entire buffer.
         self.buffer.reset()
-        train_logs = self.update_ppo(rollout_data)
-        if log:
+        train_logs = self.update_algo(rollout_data)
+        if log_this_batch:
             return train_logs
         else:
             return {}
 
-    def update_ppo(self, data: TensorDict) -> Dict[str, Any]:
+    def update_algo(self, data: TensorDict) -> Dict[str, Any]:
         """
         Update the actor and critic.
         :param data: a batch of randomly sampled transitions
@@ -266,7 +260,8 @@ class PPO(OnPolicyAgent):
         log_pis = self.actor.evaluate_log_pi(states, actions)
 
         # ? Does analytical form exists?
-        # * (Yifan) Since we bounded the mean action with tanh(), there is no analytical form of entropy
+        # * (Yifan) Since we bounded the mean action with tanh(),
+        # * there is no analytical form of entropy
         # Approximate entropy.
         approx_ent = -log_pis.mean()
 

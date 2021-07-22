@@ -36,20 +36,32 @@ def CLI():
     p.add_argument(
         "--algo",
         type=str,
-        default="sac",
+        default="airl",
+        choices=[
+            "airl",
+            "gail",
+        ],
+        help="Adversarial imitation algo to use",
+    )
+    p.add_argument(
+        "--gen_algo",
+        type=str,
+        default="ppo",
         choices=[
             "ppo",
             "sac",
         ],
-        help="RL algo to use",
+        help="RL algo to use as generator",
     )
     p.add_argument("--num_steps", type=int, default=2 * 1e6)
     p.add_argument("--rollout_length", type=int, default=None)
-    p.add_argument("--batch_size", type=int, default=256)
+    p.add_argument("--gen_batch_size", type=int, default=256)
+    p.add_argument("--replay_batch_size", type=int, default=256)
     p.add_argument("--buffer_size", type=int, default=1 * 1e6)
     p.add_argument("--log_every_n_updates", "-lg", type=int, default=20)
     p.add_argument("--eval_interval", type=int, default=5 * 1e3)
     p.add_argument("--num_eval_episodes", type=int, default=10)
+    p.add_argument("--gamma", type=float, default=0.99)
     p.add_argument("--cuda", action="store_true")
     p.add_argument("--fp16", action="store_true")
     p.add_argument("--optim_cls", type=str, default="adam")
@@ -58,7 +70,6 @@ def CLI():
     p.add_argument("--debug", action="store_true")
     p.add_argument("--profiling", "-prof", action="store_true")
     p.add_argument("--use_wandb", "-wb", action="store_true")
-
     args = p.parse_args()
 
     args.device = "cuda" if args.cuda else "cpu"
@@ -80,18 +91,17 @@ def run(args):
         device=args.device,
         fp16=args.fp16,
         seed=args.seed,
-        gamma=0.99,
+        gamma=args.gamma,
         max_grad_norm=None,
         optim_kwargs=dict(optim_cls=args.optim_cls, optim_set_to_none=True),
     )
 
-    if args.algo.lower() == "ppo":
+    if args.gen_algo.lower() == "ppo":
         # state_ space, action space inside trainer
         ppo_kwargs = dict(
             # buffer args
             batch_size=args.batch_size,  # PPO assums batch size == buffer_size
-            buffer_size=args.buffer_size,  # only used in SAC,
-            buffer_kwargs=dict(with_reward=True, extra_data=["log_pis"]),
+            buffer_kwargs=dict(with_reward=False, extra_data=["log_pis"]),
             # PPO only args
             epoch_ppo=10,
             gae_lambda=0.97,
@@ -107,18 +117,18 @@ def run(args):
                 lr_critic=3e-4,
             ),
         )
-        algo_kwargs.update(ppo_kwargs)
+        gen_kwargs = {**algo_kwargs, **ppo_kwargs}
 
-    elif args.algo.lower() == "sac":
+    elif args.gen_algo.lower() == "sac":
         sac_kwargs = dict(
             # buffer args
             batch_size=args.batch_size,  # PPO assums batch size == buffer_size
             buffer_size=args.buffer_size,  # only used in SAC,
-            buffer_kwargs=dict(with_reward=True, extra_data=["log_pis"]),
+            buffer_kwargs=dict(with_reward=False, extra_data=["log_pis"]),
             # SAC only args
             lr_alpha=3e-4,
             log_alpha_init=1.0,
-            tau=0.02,  # 0.005
+            tau=0.005,
             start_steps=10_000,
             # * encourage to sync following two params to reduce overhead
             num_gradient_steps=1,  # ! slow O(n)
@@ -133,10 +143,29 @@ def run(args):
                 lr_critic=7.3 * 1e-4,
             ),
         )
-        algo_kwargs.update(sac_kwargs)
+        gen_kwargs = {**algo_kwargs, **sac_kwargs}
 
     else:
         raise ValueError()
+
+    algo_kwargs.update(
+        dict(
+            epoch_disc=10,
+            replay_batch_size=args.replay_batch_size,
+            buffer_exp="replay",
+            buffer_kwargs=dict(with_reward=False),
+            gen_algo=args.gen_algo,
+            gen_kwargs=gen_kwargs,
+            disc_cls="airl_sa",
+            disc_kwargs=dict(
+                hidden_units=(128, 128),
+                hidden_activation="relu_inplace",
+                gamma=args.gamma,
+                disc_kwargs={"spectral_norm": False},
+            ),
+            lr_disc=3e-4,
+        )
+    )
 
     time = datetime.now().strftime("%Y%m%d-%H%M")
     exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{time}")

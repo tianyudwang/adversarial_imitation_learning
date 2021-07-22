@@ -9,15 +9,14 @@ import torch as th
 from torch import nn
 from torch.nn.utils import clip_grad_norm_
 
-
 from ail.agents.base import BaseAgent
 from ail.network.policies import StateIndependentPolicy
 from ail.network.value import mlp_value
 from ail.buffer import BufferType
 
 from ail.common.utils import dataclass_quick_asdict
-from ail.common.pytorch_util import to_numpy, orthogonal_init
-from ail.common.type_alias import GymSpace, EXTRA_SHAPES, EXTRA_DTYPES
+from ail.common.pytorch_util import count_vars, to_numpy, orthogonal_init
+from ail.common.type_alias import GymEnv, GymSpace, EXTRA_SHAPES, EXTRA_DTYPES
 
 
 class BaseRLAgent(BaseAgent, ABC):
@@ -74,8 +73,19 @@ class BaseRLAgent(BaseAgent, ABC):
         self.max_grad_norm = max_grad_norm
         self.clipping = max_grad_norm is not None
 
-    def info(self) -> Dict[Any, Any]:
-        return {}
+    def info(self) -> Dict[nn.Module, int]:
+        """
+        Count variables.
+        (protip): try to get a feel for how different size networks behave!
+        """
+        models = [self.actor, self.critic]
+        return {module: count_vars(module) for module in models}
+
+    @abstractmethod
+    def step(
+        self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
+    ) -> Tuple[np.ndarray, int]:
+        raise NotImplementedError()
 
     def explore(self, state: th.Tensor) -> Tuple[np.ndarray, th.Tensor]:
         assert isinstance(state, th.Tensor)

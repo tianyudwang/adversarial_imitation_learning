@@ -140,10 +140,12 @@ class RL_Trainer(BaseTrainer):
             if self.algo.is_update(step):
 
                 if self.is_train_logging(step):
-                    train_logs = self.algo.update(log=True)
+                    train_logs = self.algo.update(log_this_batch=True)
                     train_logs = self.convert_logs(train_logs)
+
                     # Print changes from training updates.
                     self.train_logging(train_logs, step)
+
                     # Logging changes to tensorboard.
                     self.info_to_tb(train_logs, step)
                     # TODO: Set a better log strategy to reduce overhead. Current downsampling.
@@ -159,7 +161,7 @@ class RL_Trainer(BaseTrainer):
                     #     self.info_to_tb(summary, step)
                     #     log.clear()
                 else:
-                    self.algo.update(log=False)
+                    self.algo.update(log_this_batch=False)
 
             # Evaluate regularly.
             if step % self.eval_interval == 0:

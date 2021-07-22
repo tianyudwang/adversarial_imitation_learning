@@ -147,17 +147,17 @@ class GAILDiscrim(DiscrimNet):
             state_dim, action_dim, hidden_units, hidden_activation, None, disc_kwargs
         )
 
-    def forward(self, state, action):
+    def forward(self, obs: th.Tensor, acts: th.Tensor):
         # naming `f` to keep consistent with base DiscrimNet
-        return self.f(th.cat([state, action], dim=-1))
+        return self.f(th.cat([obs, acts], dim=-1))
 
-    def calculate_reward(self, state, action):
+    def calculate_reward(self, obs, acts):
         # (GAIL) is to maximize E_{\pi} [-log(1 - D)].
         # r(s, a) = − ln(1 − D) = softplus(h)
         # TODO: modify this to softplus or keep the same
         with th.no_grad():
-            r = -F.logsigmoid(-self.forward(state, action))
-            return r
+            rews = -F.logsigmoid(-self.forward(obs, acts))
+            return rews
 
 
 class AIRLStateDiscrim(DiscrimNet):
@@ -181,7 +181,10 @@ class AIRLStateDiscrim(DiscrimNet):
             state_dim, None, hidden_units, hidden_activation, gamma, disc_kwargs
         )
 
-    def f(self, state: th.Tensor, done: th.FloatTensor, next_state: th.Tensor):
+    # TODO: remove views
+    def f(
+        self, obs: th.Tensor, dones: th.FloatTensor, next_obs: th.Tensor
+    ) -> th.Tensor:
         """
         f(s, a, s' ) = g_θ (s) + \gamma h_φ (s') − h_φ (s)
 
@@ -189,13 +192,21 @@ class AIRLStateDiscrim(DiscrimNet):
         g: state-only reward function approximator
         h: shaping term
         """
-        r_s = self.g(state)
-        v_s = self.h(state)
-        next_vs = self.h(next_state)
+        r_s = self.g(obs)
+        v_s = self.h(obs)
+        next_vs = self.h(next_obs)
         # reshape (1-done) from (n,) to (n,1) to prevent shape mismatch
-        return r_s + self.gamma * (1 - done).view(-1, 1) * next_vs - v_s
+        return r_s + self.gamma * (1 - dones).view(-1, 1) * next_vs - v_s
 
-    def forward(self, state, done, next_state, log_pi=None, **kwargs):
+    def forward(
+        self,
+        obs: th.Tensor,
+        dones: th.Tensor,
+        next_obs: th.Tensor,
+        log_pis: Optional[th.Tensor] = None,
+        subtract_logp: bool = True,
+        **kwargs,
+    ):
         """
         Policy Objective
         \hat{r}_t = log[D_θ(s,a)] - log[1-D_θ(s,a)]
@@ -203,28 +214,33 @@ class AIRLStateDiscrim(DiscrimNet):
         = f_θ (s,a) - log \pi (a|s)
         """
         # TODO: verify this in paper
-        if log_pi is not None:
+        if log_pis is not None and subtract_logp:
             # Discriminator's output is sigmoid(f - log_pi).
             # reshape log_pi to prevent size mismatch
-            return self.f(state, done, next_state) - log_pi.view(-1, 1)
+            return self.f(obs, dones, next_obs) - log_pis.view(-1, 1)
         else:
-            return self.f(state, done, next_state)
+            return self.f(obs, dones, next_obs)
 
     def calculate_reward(
-        self, state, done, next_state, log_pi: Optional[th.Tensor] = None
+        self,
+        obs: th.Tensor,
+        dones: th.Tensor,
+        next_obs: th.Tensor,
+        log_pis: Optional[th.Tensor] = None,
+        **kwargs,
     ):
         """
         Calculate GAN reward (can pass all data at once)
         """
         # r(s, a) = ln D − ln(1 − D) = f
         kwargs = {
-            "done": done,
-            "next_state": next_state,
-            "log_pi": log_pi,
+            "dones": dones,
+            "next_obs": next_obs,
+            "log_pis": log_pis,
         }
         with th.no_grad():
-            r = self.forward(state, **kwargs)
-        return r
+            rews = self.forward(obs, **kwargs)
+        return rews
 
 
 class AIRLStateActionDiscrim(DiscrimNet):
@@ -250,25 +266,36 @@ class AIRLStateActionDiscrim(DiscrimNet):
             state_dim, action_dim, hidden_units, hidden_activation, gamma, disc_kwargs
         )
 
-    def forward(self, obs, act, log_pi=None, **kwargs):
-        if log_pi is not None:
+    def forward(
+        self,
+        obs: th.Tensor,
+        acts: th.Tensors,
+        log_pis: Optional[th.Tensor] = None,
+        subtract_logp: bool = True,
+        **kwargs,
+    ):
+        if log_pis is not None and subtract_logp:
             # Discriminator's output is sigmoid(f - log_pi).
             # reshape log_pi to prevent size mismatch
-            return self.f(th.cat([obs, act], dim=-1)) - log_pi.view(-1, 1)
+            return self.f(th.cat([obs, acts], dim=-1)) - log_pis.view(-1, 1)
         else:
-            return self.f(th.cat([obs, act], dim=-1))
+            return self.f(th.cat([obs, acts], dim=-1))
 
     def calculate_reward(
-        self, state: th.Tensor, action: th.Tensor, log_pi: Optional[th.Tensor] = None
+        self,
+        obs: th.Tensor,
+        acts: th.Tensor,
+        log_pis: Optional[th.Tensor] = None,
+        **kwargs,
     ):
         # r(s, a) = ln D − ln(1 − D) = f
         kwargs = {
-            "action": action,
-            "log_pi": log_pi,
+            "acts": acts,
+            "log_pis": log_pis,
         }
         with th.no_grad():
-            r = self.forward(state, **kwargs)
-        return r
+            rews = self.forward(obs, **kwargs)
+        return rews
 
 
 class DiscrimType(Enum):

@@ -25,7 +25,7 @@ next_state, reward, done, info = env.step(action)
 
 data = dict(np.load(f"../../scripts/transitions/{env_id}/size11000.npz"))
 ic(data)
-buffer = ReplayBuffer.from_data(data, device='cpu', with_reward=False)
+buffer = ReplayBuffer.from_data(data, device="cpu", with_reward=False)
 
 trajectory = buffer.get()
 for k, v in trajectory.items():
@@ -36,4 +36,3 @@ samples = buffer.sample(10)
 for k, v in samples.items():
     assert v.shape[0] == 5000
     print(k, v.shape)
-    

@@ -161,20 +161,13 @@ class SAC(OffPolicyAgent):
     def __repr__(self):
         return "SAC"
 
-    def info(self):
-        """
-        Count variables.
-        protip: try to get a feel for how different size networks behave!
-        """
-        return {
-            module: count_vars(module)
-            for module in [self.actor, self.critic, self.critic_target]
-        }
-
     def is_update(self, step: int):
         return step >= max(self.start_steps, self.batch_size)
 
-    def step(self, env: GymEnv, state: th.Tensor, t: int, step: Optional[int] = None):
+    def step(
+        self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
+    ) -> Tuple[np.ndarray, int]:
+
         """
         Intereact with environment and store the transition.
 
@@ -216,7 +209,7 @@ class SAC(OffPolicyAgent):
             next_state = env.reset()
         return next_state, t
 
-    def update(self, log: bool = False) -> Dict[str, Any]:
+    def update(self, log_this_batch: bool = False) -> Dict[str, Any]:
         """
         A general Roadmap
         for each gradient step do
@@ -232,14 +225,14 @@ class SAC(OffPolicyAgent):
             self.learning_steps += 1
             # Random uniform sampling a batch of transitions, B = {(s, a, r, s',d)}, from buffer.
             replay_data = self.buffer.sample(self.batch_size)
-            info = self.update_sac(replay_data, gradient_step)
-            if log:
+            info = self.update_algo(replay_data, gradient_step)
+            if log_this_batch:
                 for k in info.keys():
                     train_logs[k].append(info[k])
 
         return train_logs
 
-    def update_sac(self, data: TensorDict, gradient_step: int) -> Dict[str, Any]:
+    def update_algo(self, data: TensorDict, gradient_step: int) -> Dict[str, Any]:
         """
         Update the actor and critic and target network as well.
         :param data: a batch of randomly sampled transitions
