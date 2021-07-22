@@ -1,5 +1,6 @@
 from typing import Dict, Mapping, Optional, Tuple, Union
 from enum import Enum
+import os
 
 import numpy as np
 import torch as th
@@ -260,6 +261,20 @@ class Buffer:
     def to_numpy(tensor: th.Tensor) -> np.ndarray:
         """Convert torch tensor to numpy array and send to CPU."""
         return tensor.detach().cpu().numpy()
+    
+    def save(self, save_dir: str) -> None:
+        dir_name = os.path.dirname(save_dir)
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+
+        np.savez(
+            save_dir,
+            obs=self._array["obs"],
+            act=self._array["act"],
+            done=self._array["dones"],
+            nxet_obs=self._array["nxt_obs"],
+        )
+        
 
 
 class BaseBuffer:
@@ -410,8 +425,7 @@ class BaseBuffer:
         Obtain a batch of samples with size = n_samples. (order preserved)
             By default, return all samples in the buffer, if n_samples is None.
         """
-        out = self._buffer.get(n_samples)
-        return out
+        return self._buffer.get(n_samples)
 
     @classmethod
     def from_data(
@@ -461,6 +475,10 @@ class BaseBuffer:
         instance._init_buffer()
         instance.store(transitions, truncate_ok=truncate_ok)
         return instance
+    
+    def save(self, save_dir) -> None:
+        """Save trainsitions to save_dir."""
+        self._buffer.save(save_dir)
 
 
 class ReplayBuffer(BaseBuffer):

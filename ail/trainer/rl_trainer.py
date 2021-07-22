@@ -2,6 +2,7 @@ from typing import Union, Optional, Dict, Any
 from collections import defaultdict
 from pprint import pprint
 from time import time
+import os
 import re
 
 from torch.utils.tensorboard import SummaryWriter
@@ -166,5 +167,6 @@ class RL_Trainer(BaseTrainer):
 
             # Saving the model.
             if self.is_saving_model(step):
-                self.save_models(step)
+                self.save_models(os.path.join(self.model_dir, f"step{step}"))
+            
         self.finish_logging()
