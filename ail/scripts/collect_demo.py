@@ -1,4 +1,3 @@
-
 import argparse
 import os
 
@@ -18,7 +17,7 @@ from ail.agents import ALGO
 from ail.buffer import ReplayBuffer
 from ail.common.env_utils import maybe_make_env
 from ail.common.utils import set_random_seed
-from ail.common.pytorch_util import asarray_shape2d,
+from ail.common.pytorch_util import asarray_shape2d
 
 
 def collect_demo(
@@ -31,7 +30,8 @@ def collect_demo(
     demo_buffer = ReplayBuffer(
         capacity=buffer_size,
         device=device,
-        env=env,
+        obs_shape=env.observation_space.shape,
+        act_shape=env.action_space.shape,
         with_reward=False,
     )
 
@@ -56,11 +56,11 @@ def collect_demo(
         data = {
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
-            "dones": asarray_shape2d(mask),  
+            "dones": asarray_shape2d(mask),
             "next_obs": asarray_shape2d(next_state),
-        }         
-        
-        demo_buffer.store(transitions = data, truncate_ok=True)
+        }
+
+        demo_buffer.store(transitions=data, truncate_ok=True)
         episode_return += reward
 
         if render:
@@ -87,7 +87,7 @@ def collect_demo(
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--weight", type=str)
+    p.add_argument("--weight", type=str, default="")
     p.add_argument("--env_id", type=str, default="HalfCheetah-v2")
     p.add_argument("--buffer_size", type=int, default=1_000 * 11)
     p.add_argument("--algo", type=str, default="")
@@ -97,22 +97,28 @@ if __name__ == "__main__":
     args = p.parse_args()
 
     sb3_ALGO = {
-        "ppo": PPO,
-        "a2c": A2C,
-        "sac": SAC,
-        "her": HER,
+        "sb3_ppo": PPO,
+        "sb3_a2c": A2C,
+        "sb3_sac": SAC,
+        "sb3_her": HER,
     }
 
-    if args.algo.stratwith('sb3'):
+    if not args.weight:
+        if args.algo.startswith("sb3"):
+            args.weight = f"../rl-trained-agents/{args.env_id}"
+        else:
+            args.weight = f"../rl-trained-agents/{args.env_id}.pth"
+
+    if args.algo.startswith("sb3"):
         print(args.weight)
-        sb3_model = sb3_ALGO[args.sb3_algo].load(args.weight)
+        sb3_model = sb3_ALGO[args.algo].load(args.weight)
         algo = None
     else:
         sb3_model = None
-        algo = ALGO[args.algo]
+        algo = ALGO[args.algo].load()  # TODO implement loading of custom models
 
     buffer = collect_demo(
-        env=args.env,
+        env=args.env_id,
         algo=algo,
         buffer_size=args.buffer_size,
         device=th.device("cuda" if args.cuda else "cpu"),
@@ -121,6 +127,6 @@ if __name__ == "__main__":
         sb3_model=sb3_model,
     )
 
-    save_dir = os.path.join("buffers", args.env_id, f"size{args.buffer_size}")
+    save_dir = os.path.join("transitions", args.env_id, f"size{args.buffer_size}")
     print(f"Saving to {save_dir}")
     buffer.save(save_dir)  # default save with .npz

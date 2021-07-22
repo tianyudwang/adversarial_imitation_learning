@@ -6,7 +6,7 @@ from torch import nn
 from torch.nn.utils import spectral_norm
 
 from ail.common.type_alias import Activation, StrToActivation
-from ail.console.color_console import Console
+from ail.color_console import Console
 
 
 def build_mlp(

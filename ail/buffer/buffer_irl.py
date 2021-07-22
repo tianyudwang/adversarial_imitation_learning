@@ -269,10 +269,10 @@ class Buffer:
 
         np.savez(
             save_dir,
-            obs=self._array["obs"],
-            act=self._array["act"],
-            done=self._array["dones"],
-            nxet_obs=self._array["nxt_obs"],
+            obs=self._arrays["obs"],
+            acts=self._arrays["acts"],
+            dones=self._arrays["dones"],
+            nxet_obs=self._arrays["next_obs"],
         )
 
 
@@ -310,8 +310,8 @@ class BaseBuffer:
         self.dtypes = {}
         if env is not None:
             if np.any([x is not None for x in params]):
-                raise ValueError("Specified shape or dtype and environment.")
-
+                print("Specified shape and dtype and environment.")
+                print("Shape and dtypes will be refer to env")
             self.sample_shapes.update(
                 {
                     "obs": tuple(env.observation_space.shape),
@@ -387,8 +387,9 @@ class BaseBuffer:
         Raises:
             ValueError: The arguments didn't have the same length.
         """
-
+        assert isinstance(transitions, dict), "transitions should be a dict"
         intersect = self._buffer.stored_keys.intersection(transitions.keys())
+
         # Remove unnecessary fields
         trans_dict = {k: transitions[k] for k in intersect}
         self._buffer._store_easy(trans_dict, truncate_ok=truncate_ok)  # noqa
@@ -405,6 +406,7 @@ class BaseBuffer:
         Raises:
             ValueError: The arguments didn't have the same length.
         """
+        assert isinstance(transitions, dict), "transitions should be a dict"
         intersect = self._buffer.stored_keys.intersection(transitions.keys())
         # Remove unnecessary fields
         trans_dict = {k: transitions[k] for k in intersect}
@@ -433,6 +435,7 @@ class BaseBuffer:
         device: Union[th.device, str],
         capacity: Optional[int] = None,
         truncate_ok: bool = False,
+        with_reward: bool = True,
     ):
         """
         Construct and return a ReplayBuffer/RolloutBuffer containing the provided data.
@@ -458,9 +461,8 @@ class BaseBuffer:
         Returns:
             A new ReplayBuffer.
         """
-        # TODO: load from npz
         obs_shape = transitions["obs"].shape[1:]
-        act_shape = transitions["act"].shape[1:]
+        act_shape = transitions["acts"].shape[1:]
         if capacity is None:
             capacity = transitions["obs"].shape[0]
         instance = cls(
@@ -468,11 +470,12 @@ class BaseBuffer:
             obs_shape=obs_shape,
             act_shape=act_shape,
             obs_dtype=transitions["obs"].dtype,
-            act_dtype=transitions["act"].dtype,
+            act_dtype=transitions["acts"].dtype,
             device=device,
+            with_reward=with_reward,
         )
         instance._init_buffer()
-        instance.store(transitions, truncate_ok=truncate_ok)
+        instance.store_path(transitions, truncate_ok=truncate_ok)
         return instance
 
     def save(self, save_dir) -> None:

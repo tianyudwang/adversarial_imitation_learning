@@ -14,7 +14,7 @@ from ail.common.running_stats import RunningStats
 from ail.common.pytorch_util import obs_as_tensor
 from ail.common.type_alias import GymEnv
 from ail.common.utils import set_random_seed, get_stats, countdown
-from ail.console.color_console import COLORS, Console
+from ail.color_console import COLORS, Console
 
 
 class BaseTrainer(ABC):

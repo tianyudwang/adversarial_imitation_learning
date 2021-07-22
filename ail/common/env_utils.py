@@ -8,7 +8,7 @@ import numpy as np
 from gym.spaces import Box, Discrete, MultiDiscrete, MultiBinary
 
 from ail.common.type_alias import GymEnv, GymWrapper, GymSpace, GymDict
-from ail.console.color_console import COLORS
+from ail.color_console import COLORS
 
 
 def maybe_make_env(
