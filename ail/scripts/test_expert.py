@@ -4,7 +4,6 @@ import pathlib
 import gym
 import numpy as np
 import torch as th
-import matplotlib
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from stable_baselines3 import SAC, PPO
@@ -19,9 +18,6 @@ try:
     install()
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
-
-
-matplotlib.use("TkAgg")
 
 
 SB3_ALGO = {
@@ -50,7 +46,7 @@ def eval_th_algo(model, env_id, num_episodes=10, seed=42, render=False, sb3=Fals
             if sb3:
                 action, _ = model.predict(th.as_tensor(obs).float())
             else:
-                action, log_pi = model.actor.sample(th.as_tensor(obs).float())
+                action = model.exploit(th.as_tensor(obs).float())
             # here, action, rewards and dones are arrays
             obs, reward, done, info = eval_env.step(np.asarray(action))
             episode_rewards.append(reward)
@@ -94,6 +90,10 @@ if __name__ == "__main__":
         choices=["ppo", "sac", "sb3_ppo", "sb3_sac"],
         help="RL algo to test",
     )
+    # Policy Arch 
+    p.add_argument('--n_layers', '-l', type=int, default=2)
+    p.add_argument('--size', '-s', type=int, default=64)
+    
     p.add_argument("--rollout_length", type=int, default=None)
     p.add_argument("--num_eval_episodes", type=int, default=20)
     p.add_argument("--render", "-r", action="store_true")
@@ -128,10 +128,13 @@ if __name__ == "__main__":
         demo = SB3_ALGO[args.algo].load(args.weight)
         use_sb3 = True
     else:
+        pi_arch = [args.size] * args.n_layers
         demo = ALGO[args.algo].load(
-            dummy_env,
             path=args.weight,
             device=device,
+            policy_kwargs={"pi": pi_arch}, # * make sure the arch matches state_dict
+            env=dummy_env,
+            
         )
         demo.actor.eval()
         use_sb3 = False

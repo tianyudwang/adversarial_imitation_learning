@@ -72,11 +72,11 @@ class SAC(OffPolicyAgent):
         action_space: GymSpace,
         device: Union[th.device, str],
         seed: int,
-        batch_size: int,
-        buffer_size: int,
         policy_kwargs: Dict[str, Any],
-        lr_alpha: float,
-        start_steps: int,
+        batch_size: int = 256,
+        buffer_size: int = 10**6,
+        lr_alpha: float = 3e-4,
+        start_steps: int = 10_000,
         num_gradient_steps: int = 1,
         target_update_interval: int = 1,
         log_alpha_init: float = 1.0,
@@ -88,6 +88,7 @@ class SAC(OffPolicyAgent):
         buffer_kwargs: Optional[Dict[str, Any]] = None,
         init_buffer: bool = True,
         init_models: bool = True,
+        expert_mode: bool = False,
         **kwargs,
     ):
         super().__init__(
@@ -105,14 +106,46 @@ class SAC(OffPolicyAgent):
             buffer_kwargs,
             init_buffer,
             init_models,
+            expert_mode,
         )
+        if expert_mode:
+            self.actor = StateDependentPolicy(
+            self.obs_dim, self.act_dim, self.units_actor, 'relu'
+        ).to(self.device)
+        else:
+            self._setup_models()
+        # Entropy regularization coefficient (Inverse of the reward scale)
+        # The entropy coefficient or entropy can be learned automatically
+        # see Automating Entropy Adjustment for Maximum Entropy RL section
+        # of https://arxiv.org/abs/1812.05905
+        self.lr_alpha = lr_alpha
 
+        # Enforces an entropy constraint by varying alpha over the course of training.
+        # We optimize log(alpha) because alpha should be always bigger than 0.
+        self.log_alpha = th.log(
+            th.ones(1, device=self.device) * log_alpha_init
+        ).requires_grad_(True)
+
+        # Target entropy is -|A|.
+        self.target_entropy = -np.prod(self.action_shape).astype(np.float32)
+        self.optim_alpha = self.optim_cls([self.log_alpha], lr=self.lr_alpha)
+
+        # Other algo params.
+        self.start_steps = start_steps
+        self.num_gradient_steps = num_gradient_steps
+        self.target_update_interval = target_update_interval
+        self.tau = tau
+        self.one = th.ones(1, device=self.device)  # a constant for quick soft update
+
+    def _setup_models(self):
         # TODO: (Yifan) Build the model inside off policy class latter.
+        
         # Actor.
         self.actor = StateDependentPolicy(
             self.obs_dim, self.act_dim, self.units_actor, self.hidden_activation
         ).to(self.device)
-
+        
+        
         # Critic.
         self.critic = mlp_value(
             self.obs_dim,
@@ -130,34 +163,12 @@ class SAC(OffPolicyAgent):
 
         # Freeze target networks with respect to optimizers (only update via polyak averaging)
         disable_gradient(self.critic_target)
-
-        # Entropy regularization coefficient (Inverse of the reward scale)
-        # The entropy coefficient or entropy can be learned automatically
-        # see Automating Entropy Adjustment for Maximum Entropy RL section
-        # of https://arxiv.org/abs/1812.05905
-        self.lr_alpha = lr_alpha
-
-        # Enforces an entropy constraint by varying alpha over the course of training.
-        # We optimize log(alpha) because alpha should be always bigger than 0.
-        self.log_alpha = th.log(
-            th.ones(1, device=self.device) * log_alpha_init
-        ).requires_grad_(True)
-
-        # Target entropy is -|A|.
-        self.target_entropy = -np.prod(self.action_shape).astype(np.float32)
-
+        
         # Config optimizer
         self.optim_actor = self.optim_cls(self.actor.parameters(), lr=self.lr_actor)
         self.optim_critic = self.optim_cls(self.critic.parameters(), lr=self.lr_critic)
-        self.optim_alpha = self.optim_cls([self.log_alpha], lr=self.lr_alpha)
-
-        # Other algo params.
-        self.start_steps = start_steps
-        self.num_gradient_steps = num_gradient_steps
-        self.target_update_interval = target_update_interval
-        self.tau = tau
-        self.one = th.ones(1, device=self.device)  # a constant for quick soft update
-
+        
+    
     def __repr__(self):
         return "SAC"
 
@@ -362,3 +373,43 @@ class SAC(OffPolicyAgent):
         # TODO: (Yifan) implement this.
         # Only save actor to reduce workloads
         th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))
+    
+    @classmethod
+    def load(
+        cls,
+        path: str,
+        policy_kwargs: Dict[str, Any],
+        env: Union[GymEnv, str, None] = None,
+        state_space: Optional[GymSpace] = None,
+        action_space: Optional[GymSpace] = None,
+        device: Union[th.device, str] = "cpu",
+        seed: int = 42,
+        **kwargs,
+    ) -> None:
+        """
+        Load the model from a saved model directory.
+        we only load actor.
+        """
+        super().load(env, state_space, action_space)
+        if env is not None:
+            if isinstance(env, str):
+                import gym
+                env = gym.make(env)
+            state_space, action_space = env.observation_space, env.action_space
+
+        sac_expert = cls(
+            state_space,
+            action_space,
+            device,
+            seed,
+            policy_kwargs,
+            init_buffer=False,
+            init_models=False,
+            expert_mode=True,
+            **kwargs,
+        )
+        state_dict = th.load(path)
+        sac_expert.actor.load_state_dict(state_dict)
+        disable_gradient(sac_expert.actor)
+        sac_expert.actor.eval()
+        return sac_expert

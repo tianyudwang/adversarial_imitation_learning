@@ -11,34 +11,6 @@ from ail.common.type_alias import TensorDict, GymEnv, GymSpace
 from ail.common.pytorch_util import asarray_shape2d, obs_as_tensor, disable_gradient
 
 
-def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True):
-    """
-    Compute the lambda-return (TD(lambda) estimate) and GAE(lambda) advantage.
-
-    Uses Generalized Advantage Estimation (https://arxiv.org/abs/1506.02438)
-    to compute the advantage. To obtain vanilla advantage (A(s) = R - V(S))
-    where R is the discounted reward with value bootstrap,
-    set `lambd=1.0`.
-    https://github.com/openai/baselines/blob/ea25b9e8b234e6ee1bca43083f8f3cf974143998/baselines/ppo1/pposgd_simple.py#L66
-    """
-    # Calculate TD errors.
-    deltas = rewards + gamma * next_values * (1.0 - dones) - values
-    # Initialize gae.
-    gaes = th.empty_like(rewards)
-
-    # Calculate gae recursively from behind.
-    gaes[-1] = deltas[-1]
-    for t in reversed(range(rewards.size(0) - 1)):
-        gaes[t] = deltas[t] + gamma * lambd * (1.0 - dones[t]) * gaes[t + 1]
-
-    targets = values + gaes
-
-    if normal:
-        return targets, normalize(gaes, gaes.mean(), gaes.std())
-    else:
-        return targets, gaes
-
-
 class PPO(OnPolicyAgent):
     """
     Proximal Policy Optimization algorithm (PPO) (clip version)
@@ -85,8 +57,8 @@ class PPO(OnPolicyAgent):
         action_space: GymSpace,
         device: Union[th.device, str],
         seed: int,
-        batch_size: int,
         policy_kwargs: Dict[str, Any],
+        batch_size: int = 2_000,
         epoch_ppo: int = 10,
         gamma: float = 0.99,
         gae_lambda: float = 0.97,
@@ -313,34 +285,68 @@ class PPO(OnPolicyAgent):
     @classmethod
     def load(
         cls,
-        env: Union[GymEnv, str],
         path: str,
+        policy_kwargs: Dict[str, Any],
+        env: Union[GymEnv, str, None] = None,
+        state_space: Optional[GymSpace] = None,
+        action_space: Optional[GymSpace] = None,
         device: Union[th.device, str] = "cpu",
         seed: int = 42,
-        batch_size: int = 1_000,
-        policy_kwargs: Dict[str, Any] = dict(
-            pi=(64, 64),
-        ),
         **kwargs,
     ) -> None:
-        if isinstance(env, str):
-            import gym
-
-            env = gym.make(env)
+        """
+        Load the model from a saved model directory.
+        we only load actor.
+        """
+        super().load(env, state_space, action_space)
+        if env is not None:
+            if isinstance(env, str):
+                import gym
+                env = gym.make(env)
+            state_space, action_space = env.observation_space, env.action_space
 
         ppo_expert = cls(
-            env.observation_space,
-            env.action_space,
+            state_space,
+            action_space,
             device,
             seed,
-            batch_size,
             policy_kwargs,
             init_buffer=False,
             init_models=False,
             expert_mode=True,
             **kwargs,
         )
-        ppo_expert.actor.load_state_dict(th.load(path))
+        state_dict = th.load(path)
+        ppo_expert.actor.load_state_dict(state_dict)
         disable_gradient(ppo_expert.actor)
         ppo_expert.actor.eval()
         return ppo_expert
+
+
+def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True):
+    """
+    Compute the lambda-return (TD(lambda) estimate) and GAE(lambda) advantage.
+
+    Uses Generalized Advantage Estimation (https://arxiv.org/abs/1506.02438)
+    to compute the advantage. To obtain vanilla advantage (A(s) = R - V(S))
+    where R is the discounted reward with value bootstrap,
+    set `lambd=1.0`.
+    https://github.com/openai/baselines/blob/ea25b9e8b234e6ee1bca43083f8f3cf974143998/baselines/ppo1/pposgd_simple.py#L66
+    """
+    # Calculate TD errors.
+    deltas = rewards + gamma * next_values * (1.0 - dones) - values
+    # Initialize gae.
+    gaes = th.empty_like(rewards)
+
+    # Calculate gae recursively from behind.
+    gaes[-1] = deltas[-1]
+    for t in reversed(range(rewards.size(0) - 1)):
+        gaes[t] = deltas[t] + gamma * lambd * (1.0 - dones[t]) * gaes[t + 1]
+
+    targets = values + gaes
+
+    if normal:
+        return targets, normalize(gaes, gaes.mean(), gaes.std())
+    else:
+        return targets, gaes
+

@@ -112,7 +112,22 @@ class BaseRLAgent(BaseAgent, ABC):
     def save_models(self, save_dir) -> None:
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-
+    
+    @classmethod
+    def load(
+        cls,
+        env: Union[GymEnv, str, None] = None,
+        state_space: Optional[GymSpace] = None,
+        action_space: Optional[GymSpace] = None,
+        **kwargs,
+    ):
+        if all([x is None for x in [env, state_space, action_space]]):
+            raise ValueError("Must provide env or state_space and action_space")
+        else:
+            if env is None and any([x is None for x in [state_space, action_space]]):
+                raise ValueError("Must provide state_space and action_space if env is not sepcifed")
+            
+            
     def _init_models_componet(self, policy_kwargs: Dict[str, Any]) -> None:
         """Check if the core componet exits in policy kwargs."""
         assert policy_kwargs is not None, "policy_kwargs cannot be None."
@@ -346,6 +361,7 @@ class OffPolicyAgent(BaseRLAgent):
         buffer_kwargs: Optional[Dict[str, Any]],
         init_buffer: bool,
         init_models: bool,  # TODO: not implemented
+        expert_mode: bool = False,
         **kwargs
     ):
 
@@ -367,8 +383,15 @@ class OffPolicyAgent(BaseRLAgent):
         if init_buffer:
             self._init_buffer(buffer_type="replay")
 
-        # Policy kwargs.
-        self._init_models_componet(policy_kwargs)
+        if expert_mode:
+            # only need actor
+            assert "pi" in policy_kwargs, "Missing `pi` key in policy_kwargs."
+            self.units_actor = policy_kwargs["pi"]
+            
+
+        else:
+            # Policy kwargs.
+            self._init_models_componet(policy_kwargs)
 
         # # Build actor and critic and initialize optimizer.
         # if init_models:

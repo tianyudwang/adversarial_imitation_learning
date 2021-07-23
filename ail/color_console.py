@@ -101,7 +101,7 @@ class CustomFormatter(logging.Formatter):
 
 # Create console (just a logger with color output)
 Console = logging.getLogger("")
-Console.setLevel(logging.DEBUG)
+Console.setLevel(logging.INFO)
 
 # Create console handler with a higher log level
 ch = logging.StreamHandler()
