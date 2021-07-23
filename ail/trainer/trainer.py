@@ -138,7 +138,6 @@ class Trainer(BaseTrainer):
 
             # Update the algorithm whenever ready.
             if self.algo.is_update(step):
-
                 if self.is_train_logging(step):
                     train_logs = self.algo.update(log_this_batch=True)
                     train_logs = self.convert_logs(train_logs)

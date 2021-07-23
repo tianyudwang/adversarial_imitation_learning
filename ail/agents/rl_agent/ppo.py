@@ -8,7 +8,7 @@ from torch.cuda.amp import autocast
 from ail.agents.rl_agent.rl_core import OnPolicyAgent
 from ail.common.math import normalize
 from ail.common.type_alias import TensorDict, GymEnv, GymSpace
-from ail.common.pytorch_util import asarray_shape2d, obs_as_tensor
+from ail.common.pytorch_util import asarray_shape2d, obs_as_tensor, disable_gradient
 
 
 def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True):
@@ -98,7 +98,8 @@ class PPO(OnPolicyAgent):
         buffer_kwargs: Optional[Dict[str, Any]] = None,
         init_buffer: bool = True,
         init_models: bool = True,
-        **kwargs
+        expert_mode: bool = False,
+        **kwargs,
     ):
         super().__init__(
             state_space,
@@ -115,6 +116,7 @@ class PPO(OnPolicyAgent):
             buffer_kwargs,
             init_buffer,
             init_models,
+            expert_mode,
         )
 
         # learning rate scheduler.
@@ -183,13 +185,12 @@ class PPO(OnPolicyAgent):
         rollout_data = self.buffer.get()
         # Clear buffer after getting entire buffer.
         self.buffer.reset()
-        train_logs = self.update_algo(rollout_data)
-        if log_this_batch:
-            return train_logs
-        else:
-            return {}
+        train_logs = self.update_algo(rollout_data, log_this_batch)
+        return train_logs
 
-    def update_algo(self, data: TensorDict) -> Dict[str, Any]:
+    def update_algo(
+        self, data: TensorDict, log_this_batch: bool = False
+    ) -> Dict[str, Any]:
         """
         Update the actor and critic.
         :param data: a batch of randomly sampled transitions
@@ -217,17 +218,20 @@ class PPO(OnPolicyAgent):
             loss_critic = self.update_critic(states, targets)
             loss_actor, pi_info = self.update_actor(states, actions, log_pis, gaes)
 
-        # Return log changes(key used for logging name).
-        return {
-            "actor_loss": loss_actor,
-            "critic_loss": loss_critic,
-            "approx_kl": pi_info["kl"],
-            "entropy": pi_info["ent"],
-            "clip_fraction": pi_info["cf"],
-            "pi_lr": self.lr_actor,
-            "vf_lr": self.lr_critic,
-            "learn_steps_ppo": self.learning_steps_ppo,
-        }
+        if log_this_batch:
+            # Return log changes(key used for logging name).
+            return {
+                "actor_loss": loss_actor,
+                "critic_loss": loss_critic,
+                "approx_kl": pi_info["kl"],
+                "entropy": pi_info["ent"],
+                "clip_fraction": pi_info["cf"],
+                "pi_lr": self.lr_actor,
+                "vf_lr": self.lr_critic,
+                "learn_steps_ppo": self.learning_steps_ppo,
+            }
+        else:
+            return {}
 
     def update_critic(self, states: th.Tensor, targets: th.Tensor) -> th.Tensor:
         """
@@ -305,3 +309,38 @@ class PPO(OnPolicyAgent):
         """
         super().save_models(save_dir)
         th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))
+
+    @classmethod
+    def load(
+        cls,
+        env: Union[GymEnv, str],
+        path: str,
+        device: Union[th.device, str] = "cpu",
+        seed: int = 42,
+        batch_size: int = 1_000,
+        policy_kwargs: Dict[str, Any] = dict(
+            pi=(64, 64),
+        ),
+        **kwargs,
+    ) -> None:
+        if isinstance(env, str):
+            import gym
+
+            env = gym.make(env)
+
+        ppo_expert = cls(
+            env.observation_space,
+            env.action_space,
+            device,
+            seed,
+            batch_size,
+            policy_kwargs,
+            init_buffer=False,
+            init_models=False,
+            expert_mode=True,
+            **kwargs,
+        )
+        ppo_expert.actor.load_state_dict(th.load(path))
+        disable_gradient(ppo_expert.actor)
+        ppo_expert.actor.eval()
+        return ppo_expert

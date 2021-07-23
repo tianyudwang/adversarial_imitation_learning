@@ -43,7 +43,7 @@ def CLI():
         ],
         help="RL algo to use",
     )
-    p.add_argument("--num_steps", type=int, default=2 * 1e6)
+    p.add_argument("--num_steps", "-n", type=int, default=2 * 1e6)
     p.add_argument("--rollout_length", type=int, default=None)
     p.add_argument("--batch_size", type=int, default=256)
     p.add_argument("--buffer_size", type=int, default=1 * 1e6)

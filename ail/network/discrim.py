@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence, Any, Dict
+from typing import Optional, Sequence, Union, Any, Dict
 from enum import Enum, auto
 
 import torch as th
@@ -55,7 +55,8 @@ class DiscrimNet(nn.Module, ABC):
         hidden_units: Sequence[int] = (128, 128),
         hidden_activation: Activation = nn.ReLU(inplace=True),
         gamma: Optional[float] = None,
-        disc_kwargs: Optional[Dict[str, Any]] = None,
+        disc_type=None,
+        **disc_kwargs,
     ):
         super(DiscrimNet, self).__init__()
         if disc_kwargs is None:
@@ -79,10 +80,9 @@ class DiscrimNet(nn.Module, ABC):
         # Init Discriminator
         self.init_model = disc_kwargs.get("init_model", True)
         if self.init_model:
-            self._init_model(disc_kwargs)
+            self._init_model(disc_type)
 
-    def _init_model(self, disc_kwargs):
-        disc_type = disc_kwargs.get("disc_type", "")
+    def _init_model(self, disc_type: ArchType) -> None:
         if disc_type == ArchType.s:
             self.hidden_units_r = self.disc_kwargs.get(
                 "hidden_units_r", self.hidden_units
@@ -127,7 +127,7 @@ class DiscrimNet(nn.Module, ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def calculate_reward(self, *args, **kwargs):
+    def calculate_rewards(self, *args, **kwargs):
         raise NotImplementedError()
 
 
@@ -138,7 +138,7 @@ class GAILDiscrim(DiscrimNet):
         action_dim: int,
         hidden_units: Sequence[int],
         hidden_activation: Activation,
-        disc_kwargs: Optional[Dict[str, Any]] = None,
+        **disc_kwargs,
     ):
         if disc_kwargs is None:
             disc_kwargs = {}
@@ -151,7 +151,7 @@ class GAILDiscrim(DiscrimNet):
         # naming `f` to keep consistent with base DiscrimNet
         return self.f(th.cat([obs, acts], dim=-1))
 
-    def calculate_reward(self, obs: th.Tensor, acts: th.Tensor, **kwargs):
+    def calculate_rewards(self, obs: th.Tensor, acts: th.Tensor, **kwargs):
         # (GAIL) is to maximize E_{\pi} [-log(1 - D)].
         # r(s, a) = − ln(1 − D) = softplus(h)
         # TODO: modify this to softplus or keep the same
@@ -172,10 +172,11 @@ class AIRLStateDiscrim(DiscrimNet):
         gamma: float,
         hidden_units: Sequence[int],
         hidden_activation: Activation,
-        disc_kwargs: Optional[Dict[str, Any]] = None,
+        disc_type=ArchType.s,
+        **disc_kwargs,
     ):
         if disc_kwargs is None:
-            disc_kwargs = {"disc_type", ArchType.s}
+            disc_kwargs = {}
 
         super().__init__(
             state_dim, None, hidden_units, hidden_activation, gamma, disc_kwargs
@@ -221,7 +222,7 @@ class AIRLStateDiscrim(DiscrimNet):
         else:
             return self.f(obs, dones, next_obs)
 
-    def calculate_reward(
+    def calculate_rewards(
         self,
         obs: th.Tensor,
         dones: th.Tensor,
@@ -257,19 +258,26 @@ class AIRLStateActionDiscrim(DiscrimNet):
         hidden_units: Sequence[int],
         hidden_activation: Activation,
         gamma: float,
-        disc_kwargs: Optional[Dict[str, Any]] = None,
+        disc_type=ArchType,
+        **disc_kwargs,
     ):
         if disc_kwargs is None:
-            disc_kwargs = {"disc_type", ArchType.sa}
+            disc_kwargs = {}
 
         super().__init__(
-            state_dim, action_dim, hidden_units, hidden_activation, gamma, disc_kwargs
+            state_dim,
+            action_dim,
+            hidden_units,
+            hidden_activation,
+            gamma,
+            disc_type,
+            **disc_kwargs,
         )
 
     def forward(
         self,
         obs: th.Tensor,
-        acts: th.Tensors,
+        acts: th.Tensor,
         log_pis: Optional[th.Tensor] = None,
         subtract_logp: bool = True,
         **kwargs,
@@ -277,11 +285,11 @@ class AIRLStateActionDiscrim(DiscrimNet):
         if log_pis is not None and subtract_logp:
             # Discriminator's output is sigmoid(f - log_pi).
             # reshape log_pi to prevent size mismatch
-            return self.f(th.cat([obs, acts], dim=-1)) - log_pis.view(-1, 1)
+            return self.f(obs, acts) - log_pis.view(-1, 1)
         else:
-            return self.f(th.cat([obs, acts], dim=-1))
+            return self.f(obs, acts)
 
-    def calculate_reward(
+    def calculate_rewards(
         self,
         obs: th.Tensor,
         acts: th.Tensor,
@@ -294,7 +302,7 @@ class AIRLStateActionDiscrim(DiscrimNet):
             "log_pis": log_pis,
         }
         with th.no_grad():
-            rews = self.forward(obs, **kwargs)
+            rews = -F.logsigmoid(-self.forward(obs, **kwargs))
         return rews
 
 

@@ -1,5 +1,5 @@
 from typing import Dict, Mapping, Optional, Tuple, Union
-from enum import Enum
+from enum import Enum, auto
 import os
 
 import numpy as np
@@ -263,10 +263,15 @@ class Buffer:
         return tensor.detach().cpu().numpy()
 
     def save(self, save_dir: str) -> None:
+        """
+        Saving the data in buffer as .npz archive to a directory.
+        see: https://numpy.org/doc/stable/reference/generated/numpy.savez.html#numpy.savez
+        """
         dir_name = os.path.dirname(save_dir)
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
-
+        print("Saving buffer _arrays into a .npz archive.")
+        print(f"data key: {self._arrays.keys()}")
         np.savez(
             save_dir,
             obs=self._arrays["obs"],
@@ -483,8 +488,15 @@ class BaseBuffer:
         self._buffer.save(save_dir)
 
 
+class BufferTag(Enum):
+    REPLAY = auto()
+    ROLLOUT = auto()
+
+
 class ReplayBuffer(BaseBuffer):
     """Replay Buffer for Transitions."""
+
+    tag = BufferTag.REPLAY
 
     def __init__(
         self,
@@ -541,6 +553,8 @@ class ReplayBuffer(BaseBuffer):
 
 class RolloutBuffer(BaseBuffer):
     """Rollout Buffer for Transitions."""
+
+    tag = BufferTag.ROLLOUT
 
     def __init__(
         self,

@@ -6,8 +6,8 @@ import numpy as np
 import torch as th
 from torch import nn
 
-from ail.agents import ALGO
 from ail.agents.base import BaseAgent
+from ail.agents.rl_agent import RL_ALGO
 from ail.agents.rl_agent.rl_core import OnPolicyAgent, OffPolicyAgent
 from ail.buffer import ReplayBuffer, BufferType
 from ail.common.type_alias import GymEnv, GymSpace
@@ -49,21 +49,22 @@ class BaseIRLAgent(BaseAgent, ABC):
             assert (
                 len(buffer_kwargs) > 0
             ), "Need specifies buffer_kwargs for replay buffer."
-            self.buffer_exp = BufferType[buffer_exp].from_data(**buffer_kwargs)
+            self.buffer_exp = BufferType[buffer_exp].value.from_data(
+                device=self.device, **buffer_kwargs
+            )
         else:
             raise ValueError(f"Unsupported buffer type: {buffer_exp}")
 
         # Generator
-        gen_cls = ALGO[gen_algo] if isinstance(gen_algo, str) else gen_algo
+        gen_cls = RL_ALGO[gen_algo] if isinstance(gen_algo, str) else gen_algo
         self.gen = gen_cls(
             self.state_space,
             self.action_space,
-            self.device,
-            self.seed,
-            fp16=self.fp16,
-            optim_kwargs=self.optim_kwargs,
             **gen_kwargs,
         )
+
+        # Create Alias
+        self.actor = self.gen.actor
 
     def info(self) -> Dict[nn.Module, int]:
         """
@@ -78,8 +79,16 @@ class BaseIRLAgent(BaseAgent, ABC):
     ) -> Tuple[np.ndarray, int]:
         return self.gen.step(env, state, t, step)
 
+    def explore(self, state: th.Tensor) -> Tuple[np.ndarray, th.Tensor]:
+        assert isinstance(state, th.Tensor)
+        return self.gen.explore(state)
+
+    def exploit(self, state) -> np.ndarray:
+        assert isinstance(state, th.Tensor)
+        return self.gen.exploit(state)
+
     def is_update(self, step: int) -> bool:
-        self.gen.is_update(step)
+        return self.gen.is_update(step)
 
     @abstractmethod
     def update(self, *args, **kwargs) -> Dict[str, Any]:

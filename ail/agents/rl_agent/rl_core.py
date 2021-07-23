@@ -241,6 +241,7 @@ class OnPolicyAgent(BaseRLAgent):
         buffer_kwargs: Optional[Dict[str, Any]],
         init_buffer: bool,
         init_models: bool,
+        expert_mode: bool = False,
         **kwargs
     ):
         super().__init__(
@@ -261,8 +262,21 @@ class OnPolicyAgent(BaseRLAgent):
         if init_buffer:
             self._init_buffer(buffer_type="rollout")
 
-        # Policy kwargs.
-        self._init_models_componet(policy_kwargs)
+        if expert_mode:
+            # only need actor
+            assert "pi" in policy_kwargs, "Missing `pi` key in policy_kwargs."
+            self.units_actor = policy_kwargs["pi"]
+            # Actor.
+            self.actor = StateIndependentPolicy(
+                self.obs_dim,
+                self.act_dim,
+                self.units_actor,
+                "relu",
+            ).to(self.device)
+
+        else:
+            # Policy kwargs.
+            self._init_models_componet(policy_kwargs)
 
         # Build actor and critic and initialize optimizer.
         if init_models:

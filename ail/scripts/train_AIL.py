@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime
 
 import yaml
+import numpy as np
 import torch as th
 
 from ail.trainer import Trainer
@@ -53,8 +54,11 @@ def CLI():
         ],
         help="RL algo to use as generator",
     )
-    p.add_argument("--num_steps", type=int, default=2 * 1e6)
-    p.add_argument("--rollout_length", type=int, default=None)
+    p.add_argument(
+        "--demo_path", "-demo", type=str, help="Path to demo"
+    )  # required=True,
+    p.add_argument("--num_steps", "-n", type=int, default=3 * 1e6)
+    p.add_argument("--rollout_length", "-ep_len", type=int, default=None)
     p.add_argument("--gen_batch_size", type=int, default=256)
     p.add_argument("--replay_batch_size", type=int, default=256)
     p.add_argument("--buffer_size", type=int, default=1 * 1e6)
@@ -76,10 +80,10 @@ def CLI():
 
     # Enforce type int
     args.num_steps = int(args.num_steps)
-    args.batch_size = int(args.batch_size)
+    args.batch_size = int(args.gen_batch_size)
     args.buffer_size = int(args.buffer_size)
     # How often (in terms of steps) to output training info.
-    args.log_interval = args.batch_size * args.log_every_n_updates
+    args.log_interval = args.gen_batch_size * args.log_every_n_updates
 
     return args
 
@@ -148,12 +152,20 @@ def run(args):
     else:
         raise ValueError()
 
+    # Demo data
+    if args.demo_path is None:
+        # TODO: REMOVE THIS
+        args.demo_path = f"./ail/scripts/transitions/{args.env_id}/size11000.npz"
+    transitions = dict(np.load(args.demo_path))
+
     algo_kwargs.update(
         dict(
             epoch_disc=10,
             replay_batch_size=args.replay_batch_size,
             buffer_exp="replay",
-            buffer_kwargs=dict(with_reward=False),
+            buffer_kwargs=dict(
+                with_reward=False, transitions=transitions
+            ),  # * transitions must be a dict
             gen_algo=args.gen_algo,
             gen_kwargs=gen_kwargs,
             disc_cls="airl_sa",
@@ -248,8 +260,6 @@ if __name__ == "__main__":
     args = CLI()
 
     if args.debug:
-        import numpy as np
-
         np.seterr(all="raise")
         th.autograd.set_detect_anomaly(True)
 
@@ -259,6 +269,6 @@ if __name__ == "__main__":
         # torch backends
         th.backends.cudnn.benchmark = True  # ? Does this useful for non-convolutions?
     else:
-        # TODO: investigate this
+        # TODO: investigate this 1 , 4, 6, 8, 12
         os.environ["OMP_NUM_THREADS"] = "8"
     run(args)

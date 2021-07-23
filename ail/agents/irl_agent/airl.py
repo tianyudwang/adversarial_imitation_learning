@@ -4,10 +4,9 @@ import torch as th
 import torch.nn.functional as F
 
 from ail.agents.irl_agent.irl_core import BaseIRLAgent
-from ail.agents.rl_agent.rl_core import OnPolicyAgent, OffPolicyAgent
-from ail.buffer import ReplayBuffer
+from ail.buffer import ReplayBuffer, BufferTag
 from ail.common.type_alias import GymSpace, TensorDict
-from ail.network.discrim import DiscrimNet, DiscrimType
+from ail.network.discrim import DiscrimNet, DiscrimType, ArchType
 
 
 class AIRL(BaseIRLAgent):
@@ -22,12 +21,13 @@ class AIRL(BaseIRLAgent):
         replay_batch_size: int,
         buffer_exp: Union[ReplayBuffer, str],
         buffer_kwargs: Dict[str, Any],
-        gen_algo: Union[OnPolicyAgent, OffPolicyAgent, str],
+        gen_algo,
         gen_kwargs: Dict[str, Any],
         disc_cls: Union[DiscrimNet, str],
         disc_kwargs: Dict[str, Any],
         lr_disc: float,
         optim_kwargs: Optional[Dict[str, Any]] = None,
+        **kwargs
     ):
 
         super().__init__(
@@ -44,19 +44,17 @@ class AIRL(BaseIRLAgent):
             optim_kwargs,
         )
 
-        if disc_cls is None:
-            disc_cls = "airl"
-
         if disc_kwargs is None:
             disc_kwargs = {}  # * hidden, activation,
 
+        if disc_cls is None or disc_cls == "airl_so":
+            disc_cls = "airl"
+            disc_kwargs["disc_type"] = ArchType.s
+        elif disc_cls == "airl_sa":
+            disc_kwargs["disc_type"] = ArchType.sa
+
         # Discriminator
         if isinstance(disc_cls, str):
-            assert (
-                disc_cls.lower() in ["airl", "airl_so", "airl_sa"],
-                "AIRL has two discrim type: ``airl_so`` and ``airl_sa``. "
-                "Default airl will assign to airl_so",
-            )
             disc_cls = DiscrimType[disc_cls.lower()].value
 
         self.disc = disc_cls(self.obs_dim, self.act_dim, **disc_kwargs)
@@ -65,8 +63,7 @@ class AIRL(BaseIRLAgent):
 
         self.learning_steps_disc = 0
         self.epoch_disc = epoch_disc
-
-        # ? Create alias?
+        self.dummy = 0
 
     def __repr__(self):
         return "AIRL"
@@ -103,16 +100,31 @@ class AIRL(BaseIRLAgent):
         #     dones,
         #     log_pis,
         #     next_states,
-        rollout_data = self.buffer.get()  # TODO: n_samples
-        rollout_data["rews"] = self.disc.calculate_rewards(...)
-        assert rollout_data["rews"].shape[0] == rollout_data["obs"].shape[0]
+
+        if self.gen.buffer.tag == BufferTag.ROLLOUT:
+            # Obtain entire batch of transitions from rollout buffer.
+            data = self.gen.buffer.get()
+            # Clear buffer after getting entire buffer.
+            self.gen.buffer.reset()
+
+        elif self.gen.buffer.tag == BufferTag.REPLAY:
+            # Random uniform sampling a batch of transitions from agent's replay buffer
+            data = self.gen.buffer.sample(self.gen.batch_size)
+
+        # Claculate learning rewards
+        data["rews"] = self.disc.calculate_rewards(**data)
+        assert data["rews"].shape[0] == data["obs"].shape[0]
 
         # Update generator using estimated rewards.
-        gen_logs = self.update_generator(rollout_data, log_this_batch)
+        gen_logs = self.update_generator(data, log_this_batch)
 
-    def update_generator(self, log_this_batch: bool = False) -> Dict[str, Any]:
+        return {}
+
+    def update_generator(
+        self, data: TensorDict, log_this_batch: bool = False
+    ) -> Dict[str, Any]:
         """Update generator algo."""
-        return self.gen.update(log_this_batch)
+        return self.gen.update_algo(data, log_this_batch)
 
     def update_discriminator(
         self, data_gen: TensorDict, data_exp: TensorDict, log_this_batch: bool = False
@@ -142,12 +154,15 @@ class AIRL(BaseIRLAgent):
         loss_disc.backward()
         self.optim_disc.step()
 
+        self.dummy += 1
         if log_this_batch:
             acc_gen = (logits_gen.detach() < 0).float().mean()
             acc_exp = (logits_exp.detach() > 0).float().mean()
-            # TODO: avoid print(cuda_tensor)
-            ic(acc_gen)
-            ic(acc_exp)
+
+            if self.dummy % 100 == 0:
+                # TODO: avoid print(cuda_tensor)
+                ic(acc_gen)
+                ic(acc_exp)
             return {
                 "disc_loss": loss_disc.detach(),
                 "acc_gen": acc_gen,

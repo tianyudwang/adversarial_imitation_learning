@@ -40,7 +40,8 @@ class BaseAgent(nn.Module):
 
         # RNG.
         assert isinstance(seed, int), "seed must be integer."
-        set_random_seed(seed)
+        self.seed = seed
+        set_random_seed(self.seed)
 
         # env spaces.
         self.state_space = state_space
