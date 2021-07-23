@@ -30,7 +30,7 @@ next_state, reward, done, info = env.step(action)
 path = pathlib.Path.cwd()
 print(f"current_dir: {path}")
 
-data_path = path.parent.parent /"scripts"/"transitions"/env_id/"size11000.npz"
+data_path = path.parent.parent / "scripts" / "transitions" / env_id / "size11000.npz"
 data = dict(np.load(data_path))
 ic(data)
 buffer = ReplayBuffer.from_data(data, device="cpu", with_reward=False)

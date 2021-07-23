@@ -90,10 +90,10 @@ if __name__ == "__main__":
         choices=["ppo", "sac", "sb3_ppo", "sb3_sac"],
         help="RL algo to test",
     )
-    # Policy Arch 
-    p.add_argument('--n_layers', '-l', type=int, default=2)
-    p.add_argument('--size', '-s', type=int, default=64)
-    
+    # Policy Arch
+    p.add_argument("--n_layers", "-l", type=int, default=2)
+    p.add_argument("--size", "-s", type=int, default=64)
+
     p.add_argument("--rollout_length", type=int, default=None)
     p.add_argument("--num_eval_episodes", type=int, default=20)
     p.add_argument("--render", "-r", action="store_true")
@@ -132,9 +132,8 @@ if __name__ == "__main__":
         demo = ALGO[args.algo].load(
             path=args.weight,
             device=device,
-            policy_kwargs={"pi": pi_arch}, # * make sure the arch matches state_dict
+            policy_kwargs={"pi": pi_arch},  # * make sure the arch matches state_dict
             env=dummy_env,
-            
         )
         demo.actor.eval()
         use_sb3 = False

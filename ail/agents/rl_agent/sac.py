@@ -74,7 +74,7 @@ class SAC(OffPolicyAgent):
         seed: int,
         policy_kwargs: Dict[str, Any],
         batch_size: int = 256,
-        buffer_size: int = 10**6,
+        buffer_size: int = 10 ** 6,
         lr_alpha: float = 3e-4,
         start_steps: int = 10_000,
         num_gradient_steps: int = 1,
@@ -110,8 +110,8 @@ class SAC(OffPolicyAgent):
         )
         if expert_mode:
             self.actor = StateDependentPolicy(
-            self.obs_dim, self.act_dim, self.units_actor, 'relu'
-        ).to(self.device)
+                self.obs_dim, self.act_dim, self.units_actor, "relu"
+            ).to(self.device)
         else:
             self._setup_models()
         # Entropy regularization coefficient (Inverse of the reward scale)
@@ -139,13 +139,12 @@ class SAC(OffPolicyAgent):
 
     def _setup_models(self):
         # TODO: (Yifan) Build the model inside off policy class latter.
-        
+
         # Actor.
         self.actor = StateDependentPolicy(
             self.obs_dim, self.act_dim, self.units_actor, self.hidden_activation
         ).to(self.device)
-        
-        
+
         # Critic.
         self.critic = mlp_value(
             self.obs_dim,
@@ -163,12 +162,11 @@ class SAC(OffPolicyAgent):
 
         # Freeze target networks with respect to optimizers (only update via polyak averaging)
         disable_gradient(self.critic_target)
-        
+
         # Config optimizer
         self.optim_actor = self.optim_cls(self.actor.parameters(), lr=self.lr_actor)
         self.optim_critic = self.optim_cls(self.critic.parameters(), lr=self.lr_critic)
-        
-    
+
     def __repr__(self):
         return "SAC"
 
@@ -373,7 +371,7 @@ class SAC(OffPolicyAgent):
         # TODO: (Yifan) implement this.
         # Only save actor to reduce workloads
         th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))
-    
+
     @classmethod
     def load(
         cls,
@@ -394,6 +392,7 @@ class SAC(OffPolicyAgent):
         if env is not None:
             if isinstance(env, str):
                 import gym
+
                 env = gym.make(env)
             state_space, action_space = env.observation_space, env.action_space
 

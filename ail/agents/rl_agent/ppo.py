@@ -302,6 +302,7 @@ class PPO(OnPolicyAgent):
         if env is not None:
             if isinstance(env, str):
                 import gym
+
                 env = gym.make(env)
             state_space, action_space = env.observation_space, env.action_space
 
@@ -349,4 +350,3 @@ def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True
         return targets, normalize(gaes, gaes.mean(), gaes.std())
     else:
         return targets, gaes
-
