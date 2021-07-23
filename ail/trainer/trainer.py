@@ -13,7 +13,7 @@ from ail.common.type_alias import GymEnv
 from ail.trainer import BaseTrainer
 
 
-class RL_Trainer(BaseTrainer):
+class Trainer(BaseTrainer):
     """
     RL_Trainer with tensorboard integration.
 

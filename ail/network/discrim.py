@@ -147,11 +147,11 @@ class GAILDiscrim(DiscrimNet):
             state_dim, action_dim, hidden_units, hidden_activation, None, disc_kwargs
         )
 
-    def forward(self, obs: th.Tensor, acts: th.Tensor):
+    def forward(self, obs: th.Tensor, acts: th.Tensor, **kwargs):
         # naming `f` to keep consistent with base DiscrimNet
         return self.f(th.cat([obs, acts], dim=-1))
 
-    def calculate_reward(self, obs, acts):
+    def calculate_reward(self, obs: th.Tensor, acts: th.Tensor, **kwargs):
         # (GAIL) is to maximize E_{\pi} [-log(1 - D)].
         # r(s, a) = − ln(1 − D) = softplus(h)
         # TODO: modify this to softplus or keep the same

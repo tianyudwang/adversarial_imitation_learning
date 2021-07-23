@@ -6,7 +6,7 @@ from datetime import datetime
 import yaml
 import torch as th
 
-from ail.trainer import RL_Trainer
+from ail.trainer import Trainer
 
 try:
     from icecream import install  # noqa
@@ -224,7 +224,7 @@ def run(args):
             print("`wandb` Module Not Found")
             sys.exit(0)
 
-    trainer = RL_Trainer(**config)
+    trainer = Trainer(**config)
 
     if args.profiling:
         import cProfile
