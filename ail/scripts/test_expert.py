@@ -78,6 +78,7 @@ def eval_th_algo(model, env_id, num_episodes=10, seed=42, render=False, sb3=Fals
 if __name__ == "__main__":
 
     p = argparse.ArgumentParser()
+    p.add_argument("--weight", type=str, default="")
     p.add_argument(
         "--env_id",
         type=str,
@@ -114,24 +115,28 @@ if __name__ == "__main__":
 
     # Path
     path = pathlib.Path.cwd()
-    demo_dir = path.parent / "rl-trained-agents" / args.env_id
     print(f"current_dir: {path}")
 
+    if not args.weight:
+        demo_dir = path.parent / "rl-trained-agents" / args.env_id
+        if args.algo.startswith("sb3"):
+            args.weight = demo_dir / args.algo[4:] / f"{args.env_id}_sb3"
+        else:
+            args.weight = demo_dir / args.algo / f"{args.env_id}_actor.pth"
+
     if args.algo.startswith("sb3"):
-        fname_demo = demo_dir / args.algo[4:] / f"{args.env_id}_sb3"
-        demo = SB3_ALGO[args.algo].load(fname_demo)
+        demo = SB3_ALGO[args.algo].load(args.weight)
         use_sb3 = True
     else:
-        fname_demo = demo_dir / args.algo / f"{args.env_id}_actor.pth"
         demo = ALGO[args.algo].load(
             dummy_env,
-            path=fname_demo,
+            path=args.weight,
             device=device,
         )
         demo.actor.eval()
         use_sb3 = False
 
-    print(f"{fname_demo}\n")
+    print(f"weight_dir: {args.weight}\n")
 
     # Max episode length
     max_ep_len = (
