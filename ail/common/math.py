@@ -10,10 +10,6 @@ from scipy.signal import lfilter
 from ail.common.utils import zip_strict
 
 
-LOG_2 = log(2)
-LOG2PI = log(2 * pi)
-
-
 def pure_discount_cumsum(x, discount) -> list:
     """
     Discount cumsum implemented in pure python.
@@ -51,36 +47,56 @@ def unnormalize(x, mean, std):
     return x * std + mean
 
 
+@th.jit.script
+def fused_normalize(x: th.Tensor, mean: th.Tensor, std: th.Tensor, eps: float = 1e-8):
+    """Normalize or standardize."""
+    return (x - mean) / (std + eps)
+
+
+@th.jit.script
+def fused_unnormalize(x: th.Tensor, mean: th.Tensor, std: th.Tensor):
+    """Unnormalize or Unstandardize."""
+    return x * std + mean
+
+
 def reparameterize(means: th.Tensor, log_stds: th.Tensor):
     """Reparameterize Trick."""
     noises = th.randn_like(means)
-    us = means + noises * log_stds.exp()
+    us = fused_unnormalize(noises, means, log_stds.exp())
     actions = th.tanh(us)
     return actions, calculate_log_pi(log_stds, noises, actions)
 
 
+def gaussian_logprobs(x: th.Tensor, log_stds: th.Tensor):
+    """Calculate log probabilities for Gaussian Distribution"""
+    return (-0.5 * x.pow(2) - log_stds).sum(dim=-1, keepdim=True) - 0.5 * log(
+        2 * pi
+    ) * log_stds.size(-1)
+
+
+@th.jit.script
 def atanh(x: th.Tensor):
     """Numerical stable atanh."""
     # pytorch's atanh does not clamp the value learning to Nan/inf
     return 0.5 * (th.log(1 + x + 1e-6) - th.log(1 - x + 1e-6))
 
 
-def evaluate_lop_pi(means: th.Tensor, log_stds: th.Tensor, actions: th.Tensor):
-    noises = (atanh(actions) - means) / (log_stds.exp() + 1e-8)
+def evaluate_lop_pi(
+    means: th.Tensor, log_stds: th.Tensor, actions: th.Tensor
+) -> th.Tensor:
+    noises = fused_normalize(atanh(actions), means, log_stds.exp())
     return calculate_log_pi(log_stds, noises, actions)
 
 
-def calculate_log_pi(log_stds, noises, actions):
+def calculate_log_pi(
+    log_stds: th.Tensor, noises: th.Tensor, actions: th.Tensor
+) -> th.Tensor:
     """Calculate log probability of squash Gaussian."""
-    gaussian_log_probs = (-0.5 * noises.pow(2) - log_stds).sum(
-        dim=-1, keepdim=True
-    ) - 0.5 * LOG2PI * log_stds.size(-1)
-
     correction = squash_logprob_correction(actions).sum(dim=-1, keepdim=True)
+    return gaussian_logprobs(noises, log_stds) - correction
 
-    return gaussian_log_probs - correction
 
-
+@th.jit.script
 def squash_logprob_correction(actions: th.Tensor) -> th.Tensor:
     """
     Squash correction. (from original SAC implementation)
@@ -97,7 +113,7 @@ def squash_logprob_correction(actions: th.Tensor) -> th.Tensor:
     :param actions:
     """
     x = atanh(actions)
-    return 2 * (LOG_2 - x - F.softplus(-2 * x))
+    return 2 * (log(2) - x - F.softplus(-2 * x))
 
 
 def soft_update(

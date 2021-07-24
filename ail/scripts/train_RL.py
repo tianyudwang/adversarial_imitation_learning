@@ -43,7 +43,7 @@ def CLI():
         ],
         help="RL algo to use",
     )
-    p.add_argument("--num_steps", "-n", type=int, default=2 * 1e6)
+    p.add_argument("--num_steps", "-n", type=int, default=0.5 * 1e6)
     p.add_argument("--rollout_length", type=int, default=None)
     p.add_argument("--batch_size", type=int, default=256)
     p.add_argument("--buffer_size", type=int, default=1 * 1e6)
@@ -226,10 +226,8 @@ if __name__ == "__main__":
 
     if args.cuda:
         # TODO: investigate this
-        # os.environ["OMP_NUM_THREADS"] = "1"
+        os.environ["OMP_NUM_THREADS"] = "1"
         # torch backends
         th.backends.cudnn.benchmark = True  # ? Does this useful for non-convolutions?
-    else:
-        # TODO: investigate this
-        os.environ["OMP_NUM_THREADS"] = "8"
+        
     run(args)
