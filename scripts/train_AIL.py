@@ -108,10 +108,6 @@ def CLI():
 def run(args):
     """Training Configuration"""
 
-    # Path
-    path = pathlib.Path.cwd()
-    print(f"current_dir: {path}")
-
     algo_kwargs = dict(
         # common args
         device=args.device,
@@ -176,11 +172,15 @@ def run(args):
     else:
         raise ValueError()
 
+    # Path
+    path = pathlib.Path(__file__).parent
+    print(f"File_dir: {path}")    
+    
     # Demo data
     if args.demo_path is None:
         # TODO: REMOVE THIS
         args.demo_path = (
-            path / "ail" / "scripts" / "transitions" / args.env_id / "size11000.npz"
+            path / "transitions" / args.env_id / "size11000.npz"
         )
     transitions = dict(np.load(args.demo_path))
 
@@ -211,7 +211,7 @@ def run(args):
 
     time = datetime.now().strftime("%Y%m%d-%H%M")
     exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{time}")
-    log_dir = os.path.join("runs", exp_name)
+    log_dir = path.joinpath("runs", exp_name)
     if not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
 

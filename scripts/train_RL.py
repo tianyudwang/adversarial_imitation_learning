@@ -1,4 +1,5 @@
 import os
+import pathlib
 import sys
 import argparse
 from datetime import datetime
@@ -7,6 +8,8 @@ import yaml
 import torch as th
 
 from ail.trainer import Trainer
+from config.config import get_cfg_defaults
+
 
 try:
     from icecream import install  # noqa
@@ -43,20 +46,19 @@ def CLI():
         ],
         help="RL algo to use",
     )
-    p.add_argument("--num_steps", "-n", type=int, default=0.5 * 1e6)
+    p.add_argument("--num_steps", type=int, default=0.5 * 1e6)
     p.add_argument("--rollout_length", type=int, default=None)
     p.add_argument("--batch_size", type=int, default=256)
     p.add_argument("--buffer_size", type=int, default=1 * 1e6)
     p.add_argument("--log_every_n_updates", "-lg", type=int, default=20)
     p.add_argument("--eval_interval", type=int, default=5 * 1e3)
     p.add_argument("--num_eval_episodes", type=int, default=10)
+    p.add_argument("--save_freq", type=int, default=50_000)
     p.add_argument("--cuda", action="store_true")
     p.add_argument("--fp16", action="store_true")
-    p.add_argument("--optim_cls", type=str, default="adam")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--verbose", type=int, default=2)
     p.add_argument("--debug", action="store_true")
-    p.add_argument("--profiling", "-prof", action="store_true")
     p.add_argument("--use_wandb", "-wb", action="store_true")
 
     args = p.parse_args()
@@ -73,19 +75,21 @@ def CLI():
     return args
 
 
-def run(args):
+def run(args, cfg, path):
     """Training Configuration"""
     algo_kwargs = dict(
         # common args
         device=args.device,
         fp16=args.fp16,
-        seed=args.seed,
-        gamma=0.99,
-        max_grad_norm=None,
-        optim_kwargs=dict(optim_cls=args.optim_cls, optim_set_to_none=True),
+        seed=cfg.MISC.seed,
+        gamma=cfg.ALGO.gamma,
+        max_grad_norm=cfg.ALGO.max_grad_norm,
+        optim_kwargs=dict(cfg.OPTIM)
     )
-
-    if args.algo.lower() == "ppo":
+    
+    rl_algo = args.algo.lower()
+    
+    if rl_algo == "ppo":
         # state_ space, action space inside trainer
         ppo_kwargs = dict(
             # buffer args
@@ -93,83 +97,78 @@ def run(args):
             buffer_size=args.buffer_size,  # only used in SAC,
             buffer_kwargs=dict(with_reward=True, extra_data=["log_pis"]),
             # PPO only args
-            epoch_ppo=10,
-            gae_lambda=0.97,
-            clip_eps=0.2,
-            coef_ent=0.00,
+            epoch_ppo=cfg.PPO.epoch_ppo,
+            gae_lambda=cfg.PPO.gae_lambda,
+            clip_eps=cfg.PPO.clip_eps,
+            coef_ent=cfg.PPO.coef_ent,
             # poliy args: net arch, activation, lr
             policy_kwargs=dict(
-                pi=(64, 64),
-                vf=(64, 64),
-                activation="relu_inplace",
+                pi=cfg.PPO.pi,
+                vf=cfg.PPO.vf,
+                activation=cfg.PPO.activation,
                 critic_type="V",
-                lr_actor=3e-4,
-                lr_critic=3e-4,
+                lr_actor=cfg.PPO.lr_actor,
+                lr_critic=cfg.PPO.lr_critic,
             ),
         )
         algo_kwargs.update(ppo_kwargs)
         sac_kwargs = None
 
-    elif args.algo.lower() == "sac":
+    elif rl_algo == "sac":
         sac_kwargs = dict(
             # buffer args
             batch_size=args.batch_size,  # PPO assums batch size == buffer_size
             buffer_size=args.buffer_size,  # only used in SAC,
-            buffer_kwargs=dict(with_reward=True, extra_data=["log_pis"]),
+            buffer_kwargs=dict(with_reward=True),
             # SAC only args
-            lr_alpha=3e-4,
-            log_alpha_init=1.0,
-            tau=0.02,  # 0.005
-            start_steps=10_000,
-            # * encourage to sync following two params to reduce overhead
-            num_gradient_steps=1,  # ! slow O(n)
-            target_update_interval=1,
+            start_steps=cfg.SAC.start_steps,
+            lr_alpha=cfg.SAC.lr_alpha,
+            log_alpha_init=cfg.SAC.log_alpha_init,
+            tau=cfg.SAC.tau,  # 0.005
+            # * Recommend to sync following two params to reduce overhead
+            num_gradient_steps=cfg.SAC.num_gradient_steps,  # ! slow O(n)
+            target_update_interval=cfg.SAC.target_update_interval,
+            
             # poliy args: net arch, activation, lr
             policy_kwargs=dict(
-                pi=(128, 128),
-                qf=(128, 128),
-                activation="relu_inplace",
+                pi=cfg.SAC.pi,
+                qf=cfg.SAC.qf,
+                activation=cfg.SAC.activation,
                 critic_type="twin",
-                lr_actor=7.3 * 1e-4,
-                lr_critic=7.3 * 1e-4,
+                lr_actor=cfg.SAC.lr_actor,
+                lr_critic=cfg.SAC.lr_critic,
             ),
         )
         algo_kwargs.update(sac_kwargs)
         ppo_kwargs = None
 
     else:
-        raise ValueError()
+        raise ValueError(f"RL ALgo {args.algo} not Implemented.")
 
+        
     time = datetime.now().strftime("%Y%m%d-%H%M")
     exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{time}")
-    log_dir = os.path.join("runs", exp_name)
+    log_dir = path.joinpath("runs", exp_name)
+    
     if not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
-
-    # Mainly for wandb.watch function
-    wandb_kwargs = dict(
-        # strategy="hist",  # TODO: may implment this
-        log_param=True,
-        log_type="gradients",
-        log_freq=100,
-    )
 
     config = dict(
         num_steps=args.num_steps,
         env=args.env_id,
         algo=args.algo,
         algo_kwargs=algo_kwargs,
-        env_kwargs=None,
+        env_kwargs=None,        # TODO: add env wrappers
         max_ep_len=args.rollout_length,
         seed=args.seed,
         eval_interval=args.eval_interval,
         num_eval_episodes=args.num_eval_episodes,
-        save_freq=50_000,
+        save_freq=args.save_freq,
         log_dir=log_dir,
         log_interval=args.log_interval,
         verbose=args.verbose,
         use_wandb=args.use_wandb,
-        wandb_kwargs=wandb_kwargs,
+        wandb_kwargs=cfg.WANDB,
     )
 
     # Log with tensorboard and sync to wandb dashboard as well
@@ -204,29 +203,25 @@ def run(args):
     with open(os.path.join(log_dir, "hyperparams.yaml"), "w") as f:
         yaml.dump(algo_kwargs, f)
 
-    del algo_kwargs, ppo_kwargs, sac_kwargs, wandb_kwargs
+    del algo_kwargs, ppo_kwargs, sac_kwargs
 
-    if args.profiling:
-        import cProfile
-        import pstats
-
-        with cProfile.Profile() as pr:
-            trainer.run_training_loop()
-
-        stats = pstats.Stats(pr)
-        stats.sort_stats(pstats.SortKey.TIME)
-        stats.dump_stats(filename="run_profiling.prof")
-        stats.print_stats()
-    else:
-        trainer.run_training_loop()
+    trainer.run_training_loop()
 
 
 if __name__ == "__main__":
     # ENVIRONMENT VARIABLE
     os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # modify to assign a meaningful name
-
+    
     args = CLI()
-
+    
+    path = pathlib.Path(__file__).parent
+    print(path)
+    
+    cfg_path = path / "config" /'rl_configs.yaml'
+    cfg = get_cfg_defaults()
+    cfg.merge_from_file(cfg_path)
+    cfg.freeze()
+    
     if args.debug:
         import numpy as np
 
@@ -237,8 +232,21 @@ if __name__ == "__main__":
         # TODO: investigate this
         os.environ["OMP_NUM_THREADS"] = "1"
         # torch backends
-        th.backends.cudnn.benchmark = True  # ? Does this useful for non-convolutions?
+        th.backends.cudnn.benchmark = cfg.CUDA.cudnn  # ? Does this useful for non-convolutions?
 
-    print(os.getcwd())
-
-    run(args)
+    run(args, cfg, path)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+   

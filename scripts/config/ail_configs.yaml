@@ -1,0 +1,51 @@
+
+
+CUDA:
+  desc: torch.backends
+  cudnn: true
+
+OPTIM:
+  desc: Optimizer class and zero_grad input
+  optim_cls: adam
+  optim_set_to_none: true
+
+# LOG:
+#   log_every_n_updates: 20
+#   eval_interval: 5000
+#   num_eval_episodes: 10
+
+WANDB:
+  desc: wandb.watch function inputs
+  log_param: true
+  log_type: gradients
+  log_freq: 1000
+
+PPO:
+  desc: PPO unique inputs
+  epoch_ppo: 10
+  gae_lambda: 0.97
+  clip_eps: 0.2
+  coef_ent: 0.01
+
+  # policy_kwargs
+  pi: [64, 64]
+  vf: [64,64]
+  activation: 'relu'
+  lr_actor: 3.0e-4
+  lr_critic: 3.0e-4
+
+SAC:
+  desc: SAC unique inputs
+  start_steps: 10_000
+  num_gradient_steps: 1  # ! slow O(n)
+  target_update_interval: 1  # Recommend to sync with num_gradient_steps.
+  tau: 0.005
+  log_alpha_init: 1.0
+  lr_alpha: 3.0e-4
+
+  # policy_kwargs
+  pi: [128, 128]
+  qf: [128, 128]
+  activation: 'relu'
+  lr_actor: 7.3e-4
+  lr_critic: 7.3e-4

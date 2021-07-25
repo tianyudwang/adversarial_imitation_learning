@@ -546,14 +546,17 @@ class ReplayBuffer(BaseBuffer):
             with_reward,
         )
 
-        if extra_shapes is None:
-            extra_shapes = {}
-
-        if extra_dtypes is None:
-            extra_dtypes = {}
-
-        self.sample_shapes.update(extra_shapes)
-        self.dtypes.update(extra_dtypes)
+        if extra_shapes is not None:
+            if isinstance(extra_shapes, dict):
+                self.sample_shapes.update(extra_shapes)
+            else:
+                raise ValueError("extra_shapes should be Dict[str, Tuple[int, ...]]")
+        if extra_dtypes is not None:
+            if isinstance(extra_dtypes, dict):
+                self.dtypes.update(extra_dtypes)
+            else:
+                raise ValueError("extra_dtypes should be Dict[str, np.dtype]")
+            
         self._init_buffer()
 
     def __repr__(self) -> str:
@@ -604,15 +607,17 @@ class RolloutBuffer(BaseBuffer):
             with_reward,
         )
 
-        # log_pis, advs, rets, vals
-        if extra_shapes is None:
-            extra_shapes = {}
-
-        if extra_dtypes is None:
-            extra_dtypes = {}
-
-        self.sample_shapes.update(extra_shapes)
-        self.dtypes.update(extra_dtypes)
+        if extra_shapes is not None:
+            if isinstance(extra_shapes, dict):
+                self.sample_shapes.update(extra_shapes)
+            else:
+                raise ValueError("extra_shapes should be Dict[str, Tuple[int, ...]]")
+        if extra_dtypes is not None:
+            if isinstance(extra_dtypes, dict):
+                self.dtypes.update(extra_dtypes)
+            else:
+                raise ValueError("extra_dtypes should be Dict[str, np.dtype]")
+        
         self._init_buffer()
 
     def __repr__(self) -> str:
