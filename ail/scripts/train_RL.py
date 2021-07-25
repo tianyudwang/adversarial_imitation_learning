@@ -108,6 +108,7 @@ def run(args):
             ),
         )
         algo_kwargs.update(ppo_kwargs)
+        sac_kwargs = None
 
     elif args.algo.lower() == "sac":
         sac_kwargs = dict(
@@ -134,6 +135,7 @@ def run(args):
             ),
         )
         algo_kwargs.update(sac_kwargs)
+        ppo_kwargs = None
 
     else:
         raise ValueError()

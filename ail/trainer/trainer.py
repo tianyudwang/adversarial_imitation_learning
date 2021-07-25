@@ -1,5 +1,4 @@
 from typing import Union, Optional, Dict, Any
-from collections import defaultdict
 from pprint import pprint
 from time import time
 import os
@@ -10,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from ail.agents import ALGO
 from ail.agents.rl_agent.rl_core import OnPolicyAgent, OffPolicyAgent
 from ail.common.type_alias import GymEnv
-from ail.trainer import BaseTrainer
+from ail.trainer.base_trainer import BaseTrainer
 
 
 class Trainer(BaseTrainer):
