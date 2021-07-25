@@ -44,8 +44,10 @@ class BaseIRLAgent(BaseAgent, ABC):
         # Expert's buffer.
         self.replay_batch_size = replay_batch_size
         if isinstance(buffer_exp, ReplayBuffer):
+            # Assume expert's buffer is already initialized.
             self.buffer_exp = buffer_exp
         elif isinstance(buffer_exp, str):
+            # Initialize the buffer from a dictionary of data.
             if len(buffer_kwargs) == 0:
                 raise ValueError("Need specifies buffer_kwargs for replay buffer.")
             self.buffer_exp = BufferType[buffer_exp].value.from_data(
@@ -70,12 +72,17 @@ class BaseIRLAgent(BaseAgent, ABC):
         Count variables.
         (protip): try to get a feel for how different size networks behave!
         """
-        models = [self.gen.actor, self.gen.critic, self.disc]
+        models = (self.gen.actor, self.gen.critic, self.disc)
         return {module: count_vars(module) for module in models}
 
     def step(
         self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
     ) -> Tuple[np.ndarray, int]:
+        """
+        Same as generator/policy step.
+        Intereact with environment and store the transition.
+        return: next_state, episode length
+        """
         return self.gen.step(env, state, t, step)
 
     def explore(self, state: th.Tensor) -> Tuple[np.ndarray, th.Tensor]:

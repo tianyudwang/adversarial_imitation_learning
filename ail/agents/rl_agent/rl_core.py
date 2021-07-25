@@ -87,31 +87,39 @@ class BaseRLAgent(BaseAgent, ABC):
     def step(
         self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
     ) -> Tuple[np.ndarray, int]:
+        """Intereact with environment and store the transition."""
         raise NotImplementedError()
 
     def explore(self, state: th.Tensor) -> Tuple[np.ndarray, th.Tensor]:
+        """Sample actions from action distribution."""
         assert isinstance(state, th.Tensor)
         with th.no_grad():
             action, log_pi = self.actor.sample(state.unsqueeze_(0))
         return to_numpy(action)[0], log_pi
 
     def exploit(self, state) -> np.ndarray:
+        """Sample mean/mode actions from action distribution."""
         assert isinstance(state, th.Tensor)
-
         with th.no_grad():
             action = self.actor(state.unsqueeze_(0))
         return to_numpy(action)[0]
 
     @abstractmethod
     def is_update(self, step) -> bool:
+        """Whether or not to update the agent"""
         raise NotImplementedError()
 
     @abstractmethod
     def update(self, *args, **kwargs) -> Dict[str, Any]:
+        """
+        A general road map for updating the model.
+        Obtain the training batch and perform update.
+        """
         raise NotImplementedError()
 
     @abstractmethod
     def save_models(self, save_dir) -> None:
+        """Save the model."""
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
@@ -122,7 +130,8 @@ class BaseRLAgent(BaseAgent, ABC):
         state_space: Optional[GymSpace] = None,
         action_space: Optional[GymSpace] = None,
         **kwargs,
-    ):
+    ) -> "BaseRLAgent":
+        """Load the model from a saved state_dict"""
         if all([x is None for x in [env, state_space, action_space]]):
             raise ValueError("Must provide env or state_space and action_space")
         else:
@@ -132,7 +141,7 @@ class BaseRLAgent(BaseAgent, ABC):
                 )
 
     def _init_models_componet(self, policy_kwargs: Dict[str, Any]) -> None:
-        """Check if the core componet exits in policy kwargs."""
+        """Check and initialize the core componet in policy kwargs if exits."""
         if policy_kwargs is None:
             raise ValueError("policy_kwargs cannot be None.")
 
@@ -318,13 +327,14 @@ class OnPolicyAgent(BaseRLAgent):
             orthogonal_init = policy_kwargs.get("orthogonal_init", False)
             if orthogonal_init:
                 self.weight_initiation()
+            # Optimizer.
             self.optim_actor = self.optim_cls(self.actor.parameters(), lr=self.lr_actor)
             self.optim_critic = self.optim_cls(
                 self.critic.parameters(), lr=self.lr_critic
             )
 
-    def _setup_models(self):
-        """Build model for actor and critic."""
+    def _setup_models(self) -> None:
+        """Build model for actor and critic and send to proper device."""
         # Actor.
         self.actor = StateIndependentPolicy(
             self.obs_dim,
@@ -402,7 +412,7 @@ class OffPolicyAgent(BaseRLAgent):
             self._init_buffer(buffer_type="replay")
 
         if expert_mode:
-            # only need actor
+            # Only need actor
             if "pi" not in policy_kwargs:
                 raise ValueError("Missing `pi` key in policy_kwargs.")
             self.units_actor = policy_kwargs["pi"]

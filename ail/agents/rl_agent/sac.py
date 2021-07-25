@@ -137,7 +137,7 @@ class SAC(OffPolicyAgent):
         self.tau = tau
         self.one = th.ones(1, device=self.device)  # a constant for quick soft update
 
-    def _setup_models(self):
+    def _setup_models(self) -> None:
         # TODO: (Yifan) Build the model inside off policy class latter.
 
         # Actor.
@@ -167,10 +167,11 @@ class SAC(OffPolicyAgent):
         self.optim_actor = self.optim_cls(self.actor.parameters(), lr=self.lr_actor)
         self.optim_critic = self.optim_cls(self.critic.parameters(), lr=self.lr_critic)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "SAC"
 
-    def is_update(self, step: int):
+    def is_update(self, step: int) -> bool:
+        """Whether or not to update the agent"""
         return step >= max(self.start_steps, self.batch_size)
 
     def step(
@@ -273,6 +274,7 @@ class SAC(OffPolicyAgent):
         # Update target networks by polyak averaging.
         if gradient_step % self.target_update_interval == 0:
             self.update_target()
+        # Return log changes(key used for logging name).
         return {
             "actor_loss": loss_actor,
             "critic_loss": loss_critic,
@@ -314,7 +316,7 @@ class SAC(OffPolicyAgent):
         rewards: th.Tensor,
         dones: th.Tensor,
         next_states: th.Tensor,
-    ) -> Tuple[th.Tensor, Dict[str, Any]]:
+    ) -> th.Tensor:
         """Update Q-functions by one step of gradient"""
         self.optim_critic.zero_grad(set_to_none=self.optim_set_to_none)
 
@@ -361,7 +363,7 @@ class SAC(OffPolicyAgent):
         self.one_gradient_step(loss_actor, self.optim_actor, self.actor)
         return loss_actor.detach()
 
-    def update_target(self):
+    def update_target(self) -> None:
         """update the target network by polyak averaging."""
         # * here tau = (1 - polyak)
         soft_update(self.critic_target, self.critic, self.tau, self.one)
@@ -383,7 +385,7 @@ class SAC(OffPolicyAgent):
         device: Union[th.device, str] = "cpu",
         seed: int = 42,
         **kwargs,
-    ) -> None:
+    ) -> "SAC":
         """
         Load the model from a saved model directory.
         we only load actor.

@@ -107,11 +107,11 @@ class PPO(OnPolicyAgent):
         self.gae_lambda = gae_lambda
         self.coef_ent = coef_ent
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "PPO"
 
     def is_update(self, step: int) -> bool:
-        """wheter to pefrom update"""
+        """Whether or not to update the agent"""
         return step % self.batch_size == 0
 
     def step(
@@ -293,7 +293,7 @@ class PPO(OnPolicyAgent):
         device: Union[th.device, str] = "cpu",
         seed: int = 42,
         **kwargs,
-    ) -> None:
+    ) -> "PPO":
         """
         Load the model from a saved model directory.
         we only load actor.
@@ -324,7 +324,15 @@ class PPO(OnPolicyAgent):
         return ppo_expert
 
 
-def calculate_gae(rewards, dones, values, next_values, gamma, lambd, normal=True):
+def calculate_gae(
+    rewards: th.Tensor,
+    dones: th.Tensor,
+    values: th.Tensor,
+    next_values: th.Tensor,
+    gamma: float,
+    lambd: float,
+    normal: bool = True,
+) -> Tuple[th.Tensor, th.Tensor]:
     """
     Compute the lambda-return (TD(lambda) estimate) and GAE(lambda) advantage.
 

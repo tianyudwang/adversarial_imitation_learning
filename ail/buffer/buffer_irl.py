@@ -285,7 +285,7 @@ class BaseBuffer:
     __slots__ = ["capacity", "sample_shapes", "dtypes", "device", "_buffer"]
 
     """
-    Base class that represent a buffer (rollout or replay)
+    Base class that represent a buffer (rollout or replay).
 
     :param capacity: The number of samples that can be stored.
     :param device: PyTorch device to which the values will be converted.
@@ -315,8 +315,8 @@ class BaseBuffer:
         self.dtypes = {}
         if env is not None:
             if np.any([x is not None for x in params]):
-                print("Specified shape and dtype and environment.")
-                print("Shape and dtypes will be refer to env")
+                print("Specified shape and dtype and environment.", flush=True)
+                print("Shape and dtypes will be refer to env.", flush=True)
             self.sample_shapes.update(
                 {
                     "obs": tuple(env.observation_space.shape),
@@ -361,12 +361,14 @@ class BaseBuffer:
 
     def _init_buffer(self) -> None:
         """Initiate Buffer"""
-        assert len(self.sample_shapes) > 0, "sample shape not define"
-        assert len(self.dtypes) > 0, "dtypes not define"
+        if len(self.sample_shapes) == 0:
+            raise ValueError("sample shape not define.")
+        if len(self.dtypes) == 0:
+            raise ValueError("dtypes not define.")
         self.reset()
 
-    def reset(self):
-        """Reset equivalent to re-initiate a new Buffer"""
+    def reset(self) -> None:
+        """Reset equivalent to re-initiate a new Buffer."""
         self._buffer = Buffer(
             capacity=self.capacity,
             sample_shapes=self.sample_shapes,
@@ -392,7 +394,14 @@ class BaseBuffer:
         Raises:
             ValueError: The arguments didn't have the same length.
         """
-        assert isinstance(transitions, dict), "transitions should be a dict"
+        if not isinstance(transitions, dict):
+            try:
+                transitions = dict(transitions)
+            except TypeError:
+                raise TypeError(
+                    "Prefer transitions to be a dict or a dictionary-like object"
+                )
+
         intersect = self._buffer.stored_keys.intersection(transitions.keys())
 
         # Remove unnecessary fields
@@ -426,7 +435,7 @@ class BaseBuffer:
         """
         return self._buffer.sample(n_samples)
 
-    def get(self, n_samples: Optional[int] = None):
+    def get(self, n_samples: Optional[int] = None) -> Dict[str, th.Tensor]:
         """
         Obtain a batch of samples with size = n_samples. (order preserved)
             By default, return all samples in the buffer, if n_samples is None.
@@ -441,7 +450,7 @@ class BaseBuffer:
         capacity: Optional[int] = None,
         truncate_ok: bool = False,
         with_reward: bool = True,
-    ):
+    ) -> "BaseBuffer":
         """
         Construct and return a ReplayBuffer/RolloutBuffer containing the provided data.
         Shapes and dtypes are automatically inferred, and the returned ReplayBuffer is
@@ -547,7 +556,7 @@ class ReplayBuffer(BaseBuffer):
         self.dtypes.update(extra_dtypes)
         self._init_buffer()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "ReplayBuffer"
 
 
@@ -606,7 +615,7 @@ class RolloutBuffer(BaseBuffer):
         self.dtypes.update(extra_dtypes)
         self._init_buffer()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "RolloutBuffer"
 
 

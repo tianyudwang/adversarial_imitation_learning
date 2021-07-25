@@ -6,7 +6,15 @@ import torch.nn.functional as F
 from ail.agents.irl_agent.irl_core import BaseIRLAgent
 from ail.buffer import ReplayBuffer, BufferTag
 from ail.common.type_alias import GymSpace, TensorDict
-from ail.network.discrim import DiscrimNet, DiscrimType, ArchType
+from ail.network.discrim import DiscrimNet, DiscrimType
+
+
+try:
+    from icecream import install  # noqa
+
+    install()
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
 class AIRL(BaseIRLAgent):
@@ -27,7 +35,7 @@ class AIRL(BaseIRLAgent):
         disc_kwargs: Dict[str, Any],
         lr_disc: float,
         optim_kwargs: Optional[Dict[str, Any]] = None,
-        **kwargs
+        **kwargs,
     ):
 
         super().__init__(
@@ -45,17 +53,22 @@ class AIRL(BaseIRLAgent):
         )
 
         if disc_kwargs is None:
-            disc_kwargs = {}  # * hidden, activation,
-
-        if disc_cls is None or disc_cls == "airl_so":
-            disc_cls = "airl"
-            disc_kwargs["disc_type"] = ArchType.s
-        elif disc_cls == "airl_sa":
-            disc_kwargs["disc_type"] = ArchType.sa
+            disc_kwargs = {}
 
         # Discriminator
         if isinstance(disc_cls, str):
-            disc_cls = DiscrimType[disc_cls.lower()].value
+            disc_cls = disc_cls.lower()
+            if disc_cls not in ["airl", "airl_so", "airl_sa"]:
+                raise ValueError(
+                    f"No string string conversion of discriminator class {disc_cls}."
+                )
+            disc_cls = DiscrimType[disc_cls].value
+
+        else:
+            if isinstance(disc_cls, DiscrimNet):
+                disc_cls = DiscrimNet
+            else:
+                raise ValueError(f"Unknown discriminator class: {disc_cls}.")
 
         self.disc = disc_cls(self.obs_dim, self.act_dim, **disc_kwargs)
         self.lr_disc = lr_disc
@@ -67,28 +80,30 @@ class AIRL(BaseIRLAgent):
         self.acc_gen = []
         self.acc_exp = []
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "AIRL"
 
     def update(self, log_this_batch: bool = False) -> Dict[str, Any]:
-
-        # Main loop
-        # 1. Interact with the environment using the current generator
-        #    and store the experience in a replay buffer
-        # 2. Update discriminator
-        # 3. Update generator
-
+        """
+        Main loop
+         1. Interact with the environment using the current generator/ policy.
+            and store the experience in a replay buffer (implementing in step()).
+         2. Update discriminator.
+         3. Update generator.
+        """
+        # TODO: find a way to work with off policies
         for _ in range(self.epoch_disc):
-            # * samples from *current* policy's trajectories
-            # TODO: find a way to work with off policies
-            # * get current trajectories
+            self.learning_steps_disc += 1
+            # * Sample transitions from ``curret`` policy.
             data_gen = self.gen.buffer.get(self.replay_batch_size)
-            # Samples from expert's demonstrations.
+            # Samples transitions from expert's demonstrations.
             data_exp = self.buffer_exp.sample(self.replay_batch_size)
 
-            # Calculate log probabilities of agent and expert actions.
+            # Calculate log probabilities of geberator's actions.
+            # And evaluate log probabilities of expert actions.
+            # Based on current generator's action distribution.
             with th.no_grad():
-                # ? maybe we don't need to calculate the log probs of the expert actions
+                # ? maybe we don't need to calculate the log probs of the expert actions?
                 data_exp["log_pis"] = self.gen.actor.evaluate_log_pi(
                     data_exp["obs"], data_exp["acts"]
                 )
@@ -116,7 +131,10 @@ class AIRL(BaseIRLAgent):
             # Random uniform sampling a batch of transitions from agent's replay buffer
             data = self.gen.buffer.sample(self.gen.batch_size)
 
-        # Claculate learning rewards
+        else:
+            raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
+
+        # Calculate learning rewards.
         data["rews"] = self.disc.calculate_rewards(**data)
         assert data["rews"].shape[0] == data["obs"].shape[0]
 
