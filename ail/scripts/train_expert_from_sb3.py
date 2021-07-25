@@ -15,7 +15,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import EvalCallback
 
 from ail.common.env_utils import maybe_make_env
-from eval_utils import evaluate
+
 
 ALGO = {
     "ppo": PPO,

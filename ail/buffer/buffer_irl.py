@@ -235,7 +235,7 @@ class Buffer:
             path_slice = slice(0, n_samples)
             return self._get_samples(path_slice)
 
-    def _get_samples(self, batch_idxes: Union[np.ndarray, slice] = None):
+    def _get_samples(self, batch_idxes: Union[np.ndarray, slice, None] = None):
         """Get a batch size or whole buffer size with order preserved."""
         batch_idxes = slice(0, self.capacity) if batch_idxes is None else batch_idxes
         return {

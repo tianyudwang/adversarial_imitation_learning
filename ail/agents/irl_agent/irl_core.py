@@ -24,7 +24,7 @@ class BaseIRLAgent(BaseAgent, ABC):
         seed: int,
         replay_batch_size: int,
         buffer_exp: Union[ReplayBuffer, str],
-        buffer_kwargs: Dict[str, Any],
+        buffer_kwargs: Optional[Dict[str, Any]],
         gen_algo: Union[OnPolicyAgent, OffPolicyAgent, str],
         gen_kwargs: Dict[str, Any],
         optim_kwargs: Optional[Dict[str, Any]],
@@ -44,11 +44,10 @@ class BaseIRLAgent(BaseAgent, ABC):
         # Expert's buffer.
         self.replay_batch_size = replay_batch_size
         if isinstance(buffer_exp, ReplayBuffer):
-            self.buffer_exp = buffer_exp.from_data(**buffer_kwargs)
+            self.buffer_exp = buffer_exp
         elif isinstance(buffer_exp, str):
-            assert (
-                len(buffer_kwargs) > 0
-            ), "Need specifies buffer_kwargs for replay buffer."
+            if len(buffer_kwargs) == 0:
+                raise ValueError("Need specifies buffer_kwargs for replay buffer.")
             self.buffer_exp = BufferType[buffer_exp].value.from_data(
                 device=self.device, **buffer_kwargs
             )

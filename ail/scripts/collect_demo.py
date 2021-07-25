@@ -59,8 +59,10 @@ def collect_demo(
             action, _ = sb3_model.predict(
                 th.as_tensor(state, dtype=th.float32), deterministic=True
             )
-        else:
+        elif algo is not None:
             action = algo.exploit(th.as_tensor(state, dtype=th.float32))
+        else:
+            raise ValueError("Please provide either sb3_model or cumstom algo")
 
         next_state, reward, done, _ = env.step(action)
         mask = False if t == env._max_episode_steps else done

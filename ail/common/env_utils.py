@@ -1,7 +1,7 @@
 import re
 import warnings
 from pprint import pprint
-from typing import Tuple, Dict, Union, Type, Sequence
+from typing import Tuple, Dict, Union, Type, Sequence, Optional
 
 import gym
 import numpy as np
@@ -13,7 +13,7 @@ from ail.color_console import COLORS
 
 def maybe_make_env(
     env: Union[GymEnv, str, None],
-    env_wrapper: Sequence[Type[GymWrapper]] = None,
+    env_wrapper: Optional[Sequence[Type[GymWrapper]]] = None,
     verbose=2,
     tag="",
     color="invisible",
@@ -45,7 +45,7 @@ def maybe_make_env(
     return env
 
 
-def env_summary(env: Union[GymEnv, str, None], tag="", verbose=False) -> Dict:
+def env_summary(env: Union[GymEnv, str], tag="", verbose=False) -> Dict:
     """
     Obtain a summary of given env (space, dimensions, constrains)
     :param env: initialized env or env_id

@@ -254,7 +254,12 @@ class GAILDiscrim(DiscrimNet):
             disc_kwargs = {}
 
         super().__init__(
-            state_dim, action_dim, hidden_units, hidden_activation, None, disc_kwargs
+            state_dim,
+            action_dim=action_dim,
+            hidden_units=hidden_units,
+            hidden_activation=hidden_activation,
+            disc_type=ArchType.sa,
+            disc_kwargs=disc_kwargs,
         )
 
     def forward(self, obs: th.Tensor, acts: th.Tensor, **kwargs):
@@ -293,7 +298,12 @@ class AIRLStateDiscrim(DiscrimNet):
             disc_kwargs = {}
 
         super().__init__(
-            state_dim, None, hidden_units, hidden_activation, disc_type, disc_kwargs
+            state_dim,
+            action_dim=None,
+            hidden_units=hidden_units,
+            hidden_activation=hidden_activation,
+            disc_type=disc_type,
+            disc_kwargs=disc_kwargs,
         )
 
     def f(
@@ -317,6 +327,7 @@ class AIRLStateDiscrim(DiscrimNet):
         obs: th.Tensor,
         dones: th.Tensor,
         next_obs: th.Tensor,
+        gamma: float,
         log_pis: Optional[th.Tensor] = None,
         subtract_logp: bool = True,
         **kwargs,
@@ -330,15 +341,16 @@ class AIRLStateDiscrim(DiscrimNet):
         if log_pis is not None and subtract_logp:
             # Discriminator's output is sigmoid(f - log_pi).
             # reshape log_pi to prevent size mismatch
-            return self.f(obs, dones, next_obs) - log_pis.view(-1, 1)
+            return self.f(obs, dones, next_obs, gamma) - log_pis.view(-1, 1)
         else:
-            return self.f(obs, dones, next_obs)
+            return self.f(obs, dones, next_obs, gamma)
 
     def calculate_rewards(
         self,
         obs: th.Tensor,
         dones: th.Tensor,
         next_obs: th.Tensor,
+        gamma: float,
         log_pis: Optional[th.Tensor] = None,
         subtract_logp: bool = True,
         rew_type="airl",
@@ -354,6 +366,7 @@ class AIRLStateDiscrim(DiscrimNet):
             "next_obs": next_obs,
             "log_pis": log_pis,
             "subtract_logp": subtract_logp,
+            "gamma": gamma,
         }
         with th.no_grad():
             reward_fn = self.reward_fn(rew_type, choice)

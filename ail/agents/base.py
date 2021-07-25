@@ -66,10 +66,18 @@ class BaseAgent(nn.Module):
         # Device management.
         self.device = init_gpu(use_gpu=(device == "cuda"))
         # Use automatic mixed precision training in GPU
-        self.fp16 = fp16 and th.cuda.is_available() and device == "cuda"
+        self.fp16 = all([fp16, th.cuda.is_available(), device == "cuda"])
         self.scaler = GradScaler() if self.fp16 else None
 
         # Optimizer kwargs.
         self.optim_kwargs = {} if optim_kwargs is None else optim_kwargs
-        self.optim_cls = OPT[self.optim_kwargs.get("optim_cls", "adam").lower()].value
+
+        optim_cls = self.optim_kwargs.get("optim_cls", "adam")
+        if isinstance(optim_cls, str):
+            self.optim_cls = OPT[optim_cls.lower()].value
+        elif isinstance(optim_cls, th.optim.Optimizer):
+            self.optim_cls = optim_cls
+        else:
+            raise ValueError("optim_cls must be a string or an torch. optim.Optimizer.")
+
         self.optim_set_to_none = self.optim_kwargs.get("optim_set_to_none", False)
