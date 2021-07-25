@@ -15,7 +15,7 @@ class BaseValue(nn.Module, ABC):
     """
 
     def __init__(self, state_dim: int, action_dim: Optional[int] = None):
-        super(BaseValue, self).__init__()
+        super().__init__()
 
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -44,7 +44,7 @@ class StateFunction(BaseValue):
     def __init__(
         self,
         obs_dim: int,
-        hidden_units: Sequence[int],  #  (64, 64)
+        hidden_units: Sequence[int],
         activation: Union[str, nn.Module],
         use_spectral_norm=False,
         **kwargs
@@ -56,7 +56,7 @@ class StateFunction(BaseValue):
             use_spectral_norm=use_spectral_norm,
         )
 
-    def forward(self, state: th.Tensor):
+    def forward(self, state: th.Tensor) -> th.Tensor:
         """self.net()"""
         # TODO: Critical to ensure v has right shape.
         return self.net(state)

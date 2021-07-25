@@ -204,8 +204,8 @@ class BaseTrainer(ABC):
             self.best_ret = self.rs.mean()
         Console.info(
             f"Num steps: {step}\t"
-            f"| Best Ret: {self.best_ret:.1f}\t"
-            f"| Return: {self.rs.mean():.1f}"
+            f"| Best Ret: {self.best_ret:.2f}\t"
+            f"| Return: {self.rs.mean():.2f} +/- {self.rs.standard_deviation():.2f}"
         )
 
     # -----------------------

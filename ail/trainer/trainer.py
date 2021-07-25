@@ -71,11 +71,6 @@ class Trainer(BaseTrainer):
             **kwargs,
         )
 
-        # algo kwargs
-        if self.verbose > 0:
-            print("-" * 10, f"{algo}", "-" * 10)
-            pprint(algo_kwargs)
-
         if isinstance(algo, str):
             self.algo = ALGO[algo.lower()](
                 self.env.observation_space,
@@ -89,7 +84,7 @@ class Trainer(BaseTrainer):
                 **algo_kwargs,
             )
 
-        # number of variables and net arch.
+        # Number of variables and net arch.
         if self.verbose > 1:
             var_counts = self.algo.info()
             pprint(var_counts)

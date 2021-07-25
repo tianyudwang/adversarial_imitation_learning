@@ -166,13 +166,9 @@ def run(args):
         log_dir=log_dir,
         log_interval=args.log_interval,
         verbose=args.verbose,
-        use_wandb=args.use_wandb,  # TODO: not implemented wandb intergration
+        use_wandb=args.use_wandb,
         wandb_kwargs=wandb_kwargs,
     )
-
-    # Saving hyperparams to yaml file
-    with open(os.path.join(log_dir, "hyperparams.yaml"), "w") as f:
-        yaml.dump(algo_kwargs, f)
 
     # Log with tensorboard and sync to wandb dashboard as well
     # https://docs.wandb.ai/guides/integrations/tensorboard
@@ -195,7 +191,18 @@ def run(args):
             print("`wandb` Module Not Found")
             sys.exit(0)
 
+    # Create Trainer
     trainer = Trainer(**config)
+
+    # algo kwargs
+    print("-" * 10, f"{args.algo}", "-" * 10)
+    ic(algo_kwargs)
+
+    # Saving hyperparams to yaml file
+    with open(os.path.join(log_dir, "hyperparams.yaml"), "w") as f:
+        yaml.dump(algo_kwargs, f)
+
+    del algo_kwargs, ppo_kwargs, sac_kwargs, wandb_kwargs
 
     if args.profiling:
         import cProfile
@@ -229,5 +236,7 @@ if __name__ == "__main__":
         os.environ["OMP_NUM_THREADS"] = "1"
         # torch backends
         th.backends.cudnn.benchmark = True  # ? Does this useful for non-convolutions?
-        
+
+    print(os.getcwd())
+
     run(args)

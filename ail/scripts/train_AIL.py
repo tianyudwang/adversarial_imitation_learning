@@ -1,6 +1,8 @@
 import os
+import pathlib
 import sys
 import argparse
+from copy import deepcopy
 from datetime import datetime
 
 import yaml
@@ -57,19 +59,34 @@ def CLI():
     p.add_argument(
         "--demo_path", "-demo", type=str, help="Path to demo"
     )  # required=True,
-    p.add_argument("--num_steps", "-n", type=int, default=3 * 1e6)
+
+    # TODO: add more arguments to control discriminator
+    # Discriminator features
+    p.add_argument("--spectral_norm", "-sn", action="store_true")
+    p.add_argument("--dropout", "-dp", action="store_true")  # TODO: Implement and test
+
+    # Total steps and batch size
+    p.add_argument("--num_steps", "-n", type=int, default=0.5 * 1e6)
     p.add_argument("--rollout_length", "-ep_len", type=int, default=None)
-    p.add_argument("--gen_batch_size", type=int, default=256)
-    p.add_argument("--replay_batch_size", type=int, default=256)
+    p.add_argument("--gen_batch_size", "-gb", type=int, default=256)
+    p.add_argument("--replay_batch_size", "-rbs", type=int, default=256)
     p.add_argument("--buffer_size", type=int, default=1 * 1e6)
+
+    # Logging and evaluation
     p.add_argument("--log_every_n_updates", "-lg", type=int, default=20)
     p.add_argument("--eval_interval", type=int, default=5 * 1e3)
     p.add_argument("--num_eval_episodes", type=int, default=10)
-    p.add_argument("--gamma", type=float, default=0.99)
+
+    # Cuda options
     p.add_argument("--cuda", action="store_true")
     p.add_argument("--fp16", action="store_true")
     p.add_argument("--optim_cls", type=str, default="adam")
+
+    # Common hyperparams
+    p.add_argument("--gamma", type=float, default=0.99)
     p.add_argument("--seed", type=int, default=0)
+
+    # Utility
     p.add_argument("--verbose", type=int, default=2)
     p.add_argument("--debug", action="store_true")
     p.add_argument("--profiling", "-prof", action="store_true")
@@ -90,6 +107,11 @@ def CLI():
 
 def run(args):
     """Training Configuration"""
+
+    # Path
+    path = pathlib.Path.cwd()
+    print(f"current_dir: {path}")
+
     algo_kwargs = dict(
         # common args
         device=args.device,
@@ -107,14 +129,14 @@ def run(args):
             batch_size=args.batch_size,  # PPO assums batch size == buffer_size
             buffer_kwargs=dict(with_reward=False, extra_data=["log_pis"]),
             # PPO only args
-            epoch_ppo=10,
+            epoch_ppo=20,
             gae_lambda=0.97,
             clip_eps=0.2,
-            coef_ent=0.00,
+            coef_ent=0.01,
             # poliy args: net arch, activation, lr
             policy_kwargs=dict(
-                pi=(64, 64),
-                vf=(64, 64),
+                pi=(128, 128),
+                vf=(128, 128),
                 activation="relu_inplace",
                 critic_type="V",
                 lr_actor=3e-4,
@@ -122,6 +144,7 @@ def run(args):
             ),
         )
         gen_kwargs = {**algo_kwargs, **ppo_kwargs}
+        sac_kwargs = None
 
     elif args.gen_algo.lower() == "sac":
         sac_kwargs = dict(
@@ -148,6 +171,7 @@ def run(args):
             ),
         )
         gen_kwargs = {**algo_kwargs, **sac_kwargs}
+        ppo_kwargs = None
 
     else:
         raise ValueError()
@@ -155,27 +179,33 @@ def run(args):
     # Demo data
     if args.demo_path is None:
         # TODO: REMOVE THIS
-        args.demo_path = f"./ail/scripts/transitions/{args.env_id}/size11000.npz"
+        args.demo_path = (
+            path / "ail" / "scripts" / "transitions" / args.env_id / "size11000.npz"
+        )
     transitions = dict(np.load(args.demo_path))
 
     algo_kwargs.update(
         dict(
-            epoch_disc=10,
             replay_batch_size=args.replay_batch_size,
             buffer_exp="replay",
             buffer_kwargs=dict(
-                with_reward=False, transitions=transitions
-            ),  # * transitions must be a dict
+                with_reward=False,
+                transitions=transitions,  # * transitions must be a dict
+            ),
             gen_algo=args.gen_algo,
             gen_kwargs=gen_kwargs,
             disc_cls="airl_sa",
             disc_kwargs=dict(
-                hidden_units=(128, 128),
+                hidden_units=(100, 100),
                 hidden_activation="relu_inplace",
                 gamma=args.gamma,
-                disc_kwargs={"spectral_norm": False},
+                disc_kwargs={
+                    "spectral_norm": args.spectral_norm,
+                    "dropout": args.dropout,
+                },
             ),
-            lr_disc=3e-4,
+            epoch_disc=1,
+            lr_disc=1e-4,
         )
     )
 
@@ -207,13 +237,9 @@ def run(args):
         log_dir=log_dir,
         log_interval=args.log_interval,
         verbose=args.verbose,
-        use_wandb=args.use_wandb,  # TODO: not implemented wandb intergration
+        use_wandb=args.use_wandb,
         wandb_kwargs=wandb_kwargs,
     )
-
-    # Saving hyperparams to yaml file
-    with open(os.path.join(log_dir, "hyperparams.yaml"), "w") as f:
-        yaml.dump(algo_kwargs, f)
 
     # Log with tensorboard and sync to wandb dashboard as well
     # https://docs.wandb.ai/guides/integrations/tensorboard
@@ -221,22 +247,37 @@ def run(args):
         try:
             import wandb
 
+            # Not to store expert data in wandb
+            config_copy = deepcopy(config)
+            config_copy["algo_kwargs"]["buffer_kwargs"].pop("transitions")
+
             # Save API key for convenience or you have to login every time
             wandb.login()
             wandb.init(
                 project="AIL",
                 notes="tweak baseline",
                 tags=["baseline"],
-                config=config,  # Hyparams & meta data
+                config=config_copy,  # Hyparams & meta data
             )
             wandb.run.name = exp_name
-            # make sure to use the same config as passed to wandb
-            config = wandb.config
         except ImportError:
             print("`wandb` Module Not Found")
             sys.exit(0)
 
+    # Create Trainer
     trainer = Trainer(**config)
+
+    # It's a dict of data too large to store
+    algo_kwargs["buffer_kwargs"].pop("transitions")
+    # algo kwargs
+    print("-" * 10, f"{args.algo}", "-" * 10)
+    ic(algo_kwargs)
+
+    # Saving hyperparams to yaml file
+    with open(os.path.join(log_dir, "hyperparams.yaml"), "w") as f:
+        yaml.dump(algo_kwargs, f)
+
+    del algo_kwargs, gen_kwargs, ppo_kwargs, sac_kwargs, wandb_kwargs
 
     if args.profiling:
         import cProfile
@@ -264,11 +305,8 @@ if __name__ == "__main__":
         th.autograd.set_detect_anomaly(True)
 
     if args.cuda:
-        # TODO: investigate this
         # os.environ["OMP_NUM_THREADS"] = "1"
         # torch backends
         th.backends.cudnn.benchmark = True  # ? Does this useful for non-convolutions?
-    else:
-        # TODO: investigate this 1 , 4, 6, 8, 12
-        os.environ["OMP_NUM_THREADS"] = "8"
+
     run(args)

@@ -39,7 +39,8 @@ class BaseAgent(nn.Module):
         super().__init__()
 
         # RNG.
-        assert isinstance(seed, int), "seed must be integer."
+        if not isinstance(seed, int):
+            raise ValueError("seed must be integer.")
         self.seed = seed
         set_random_seed(self.seed)
 

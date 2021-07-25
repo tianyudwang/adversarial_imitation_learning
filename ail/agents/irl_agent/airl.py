@@ -63,7 +63,9 @@ class AIRL(BaseIRLAgent):
 
         self.learning_steps_disc = 0
         self.epoch_disc = epoch_disc
-        self.dummy = 0
+
+        self.acc_gen = []
+        self.acc_exp = []
 
     def __repr__(self):
         return "AIRL"
@@ -92,6 +94,9 @@ class AIRL(BaseIRLAgent):
                 )
             # Update discriminator.
             disc_logs = self.update_discriminator(data_gen, data_exp, log_this_batch)
+
+            # Not needed. Delete to save memory.
+            del data_gen, data_exp
             # TODO: a deafult dict to handle multiple logs
         # Calculate rewards:
         # # TODO: buffer.get or sample()
@@ -131,10 +136,20 @@ class AIRL(BaseIRLAgent):
     ) -> Dict[str, Any]:
         """
         Update discriminator.
+        Let D denote the probability that a state-action pair (s, a) is classified as expert
+        by the discriminator while f is the discriminator logit.
 
-        Discriminator is to maximize E_{exp} [log(D)] + E_{\pi} [log(1 - D)]
+        The objective of the discriminator is to minimize cross-entropy loss
+        between expert demonstrations and generated samples:
+
+        L = sum( -E_{exp} [log(D)] - E_{\pi} [log(1 - D)] )
+
+        We write the ``negative`` loss to turn the ``minimization`` problem into ``maximization``.
+
+        -L = sum( E_{exp} [log(D)] + E_{\pi} [log(1 - D)] )
+
         D = sigmoid(f)
-        Output of disc is logits `f` in range (-inf, inf), not [0, 1].
+        Output of self.disc() is logits `f` in range (-inf, inf), not [0, 1].
         :param data_gen: batch of data from the current policy
         :param data_exp: batch of data from demonstrations
         """
@@ -142,9 +157,11 @@ class AIRL(BaseIRLAgent):
         logits_gen = self.disc(**data_gen)
         logits_exp = self.disc(**data_exp)
 
-        # E_{exp} [log(D)] + E_{\pi} [log(1 - D)]
-        # E_{exp} [log(sigmoid(f))] + E_{\pi} [log(1 - sigmoid(f))]
-        # *Note: S(x) = 1 - S(-x) -> S(-x) = 1 - S(x)
+        """
+        E_{exp} [log(D)] + E_{\pi} [log(1 - D)]
+        E_{exp} [log(sigmoid(f))] + E_{\pi} [log(1 - sigmoid(f))]
+        *Note: S(x) = 1 - S(-x) -> S(-x) = 1 - S(x)
+        """
         loss_pi = -F.logsigmoid(-logits_gen).mean()
         loss_exp = -F.logsigmoid(logits_exp).mean()
         loss_disc = loss_pi + loss_exp
@@ -154,13 +171,21 @@ class AIRL(BaseIRLAgent):
         loss_disc.backward()
         self.optim_disc.step()
 
-        self.dummy += 1
+        # TODO: remove this
         if log_this_batch:
-            acc_gen = (logits_gen.detach() < 0).float().mean()
-            acc_exp = (logits_exp.detach() > 0).float().mean()
+            # Discriminator's accuracies.
+            with th.no_grad():
+                acc_gen = (logits_gen.detach() < 0).float().mean().item()
+                acc_exp = (logits_exp.detach() > 0).float().mean().item()
+                self.acc_gen.append(acc_gen)
+                self.acc_exp.append(acc_exp)
+            if len(self.acc_gen) == self.epoch_disc:
+                import numpy as np
 
-            if self.dummy % 100 == 0:
-                # TODO: avoid print(cuda_tensor)
+                acc_gen = round(np.mean(self.acc_gen), 4)
+                acc_exp = round(np.mean(self.acc_exp), 4)
+                self.acc_gen.clear()
+                self.acc_exp.clear()
                 ic(acc_gen)
                 ic(acc_exp)
             return {

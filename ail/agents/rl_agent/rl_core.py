@@ -59,8 +59,10 @@ class BaseRLAgent(BaseAgent, ABC):
             optim_kwargs,
         )
 
-        assert isinstance(batch_size, int), "batch_size must be integer."
-        assert isinstance(buffer_size, int), "buffer_size must be integer."
+        if not isinstance(batch_size, int):
+            raise ValueError("Batch_size must be integer.")
+        if not isinstance(buffer_size, int):
+            raise ValueError("buffer_size must be integer.")
 
         # Buffer kwargs.
         self.batch_size = batch_size
@@ -131,37 +133,52 @@ class BaseRLAgent(BaseAgent, ABC):
 
     def _init_models_componet(self, policy_kwargs: Dict[str, Any]) -> None:
         """Check if the core componet exits in policy kwargs."""
-        assert policy_kwargs is not None, "policy_kwargs cannot be None."
-        assert isinstance(
-            policy_kwargs, dict
-        ), "policy_kwargs must be a Dict[str, Any]."
-        assert len(policy_kwargs) > 0, "policy_kwargs cannot be empty."
+        if policy_kwargs is None:
+            raise ValueError("policy_kwargs cannot be None.")
 
-        assert "pi" in policy_kwargs, "Missing `pi` key in policy_kwargs."
-        assert (
-            "activation" in policy_kwargs
-        ), "Missing `activation` key in policy_kwargs."
-        assert (
-            "critic_type" in policy_kwargs
-        ), "Missing `critic_type` key in policy_kwargs."
-        assert "lr_actor" in policy_kwargs, "Missing `lr_actor` key in policy_kwargs."
-        assert "lr_critic" in policy_kwargs, "Missing `lr_critic` key in policy_kwargs."
+        if not isinstance(policy_kwargs, dict):
+            raise ValueError("policy_kwargs must be a Dict[str, Any].")
 
-        self.units_actor = policy_kwargs["pi"]
+        if len(policy_kwargs) == 0:
+            raise ValueError("policy_kwargs cannot be empty.")
+
+        if "pi" not in policy_kwargs:
+            raise ValueError("Missing `pi` key in policy_kwargs.")
+
+        if "activation" not in policy_kwargs:
+            raise ValueError("Missing `activation` key in policy_kwargs.")
+
+        if "critic_type" not in policy_kwargs:
+            raise ValueError("Missing `critic_type` key in policy_kwargs.")
+
+        if "lr_actor" not in policy_kwargs:
+            raise ValueError("Missing `lr_actor` key in policy_kwargs.")
+
+        if "lr_critic" not in policy_kwargs:
+            raise ValueError("Missing `lr_critic` key in policy_kwargs.")
+
         if "vf" in policy_kwargs:
             self.units_critic = policy_kwargs["vf"]
         elif "qf" in policy_kwargs:
             self.units_critic = policy_kwargs["qf"]
         else:
             raise ValueError("Missing `vf`/ `qf` key in policy_kwargs.")
+
+        self.units_actor = policy_kwargs["pi"]
         self.hidden_activation = policy_kwargs["activation"]
         self.critic_type = policy_kwargs["critic_type"]
         self.lr_actor = policy_kwargs["lr_actor"]
         self.lr_critic = policy_kwargs["lr_critic"]
 
-    def _init_buffer(self, buffer_type: str) -> None:
+    def _init_buffer(self, buffer_type: Union[BufferType, str]) -> None:
         """Initialize the rollout/replay buffer."""
-        assert isinstance(buffer_type, str), "buffer_type should be a string"
+        if isinstance(buffer_type, str):
+            buffer_cls = BufferType[buffer_type.lower()].value
+        elif isinstance(buffer_type, BufferType):
+            buffer_cls = buffer_type.value
+        else:
+            raise ValueError("buffer_type should be a string or BufferType")
+
         data = self.buffer_kwargs.get("extra_data", [])
         if not isinstance(data, (list, tuple)):
             data = [data]
@@ -171,8 +188,6 @@ class BaseRLAgent(BaseAgent, ABC):
 
         extra_shapes = {k: shape_dict[k] for k in data if k in shape_dict}
         extra_dtypes = {k: dtypes_dict[k] for k in data if k in dtypes_dict}
-
-        buffer_cls = BufferType[buffer_type.lower()].value
 
         self.buffer = buffer_cls(
             capacity=self.buffer_size,
@@ -243,8 +258,8 @@ class OnPolicyAgent(BaseRLAgent):
 
     def __init__(
         self,
-        state_space,
-        action_space,
+        state_space: GymSpace,
+        action_space: GymSpace,
         device: Union[th.device, str],
         fp16: bool,
         seed: int,
@@ -279,9 +294,11 @@ class OnPolicyAgent(BaseRLAgent):
             self._init_buffer(buffer_type="rollout")
 
         if expert_mode:
-            # only need actor
-            assert "pi" in policy_kwargs, "Missing `pi` key in policy_kwargs."
+            # Only need actor
+            if "pi" not in policy_kwargs:
+                raise ValueError("Missing `pi` key in policy_kwargs.")
             self.units_actor = policy_kwargs["pi"]
+
             # Actor.
             self.actor = StateIndependentPolicy(
                 self.obs_dim,
@@ -386,7 +403,8 @@ class OffPolicyAgent(BaseRLAgent):
 
         if expert_mode:
             # only need actor
-            assert "pi" in policy_kwargs, "Missing `pi` key in policy_kwargs."
+            if "pi" not in policy_kwargs:
+                raise ValueError("Missing `pi` key in policy_kwargs.")
             self.units_actor = policy_kwargs["pi"]
 
         else:

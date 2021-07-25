@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence, Union, Any, Dict
+from typing import Callable, Optional, Sequence
 from enum import Enum, auto
 
 import torch as th
@@ -19,6 +19,21 @@ class ArchType(Enum):
     sas = auto()
 
 
+class RewardType(Enum):
+    airl = "airl"
+    AIRL = "airl"
+    gail = "gail"
+    GAIL = "gail"
+
+
+class ChoiceType(Enum):
+    logit = "logit"
+    logsigmoid = "logsigmoid"
+    log_sigmoid = "log_sigmoid"
+    softplus = "softplus"
+    soft_plus = "soft_plus"
+
+
 class DiscrimNet(nn.Module, ABC):
     """
     Abstract base class for discriminator, used in AIRL and GAIL.
@@ -31,8 +46,8 @@ class DiscrimNet(nn.Module, ABC):
     Choice of reward function:
     • r(s, a) = − ln(1 − D) = softplus(h) (used in the original GAIL paper),
     • r(s, a) = ln D − ln(1 − D) = h (introduced in AIRL).
-    • r(s, a) = ln D = −softplus(−h),
-    • r(s, a) = −h exp(h) (introduced in FAIRL)
+    • r(s, a) = ln D = −softplus(−h),       # ! Currently not working.
+    • r(s, a) = −h exp(h) (introduced in FAIRL) # ! Not Implemented.
     # TODO: clip rewards with the absolute values higher than max reward magnitude
     # * The GAIL paper uses the inverse convention in which
     # * D denotes the probability as being classified as non-expert.
@@ -43,7 +58,7 @@ class DiscrimNet(nn.Module, ABC):
 
     L = \sum[ -E_{D} log(D) - E_{\pi} log(1 - D)]
 
-    write the negative loss to turn the minimization problem into maximization:
+    Write the negative loss to turn the minimization problem into maximization:
     -L = \sum[ -E_{D} log(D) + E_{\pi} log(1 - D)]
 
     """
@@ -54,7 +69,6 @@ class DiscrimNet(nn.Module, ABC):
         action_dim: Optional[int] = None,
         hidden_units: Sequence[int] = (128, 128),
         hidden_activation: Activation = nn.ReLU(inplace=True),
-        gamma: Optional[float] = None,
         disc_type=None,
         **disc_kwargs,
     ):
@@ -67,9 +81,6 @@ class DiscrimNet(nn.Module, ABC):
         self.action_dim = action_dim
         self.hidden_units = hidden_units
         self.hidden_activation = hidden_activation
-
-        # Discount factor
-        self.gamma = gamma
 
         # Regularization
         self.spectral_norm = disc_kwargs.get("spectral_norm", False)
@@ -124,11 +135,110 @@ class DiscrimNet(nn.Module, ABC):
 
     @abstractmethod
     def forward(self, *args, **kwargs):
+        """Output logits of discriminator"""
         raise NotImplementedError()
 
     @abstractmethod
     def calculate_rewards(self, *args, **kwargs):
+        """Calculate learning rewards based on choice of reward formulation"""
         raise NotImplementedError()
+
+    def reward_fn(self, rew_type: str, choice: str) -> Callable[[th.Tensor], th.Tensor]:
+        """
+        The learning rewards formulation
+        (GAIL):r(s, a) = − ln(1 − D) = softplus(h)
+        (AIRL): r(s, a) = ln D − ln(1 − D) = h
+
+        Paper:"What Matters for Adversarial Imitation Learning?" Appendix C.2.
+        See: https://arxiv.org/abs/2106.00672
+
+        :param rew_type: airl or gail
+        :param choice: logsigmoid, sofplus, logit
+        Note logit only available in airl and returns itself without any transformation
+
+        LHS equation and RHS equation are mathmatically identical why implement both?
+        Because Pytorch's logsigmoid and softplus behaves differently in the same reward function
+        Might due to the threshold value in softplus.
+        Refer to https://pytorch.org/docs/stable/generated/torch.nn.Softplus.html
+        """
+        rew_types = {"gail", "airl"}
+        choices = {"logsigmoid", "softplus", "logit"}
+
+        rew_type = RewardType[rew_type.lower()].value
+        choice = ChoiceType[choice.lower()].value
+
+        if rew_type == "gail":
+            # * (1)  − ln(1 − D) = softplus(h)
+            if choice == "logsigmoid":
+                return self.gail_logsigmoid
+            elif choice == "softplus":
+                return self.gail_softplus
+            elif choice == "logit":
+                raise ValueError(f"Choice logit not supported for Gail.")
+            else:
+                raise ValueError(
+                    f"Choice {choices} not supported. " f"Valid choices are {choices}"
+                )
+
+        elif rew_type == "airl":
+            # * (2)  ln D − ln(1 − D) = h = −softplus(-h) + softplus(h)
+            if choice == "logsigmoid":
+                return self.airl_logsigmoid
+            elif choice == "softplus":
+                return self.airl_softplus
+            elif choice == "logit":
+                return self.airl_logit
+            else:
+                raise ValueError(
+                    f"Choice {choices} not supported. " f"Valid choices are {choices}"
+                )
+
+        else:
+            raise ValueError(
+                f"Reward type {rew_type} not supported. "
+                f"Valid rew_types: {rew_types}"
+            )
+
+    @staticmethod
+    def gail_logsigmoid(x: th.Tensor) -> th.Tensor:
+        """
+        (GAIL):r(s, a) = − ln(1 − D)
+        :param x: logits
+        """
+        return -F.logsigmoid(-x)
+
+    @staticmethod
+    def gail_softplus(x: th.Tensor) -> th.Tensor:
+        """
+        (GAIL):r(s, a) = softplus(h)
+        :param x: logits
+        """
+        return F.softplus(x)
+
+    @staticmethod
+    def airl_logsigmoid(x: th.Tensor) -> th.Tensor:
+        """
+        (AIRL): r(s, a) = ln D − ln(1 − D)
+        :param x: logits
+        """
+        return F.logsigmoid(x) - F.logsigmoid(-x)
+
+    @staticmethod
+    def airl_softplus(x: th.Tensor) -> th.Tensor:
+        """
+        (AIRL): r(s, a) = -softplus(-x) + softplus(x)
+        :param x: logits
+        """
+        return -F.softplus(-x) + F.softplus(x)
+
+    @staticmethod
+    def airl_logit(x: th.Tensor) -> th.Tensor:
+        """
+        (AIRL): r(s, a) = ln D − ln(1 − D) = h
+        where h is the logits. Output of f net/ function
+        :param x: logits
+        """
+        return x
 
 
 class GAILDiscrim(DiscrimNet):
@@ -148,16 +258,21 @@ class GAILDiscrim(DiscrimNet):
         )
 
     def forward(self, obs: th.Tensor, acts: th.Tensor, **kwargs):
-        # naming `f` to keep consistent with base DiscrimNet
-        return self.f(th.cat([obs, acts], dim=-1))
+        """Naming `f` to keep consistent with base DiscrimNet"""
+        return self.f(obs, acts)
 
-    def calculate_rewards(self, obs: th.Tensor, acts: th.Tensor, **kwargs):
-        # (GAIL) is to maximize E_{\pi} [-log(1 - D)].
-        # r(s, a) = − ln(1 − D) = softplus(h)
-        # TODO: modify this to softplus or keep the same
+    def calculate_rewards(
+        self, obs: th.Tensor, acts: th.Tensor, choice="logit", **kwargs
+    ):
+        """
+        (GAIL) is to maximize E_{\pi} [-log(1 - D)].
+        r(s, a) = − ln(1 − D) = softplus(h)
+        """
         with th.no_grad():
-            rews = -F.logsigmoid(-self.forward(obs, acts))
-            return rews
+            reward_fn = self.reward_fn("gail", choice)
+            logits = self.forward(obs, acts ** kwargs)
+            rews = reward_fn(logits)
+        return rews
 
 
 class AIRLStateDiscrim(DiscrimNet):
@@ -169,7 +284,6 @@ class AIRLStateDiscrim(DiscrimNet):
     def __init__(
         self,
         state_dim: int,
-        gamma: float,
         hidden_units: Sequence[int],
         hidden_activation: Activation,
         disc_type=ArchType.s,
@@ -179,12 +293,11 @@ class AIRLStateDiscrim(DiscrimNet):
             disc_kwargs = {}
 
         super().__init__(
-            state_dim, None, hidden_units, hidden_activation, gamma, disc_kwargs
+            state_dim, None, hidden_units, hidden_activation, disc_type, disc_kwargs
         )
 
-    # TODO: remove views
     def f(
-        self, obs: th.Tensor, dones: th.FloatTensor, next_obs: th.Tensor
+        self, obs: th.Tensor, dones: th.FloatTensor, next_obs: th.Tensor, gamma: float
     ) -> th.Tensor:
         """
         f(s, a, s' ) = g_θ (s) + \gamma h_φ (s') − h_φ (s)
@@ -196,8 +309,8 @@ class AIRLStateDiscrim(DiscrimNet):
         r_s = self.g(obs)
         v_s = self.h(obs)
         next_vs = self.h(next_obs)
-        # reshape (1-done) from (n,) to (n,1) to prevent shape mismatch
-        return r_s + self.gamma * (1 - dones).view(-1, 1) * next_vs - v_s
+        # * Reshape (1-done) to (n,1) to prevent boardcasting mismatch in case done is (n,)
+        return r_s + gamma * (1 - dones).view(-1, 1) * next_vs - v_s
 
     def forward(
         self,
@@ -214,7 +327,6 @@ class AIRLStateDiscrim(DiscrimNet):
         = log[exp{f_θ} /(exp{f_θ} + \pi)] - log[\pi / (exp{f_θ} + \pi)]
         = f_θ (s,a) - log \pi (a|s)
         """
-        # TODO: verify this in paper
         if log_pis is not None and subtract_logp:
             # Discriminator's output is sigmoid(f - log_pi).
             # reshape log_pi to prevent size mismatch
@@ -228,6 +340,9 @@ class AIRLStateDiscrim(DiscrimNet):
         dones: th.Tensor,
         next_obs: th.Tensor,
         log_pis: Optional[th.Tensor] = None,
+        subtract_logp: bool = True,
+        rew_type="airl",
+        choice="logit",
         **kwargs,
     ):
         """
@@ -238,9 +353,12 @@ class AIRLStateDiscrim(DiscrimNet):
             "dones": dones,
             "next_obs": next_obs,
             "log_pis": log_pis,
+            "subtract_logp": subtract_logp,
         }
         with th.no_grad():
-            rews = self.forward(obs, **kwargs)
+            reward_fn = self.reward_fn(rew_type, choice)
+            logits = self.forward(obs, **kwargs)
+            rews = reward_fn(logits)
         return rews
 
 
@@ -257,7 +375,6 @@ class AIRLStateActionDiscrim(DiscrimNet):
         action_dim: int,
         hidden_units: Sequence[int],
         hidden_activation: Activation,
-        gamma: float,
         disc_type=ArchType,
         **disc_kwargs,
     ):
@@ -269,7 +386,6 @@ class AIRLStateActionDiscrim(DiscrimNet):
             action_dim,
             hidden_units,
             hidden_activation,
-            gamma,
             disc_type,
             **disc_kwargs,
         )
@@ -294,15 +410,21 @@ class AIRLStateActionDiscrim(DiscrimNet):
         obs: th.Tensor,
         acts: th.Tensor,
         log_pis: Optional[th.Tensor] = None,
+        subtract_logp: bool = True,
+        rew_type="airl",
+        choice="logit",
         **kwargs,
     ):
-        # r(s, a) = ln D − ln(1 − D) = f
         kwargs = {
             "acts": acts,
             "log_pis": log_pis,
+            "subtract_logp": subtract_logp,
         }
         with th.no_grad():
-            rews = -F.logsigmoid(-self.forward(obs, **kwargs))
+            reward_fn = self.reward_fn(rew_type, choice)
+            logits = self.forward(obs, **kwargs)
+            rews = reward_fn(logits)
+
         return rews
 
 

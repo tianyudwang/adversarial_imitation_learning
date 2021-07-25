@@ -10,6 +10,9 @@ from scipy.signal import lfilter
 from ail.common.utils import zip_strict
 
 
+LOG2PI = log(2 * pi)
+
+
 def pure_discount_cumsum(x, discount) -> list:
     """
     Discount cumsum implemented in pure python.
@@ -69,9 +72,9 @@ def reparameterize(means: th.Tensor, log_stds: th.Tensor):
 
 def gaussian_logprobs(x: th.Tensor, log_stds: th.Tensor):
     """Calculate log probabilities for Gaussian Distribution"""
-    return (-0.5 * x.pow(2) - log_stds).sum(dim=-1, keepdim=True) - 0.5 * log(
-        2 * pi
-    ) * log_stds.size(-1)
+    return (-0.5 * x.pow(2) - log_stds).sum(
+        dim=-1, keepdim=True
+    ) - 0.5 * LOG2PI * log_stds.size(-1)
 
 
 @th.jit.script

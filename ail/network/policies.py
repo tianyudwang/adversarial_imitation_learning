@@ -1,8 +1,11 @@
+from typing import Tuple, Sequence
+
 import torch as th
 from torch import nn
 
 from ail.common.pytorch_util import build_mlp
 from ail.common.math import reparameterize, evaluate_lop_pi
+from ail.common.type_alias import Activation
 
 
 class StateIndependentPolicy(nn.Module):
@@ -10,8 +13,8 @@ class StateIndependentPolicy(nn.Module):
         self,
         obs_dim: int,
         act_dim: int,
-        hidden_units,  # (64, 64),
-        hidden_activation,  # nn.Tanh(),
+        hidden_units: Sequence[int],
+        hidden_activation: Activation,
     ):
         super().__init__()
 
@@ -22,13 +25,13 @@ class StateIndependentPolicy(nn.Module):
         # TODO: allow log_std init
         self.log_stds = nn.Parameter(th.zeros(1, act_dim))
 
-    def forward(self, states):
+    def forward(self, states: th.Tensor):
         return th.tanh(self.net(states))
 
-    def sample(self, states):
+    def sample(self, states: th.Tensor):
         return reparameterize(self.net(states), self.log_stds)
 
-    def evaluate_log_pi(self, states, actions):
+    def evaluate_log_pi(self, states: th.Tensor, actions: th.Tensor):
         return evaluate_lop_pi(self.net(states), self.log_stds, actions)
 
 
@@ -37,8 +40,8 @@ class StateDependentPolicy(nn.Module):
         self,
         obs_dim: int,
         act_dim: int,
-        hidden_units,  # (256, 256),
-        hidden_activation,  # nn.ReLU(inplace=True),
+        hidden_units: Sequence[int],
+        hidden_activation: Activation,
     ):
         super().__init__()
 
@@ -47,13 +50,13 @@ class StateDependentPolicy(nn.Module):
             activation=hidden_activation,
         )
 
-    def forward(self, states: th.Tensor):
+    def forward(self, states: th.Tensor) -> th.Tensor:
         return th.tanh(self.net(states).chunk(2, dim=-1)[0])
 
-    def sample(self, states: th.Tensor):
+    def sample(self, states: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
         means, log_stds = self.net(states).chunk(2, dim=-1)
         return reparameterize(means, log_stds.clamp(-20, 2))
 
-    def evaluate_log_pi(self, states: th.Tensor, actions: th.Tensor):
+    def evaluate_log_pi(self, states: th.Tensor, actions: th.Tensor) -> th.Tensor:
         means, log_stds = self.net(states).chunk(2, dim=-1)
         return evaluate_lop_pi(means, log_stds, actions)
