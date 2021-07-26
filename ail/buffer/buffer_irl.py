@@ -220,7 +220,12 @@ class Buffer:
         ind = np.random.randint(self.size(), size=n_samples)
         return {k: self.to_torch(buffer[ind]) for k, buffer in self._arrays.items()}
 
-    def get(self, n_samples: Optional[int] = None) -> Dict[str, th.Tensor]:
+    def get(
+        self,
+        n_samples: Optional[int] = None,
+        last_n: bool = True,
+        shuffle: bool = False,
+    ) -> Dict[str, th.Tensor]:
         """
         Returns samples in the buffer with order preserved.
         :param: n_samples: The number of samples to return.
@@ -229,15 +234,36 @@ class Buffer:
         """
         if n_samples is None:
             assert self.size() == self.capacity, "Buffer is not full"
-            return self._get_samples()
+            if shuffle:
+                # Same as uniform sampling whole buffer
+                return self.sample(self.capacity)
+            else:
+                # get all buffer data with order preserved.
+                path_slice = slice(0, self.capacity)
+                return self._get_samples(path_slice)
         else:
-            assert isinstance(n_samples, int)
-            path_slice = slice(0, n_samples)
+            # obtain a slice of data in buffer
+            assert isinstance(n_samples, int), "n_samples must be integer."
+            n_data = self.size()
+            if n_samples > n_data:
+                raise ValueError(
+                    f"Cannot get {n_samples} of samplse, "
+                    f"which exceeds {n_data} samples currrently store in buffer."
+                )
+            if last_n:
+                # Obtain the last n_samples
+                start = n_data - n_samples
+                return {
+                    k: self.to_torch(buffer[start:n_data])
+                    for k, buffer in self._arrays.items()
+                }
+            else:
+                # Obtain data with index in range [0, n_samples)
+                path_slice = slice(0, n_samples)
             return self._get_samples(path_slice)
 
-    def _get_samples(self, batch_idxes: Union[np.ndarray, slice, None] = None):
+    def _get_samples(self, batch_idxes: Union[np.ndarray, slice]):
         """Get a batch size or whole buffer size with order preserved."""
-        batch_idxes = slice(0, self.capacity) if batch_idxes is None else batch_idxes
         return {
             k: self.to_torch(buffer[batch_idxes]) for k, buffer in self._arrays.items()
         }
@@ -447,12 +473,12 @@ class BaseBuffer:
         """
         return self._buffer.sample(n_samples)
 
-    def get(self, n_samples: Optional[int] = None) -> Dict[str, th.Tensor]:
+    def get(self, n_samples: Optional[int] = None, last_n=True) -> Dict[str, th.Tensor]:
         """
         Obtain a batch of samples with size = n_samples. (order preserved)
             By default, return all samples in the buffer, if n_samples is None.
         """
-        return self._buffer.get(n_samples)
+        return self._buffer.get(n_samples, last_n)
 
     @classmethod
     def from_data(

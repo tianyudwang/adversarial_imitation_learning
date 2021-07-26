@@ -39,6 +39,7 @@ PPO:
   activation: 'relu'
   lr_actor: 3.0e-4
   lr_critic: 3.0e-4
+  orthogonal_init: false
 
 
 SAC:

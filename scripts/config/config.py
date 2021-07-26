@@ -43,7 +43,7 @@ _C.STEP.rollout_length = None  # Max episode length if None, it sets to the envi
 # Optimizers.
 _C.OPTIM = CN()
 _C.OPTIM.optim_cls = "adam"        # Choices of ["adam", "adamW"].
-_C.OPTIM.optim_set_to_none = True  # Set grad to None instead of zero.
+_C.OPTIM.optim_set_to_none = False  # Set grad to None instead of zero.
 
 
 # algo kwargs
@@ -65,12 +65,14 @@ _C.PPO.with_reward = True # Wether to store reward in rollout buffer.
 _C.PPO.extra_data=["log_pis"]  # Extra data to store in rollout buffer.
 
 # PPO policy_kwargs
-_C.PPO.pi = (64, 64)     # Policy hidden layers & sizes.
-_C.PPO.vf = (64, 64)     # Value function hidden layers & sizes.
+_C.PPO.pi = [64, 64]     # Policy hidden layers & sizes.
+_C.PPO.vf = [64, 64]     # Value function hidden layers & sizes.
 _C.PPO.activation = "relu_inplace" # Hidden activation.
 _C.PPO.critic_type="V"   # Critic type V: value function.
 _C.PPO.lr_actor = 3e-4   # Policy learning rate.
 _C.PPO.lr_critic = 3e-4  # Value function learning rate.
+_C.PPO.orthogonal_init = False  # Orthogonal Weight Initialization
+
 
 # SAC only args
 _C.SAC = CN()
@@ -88,8 +90,8 @@ _C.SAC.with_reward = True     # Wether to store reward in replay buffer.
 _C.SAC.extra_data=[]          # Extra data to store in replay buffer.
 
 # SAC policy_kwargs
-_C.SAC.pi = (128, 128)    # Policy hidden layers & sizes.
-_C.SAC.qf = (128, 128)    # Q-function hidden layers & sizes.
+_C.SAC.pi = [128, 128]    # Policy hidden layers & sizes.
+_C.SAC.qf = [128, 128]    # Q-function hidden layers & sizes.
 _C.SAC.activation = "relu_inplace" # Hidden activation
 _C.SAC.critic_type="twin"     # Critic type twin: (double Q).
 _C.SAC.lr_actor = 7.3 * 1e-4  # Policy learning rate.
@@ -101,7 +103,7 @@ _C.DISC.spectral_norm = False  # Apply Spectral Norm.
 _C.DISC.dropout = False        # Enable dropout.
 
 # Discriminator Architecture
-_C.DISC.hidden_units = (128, 128)  # Discriminator hidden layers & sizes.
+_C.DISC.hidden_units = [128, 128]  # Discriminator hidden layers & sizes.
 _C.DISC.hidden_activation = "relu_inplace" # Hidden activation.
 
 _C.DISC.epoch_disc = 1  # Update discriminator n times per update.

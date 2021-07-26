@@ -45,7 +45,7 @@ class ClipAction(ActionWrapper):
         max_episode_steps = env.spec.max_episode_steps
         super(ClipAction, self).__init__(env)
         self._max_episode_steps = max_episode_steps
-        
+
     def action(self, action):
         return np.clip(action, self.action_space.low, self.action_space.high)
 

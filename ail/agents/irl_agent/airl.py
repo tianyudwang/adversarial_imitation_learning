@@ -68,7 +68,7 @@ class AIRL(BaseIRLAgent):
                 disc_cls = DiscrimNet
             else:
                 raise ValueError(f"Unknown discriminator class: {disc_cls}.")
-        
+
         self.disc = disc_cls(self.obs_dim, self.act_dim, **disc_kwargs).to(self.device)
         self.lr_disc = lr_disc
         self.optim_disc = self.optim_cls(self.disc.parameters(), lr=self.lr_disc)
@@ -97,7 +97,15 @@ class AIRL(BaseIRLAgent):
         for _ in range(self.epoch_disc):
             self.learning_steps_disc += 1
             # * Sample transitions from ``curret`` policy.
-            data_gen = self.gen.buffer.get(self.replay_batch_size)
+            # ? shuffule data or random samples?
+            # TODO: may add shuffle option in data get().
+            if self.gen.buffer.tag == BufferTag.ROLLOUT:
+                data_gen = self.gen.buffer.sample(self.replay_batch_size)
+            elif self.gen.buffer.tag == BufferTag.REPLAY:
+                data_gen = self.gen.buffer.get(self.replay_batch_size, last_n=True)
+            else:
+                raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
+
             # Samples transitions from expert's demonstrations.
             data_exp = self.buffer_exp.sample(self.replay_batch_size)
 
@@ -114,11 +122,13 @@ class AIRL(BaseIRLAgent):
             if log_this_batch:
                 for k in disc_info.keys():
                     disc_logs[k].append(disc_info[k])
-                disc_logs.update({
-                    "lr_disc": self.lr_disc,
-                    "learn_steps_disc":self.learning_steps_disc
-                })
-        
+                disc_logs.update(
+                    {
+                        "lr_disc": self.lr_disc,
+                        "learn_steps_disc": self.learning_steps_disc,
+                    }
+                )
+
         # TODO: buffer.get or sample()
         # Calculate rewards:
         if self.gen.buffer.tag == BufferTag.ROLLOUT:
@@ -143,7 +153,7 @@ class AIRL(BaseIRLAgent):
 
         # Update generator using estimated rewards.
         gen_logs = self.update_generator(data, log_this_batch)
-        
+
         train_logs = {**gen_logs, **disc_logs}
         return train_logs
 
@@ -190,18 +200,20 @@ class AIRL(BaseIRLAgent):
             loss_exp = F.logsigmoid(logits_exp).mean()
             loss_disc = -(loss_pi + loss_exp)
 
-        self.one_gradient_step(loss_disc, self.optim_disc, self.disc)        
-        
-        disc_logs ={}
+        self.one_gradient_step(loss_disc, self.optim_disc, self.disc)
+
+        disc_logs = {}
         if log_this_batch:
             # Discriminator's accuracies.
             with th.no_grad():
                 acc_gen = (logits_gen.detach() < 0).float().mean()
                 acc_exp = (logits_exp.detach() > 0).float().mean()
 
-            disc_logs.update({
-                "disc_loss": loss_disc.detach(),
-                "acc_gen": acc_gen,
-                "acc_exp": acc_exp,
-            })
-        return disc_logs 
+            disc_logs.update(
+                {
+                    "disc_loss": loss_disc.detach(),
+                    "acc_gen": acc_gen,
+                    "acc_exp": acc_exp,
+                }
+            )
+        return disc_logs

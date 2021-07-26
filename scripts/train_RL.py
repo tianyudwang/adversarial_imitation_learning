@@ -111,6 +111,7 @@ def run(args, cfg, path):
                 critic_type=cfg.PPO.critic_type,
                 lr_actor=cfg.PPO.lr_actor,
                 lr_critic=cfg.PPO.lr_critic,
+                orthogonal_init=cfg.PPO.orthogonal_init,
             ),
         )
         algo_kwargs.update(ppo_kwargs)

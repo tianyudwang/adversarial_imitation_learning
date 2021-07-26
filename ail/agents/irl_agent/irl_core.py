@@ -70,7 +70,7 @@ class BaseIRLAgent(BaseAgent, ABC):
         # Other parameters.
         self.max_grad_norm = max_grad_norm
         self.clipping = max_grad_norm is not None
-        
+
         # Create Alias
         self.actor = self.gen.actor
 
@@ -125,7 +125,7 @@ class BaseIRLAgent(BaseAgent, ABC):
 
         # Discriminator
         th.save(self.disc, os.path.join(save_dir, "discrim.pth"))
-    
+
     def one_gradient_step(
         self,
         loss: th.Tensor,

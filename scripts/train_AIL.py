@@ -64,8 +64,8 @@ def CLI():
 
     # TODO: add more arguments to control discriminator
     # Discriminator features
-    p.add_argument("--spectral_norm", "-sn", action="store_true")
-    p.add_argument("--dropout", "-dp", action="store_true")  # TODO: Implement and test
+    # p.add_argument("--spectral_norm", "-sn", action="store_true")
+    # p.add_argument("--dropout", "-dp", action="store_true")  # TODO: Implement and test
 
     # Total steps and batch size
     p.add_argument("--num_steps", "-n", type=int, default=3 * 1e6)
@@ -140,6 +140,7 @@ def run(args, cfg, path):
                 critic_type=cfg.PPO.critic_type,
                 lr_actor=cfg.PPO.lr_actor,
                 lr_critic=cfg.PPO.lr_critic,
+                orthogonal_init=cfg.PPO.orthogonal_init,
             ),
         )
         gen_kwargs = {**algo_kwargs, **ppo_kwargs}
@@ -201,10 +202,8 @@ def run(args, cfg, path):
                 hidden_units=cfg.DISC.hidden_units,
                 hidden_activation=cfg.DISC.hidden_activation,
                 gamma=cfg.ALGO.gamma,
-                disc_kwargs={
-                    "spectral_norm": cfg.DISC.spectral_norm,
-                    "dropout": cfg.DISC.dropout,
-                }
+                spectral_norm=cfg.DISC.spectral_norm,
+                dropout=cfg.DISC.dropout,
             ),
             epoch_disc=cfg.DISC.epoch_disc,
             lr_disc=cfg.DISC.lr_disc,
@@ -297,7 +296,9 @@ if __name__ == "__main__":
     cfg = get_cfg_defaults()
     cfg.merge_from_file(cfg_path)
     cfg.freeze()
-
+    
+    print(cfg)
+    
     if args.debug:
         np.seterr(all="raise")
         th.autograd.set_detect_anomaly(True)

@@ -16,74 +16,76 @@ CUDA:
 #   log_freq: 1000
 
 ENV:
-  wrapper: [clip_act]  
+  wrapper: []  #[clip_act]  # default: [clip_action]
 
 
 OPTIM:
   # desc: Optimizer class and zero_grad input
-  optim_cls: adam
-  optim_set_to_none: true
+  optim_cls: adam          # default: adam
+  optim_set_to_none: true  # default: false
 
 
 ALGO:
-  max_grad_norm: 5   # Gradient clipping norm.
-  gamma: 0.99 
+  max_grad_norm: 0.5  # default: None
+  gamma: 0.99         # default: 0.99
 
 
 PPO:
   # desc: PPO unique inputs
-  epoch_ppo: 20
-  gae_lambda: 0.97
-  clip_eps: 0.2
-  coef_ent: 0.01
+  epoch_ppo: 20     # default: 10
+  gae_lambda: 0.97  # default: 0.97
+  clip_eps: 0.2     # default: 0.2
+  coef_ent: 0.01    # default: 0.0
 
-  batch_size: 1000
-  with_reward: false
+  # batch_size: 1000  # default: 1000
+  with_reward: false  # dont use reward for ail 
   extra_data: ["log_pis"]  
 
-  # policy_kwargs
-  pi: [128, 128]
-  vf: [128, 128]
-  activation: "relu_inplace"
-  lr_actor: 1.0e-4
-  lr_critic: 3.0e-4
+  # PPO policy_kwargs
+  pi: [128, 128]     # default: [64, 64]
+  vf: [128, 128]     # default: [64, 64]
+  activation: "relu_inplace" # default: "relu"
+  lr_actor: 7.3e-4   # default: 3.0e-4
+  lr_critic: 1.0e-3  # default: 3.0e-4
+  orthogonal_init: true  # default: false
 
 
 SAC:
   # desc: SAC unique inputs
   start_steps: 10_000
-  num_gradient_steps: 1  # ! slow O(n)
-  target_update_interval: 1  # Recommend to sync with num_gradient_steps.
-  tau: 0.005
-  log_alpha_init: 1.0
-  lr_alpha: 3.0e-4
+  num_gradient_steps: 1      # deafult: 1 # ! slow O(n)
+  target_update_interval: 1  # deafult: 1
+  tau: 0.005                 # default: 0.005
+  log_alpha_init: 1.0        # default: 1.0
+  lr_alpha: 3.0e-4           # default: 3.0e-4
 
-  batch_size: 256
-  buffer_size: 1_000_000
-  with_reward: true     
-  extra_data: []        
+  batch_size: 256            # default: 256        
+  buffer_size: 1_000_000     # default: 1_000_000
+  with_reward: false         # dont use reward for ail     
+  extra_data: []             # default: []
   
-  # policy_kwargs
-  pi: [128, 128]
-  qf: [128, 128]
-  activation: "relu_inplace"
-  lr_actor: 7.3e-4
-  lr_critic: 7.3e-4
+  # SAC policy_kwargs
+  pi: [128, 128]        # default: [128, 128]
+  qf: [128, 128]        # default: [128, 128]
+  activation: "relu_inplace"  # default: "relu"
+  lr_actor: 7.3e-4      # default: 7.3e-4
+  lr_critic: 7.3e-4     # default: 7.3e-4
 
 
 # Discriminator settings
 DISC:
-  spectral_norm: False  # Apply Spectral Norm.
-  dropout: False        # Enable dropout.
+  spectral_norm: false  # Apply Spectral Norm.
+  dropout: false        # Enable dropout.
 
   # Discriminator Architecture
   hidden_units: [128, 128]  
   hidden_activation: "relu_inplace" 
 
   epoch_disc: 1  
-  lr_disc: 3.0e-4 
+  lr_disc: 1.0e-4 
 
 AIRL:
+  # gail, logsigmoid best for hopper-v3
   subtract_logp: true
-  rew_type: "airl"
-  rew_input_choice: "logit"
+  rew_type: "airl"   # default: "airl"
+  rew_input_choice: "logsigmoid" # default: "logit"
