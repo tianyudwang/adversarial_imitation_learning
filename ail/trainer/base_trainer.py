@@ -353,7 +353,7 @@ class BaseTrainer(ABC):
     @staticmethod
     def convert_logs(logs: Dict[str, th.Tensor]):
         for k, v in logs.items():
-            if isinstance(v, float):
+            if isinstance(v, (float, int)):
                 continue
             elif isinstance(v, np.ndarray):
                 logs[k] = np.mean(v)

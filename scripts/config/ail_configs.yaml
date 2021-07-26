@@ -16,7 +16,7 @@ CUDA:
 #   log_freq: 1000
 
 ENV:
-  wrapper: ["normalize_act"]
+  wrapper: [clip_act]  
 
 
 OPTIM:

@@ -68,7 +68,7 @@ def CLI():
     p.add_argument("--dropout", "-dp", action="store_true")  # TODO: Implement and test
 
     # Total steps and batch size
-    p.add_argument("--num_steps", "-n", type=int, default=1 * 1e6)
+    p.add_argument("--num_steps", "-n", type=int, default=3 * 1e6)
     p.add_argument("--rollout_length", "-ep_len", type=int, default=None)
     p.add_argument("--gen_batch_size", "-gb", type=int, default=1_000)
     p.add_argument("--replay_batch_size", "-rbs", type=int, default=256)
@@ -98,7 +98,7 @@ def CLI():
 
     # Enforce type int
     args.num_steps = int(args.num_steps)
-    args.batch_size = int(args.gen_batch_size)
+    args.gen_batch_size = int(args.gen_batch_size)
     args.log_every_n_updates = int(args.log_every_n_updates)
     
     # How often (in terms of steps) to output training info.
@@ -115,7 +115,7 @@ def run(args, cfg, path):
         fp16=args.fp16,
         seed=args.seed,
         gamma=cfg.ALGO.gamma,
-        max_grad_norm=100,#cfg.ALGO.max_grad_norm,
+        max_grad_norm=cfg.ALGO.max_grad_norm,
         optim_kwargs=dict(cfg.OPTIM),
     )
     
@@ -124,7 +124,7 @@ def run(args, cfg, path):
         # state space, action space inside trainer
         ppo_kwargs = dict(
             # buffer args
-            batch_size=args.batch_size,  # PPO assums batch size == buffer_size
+            batch_size=args.gen_batch_size,  # PPO assums batch size == buffer_size
             buffer_kwargs=dict(with_reward=False, extra_data=["log_pis"]),
             # PPO only args
             epoch_ppo=cfg.PPO.epoch_ppo,
@@ -148,7 +148,7 @@ def run(args, cfg, path):
     elif gen_algo == "sac":
         sac_kwargs = dict(
             # buffer args.
-            batch_size=args.batch_size,  # PPO assums batch size == buffer_size
+            batch_size=args.gen_batch_size,  # PPO assums batch size == buffer_size
             buffer_size=cfg.SAC.buffer_size,  # only used in SAC,
             buffer_kwargs=dict(with_reward=False, extra_data=["log_pis"]),
             # SAC only args.
@@ -218,15 +218,18 @@ def run(args, cfg, path):
     exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{time}")
     log_dir = path.joinpath("runs", exp_name)
     if not os.path.exists(log_dir):
-        os.makedirs(log_dir, exist_ok=True) 
+        os.makedirs(log_dir, exist_ok=True)
 
-
+    
     config = dict(
         num_steps=args.num_steps,
         env=args.env_id,
         algo=args.algo,
         algo_kwargs=algo_kwargs,
-        env_kwargs=None,
+        env_kwargs={
+            "env_wrapper": cfg.ENV.wrapper,  # ? Should we apply ActionClip wrapper by default?
+            "tag": "training",
+            "color": "green"},
         max_ep_len=args.rollout_length,
         seed=args.seed,
         eval_interval=args.eval_interval,

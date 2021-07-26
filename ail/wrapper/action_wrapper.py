@@ -7,7 +7,7 @@ from gym.spaces.box import Box
 class RescaleAction(ActionWrapper):
     """Rescales the continuous action space of the environment to a range [a,b]."""
 
-    def __init__(self, env, a, b):
+    def __init__(self, env, a: float, b: float):
         assert isinstance(
             env.action_space, Box
         ), f"expected Box action space, got {type(env.action_space)}"
@@ -34,12 +34,18 @@ class RescaleAction(ActionWrapper):
 
 # Borrow from (https://github.com/openai/gym/tree/ee5ee3a4a5b9d09219ff4c932a45c4a661778cd7/gym/wrappers)
 class ClipAction(ActionWrapper):
-    """Clip the continuous action within the valid bound."""
+    """
+    Clips Box actions to be within the high and low bounds of the action space.
+    This is a standard transformation applied to environments with continuous action spaces
+    to keep the action passed to the environment within the specified bounds.
+    """
 
     def __init__(self, env):
         assert isinstance(env.action_space, Box)
+        max_episode_steps = env.spec.max_episode_steps
         super(ClipAction, self).__init__(env)
-
+        self._max_episode_steps = max_episode_steps
+        
     def action(self, action):
         return np.clip(action, self.action_space.low, self.action_space.high)
 
