@@ -86,7 +86,10 @@ class Trainer(BaseTrainer):
         # Number of variables and net arch.
         if self.verbose > 1:
             var_counts = self.algo.info()
+            print("-"*70)
             pprint(var_counts)
+            print("-"*70, "\n")
+            
 
         # Sync same device with algo.
         self.device = self.algo.device

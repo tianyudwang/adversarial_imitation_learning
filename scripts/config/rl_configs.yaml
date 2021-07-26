@@ -15,10 +15,16 @@ CUDA:
 #   log_type: gradients
 #   log_freq: 1000
 
+
+ENV:
+  wrapper: ["normalize_act"]
+
+
 OPTIM:
   # desc: Optimizer class and zero_grad input
   optim_cls: adam
   optim_set_to_none: true
+
 
 PPO:
   # desc: PPO unique inputs
@@ -33,6 +39,7 @@ PPO:
   activation: 'relu'
   lr_actor: 3.0e-4
   lr_critic: 3.0e-4
+
 
 SAC:
   # desc: SAC unique inputs

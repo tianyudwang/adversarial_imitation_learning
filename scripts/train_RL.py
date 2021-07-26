@@ -162,7 +162,10 @@ def run(args, cfg, path):
         env=args.env_id,
         algo=args.algo,
         algo_kwargs=algo_kwargs,
-        env_kwargs=None,        # TODO: add env wrappers
+        env_kwargs={
+                "env_wrapper": cfg.ENV.wrapper,  # ? Should we apply ActionNormlize wrapper by default?
+                "tag": "training",
+                "color": "green"},
         max_ep_len=args.rollout_length,
         seed=args.seed,
         eval_interval=args.eval_interval,
@@ -200,7 +203,7 @@ def run(args, cfg, path):
     trainer = Trainer(**config)
 
     # algo kwargs
-    print("-" * 10, f"{args.algo}", "-" * 10)
+    print("-" * 35, f"{args.algo}", "-" * 35)
     ic(algo_kwargs)
 
     # Saving hyperparams to yaml file

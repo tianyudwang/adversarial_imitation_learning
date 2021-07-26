@@ -9,6 +9,7 @@ from gym.spaces import Box, Discrete, MultiDiscrete, MultiBinary
 
 from ail.common.type_alias import GymEnv, GymWrapper, GymSpace, GymDict
 from ail.color_console import COLORS
+from ail.wrapper import EnvWrapper
 
 
 def maybe_make_env(
@@ -36,6 +37,11 @@ def maybe_make_env(
         env = gym.make(env)
     if env_wrapper:
         for wrap in env_wrapper:
+            if isinstance(wrap, str):
+                try:
+                    wrap = EnvWrapper[wrap]
+                except KeyError:
+                    raise KeyError(f"{wrap} is not a valid wrapper")
             env = wrap(env)
             if verbose > 0:
                 print(COLORS[color] + f"| Wrapping {tag} env with: {wrap.class_name}")

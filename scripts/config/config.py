@@ -15,12 +15,6 @@ _C.CUDA.fp16 = False   # For FP16 mixed precisiontraining.
 _C.CUDA.cudnn = False  # torch.backends.cudnn.
 
 
-# Optimizers.
-_C.OPTIM = CN()
-_C.OPTIM.optim_cls = "adam"        # Choices of ["adam", "adamW"].
-_C.OPTIM.optim_set_to_none = True  # Set grad to None instead of zero.
-
-
 # Logging settings.
 _C.LOG = CN()
 _C.LOG.log_every_n_updates = 20  # Log metrics every n algo updates.
@@ -35,10 +29,21 @@ _C.WANDB.log_type = "gradients" # Log gradients as histograms in wandb.
 _C.WANDB.log_freq = 1000        # Log gradients evey 1000 steps.
 
 
+# Env settings.
+_C.ENV = CN()
+_C.ENV.wrapper = []
+
+
 # Steps, batch size, buffer size.
 _C.STEP = CN()
 _C.STEP.num_steps = int(1e6)   # Total number of enviroment steps to run.
 _C.STEP.rollout_length = None  # Max episode length if None, it sets to the environment default.
+
+
+# Optimizers.
+_C.OPTIM = CN()
+_C.OPTIM.optim_cls = "adam"        # Choices of ["adam", "adamW"].
+_C.OPTIM.optim_set_to_none = True  # Set grad to None instead of zero.
 
 
 # algo kwargs

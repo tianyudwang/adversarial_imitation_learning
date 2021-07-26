@@ -268,7 +268,7 @@ def run(args, cfg, path):
     # It's a dict of data too large to store.
     algo_kwargs["buffer_kwargs"].pop("transitions")
     # algo kwargs
-    print("-" * 10, f"{args.algo}", "-" * 10)
+    print("-" * 35, f"{args.algo}", "-" * 35)
     ic(algo_kwargs)
 
     # Saving hyperparams to yaml file.

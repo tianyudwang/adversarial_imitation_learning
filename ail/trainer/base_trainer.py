@@ -58,7 +58,7 @@ class BaseTrainer(ABC):
             env_kwargs = {
                 "env_wrapper": [],  # ? should we apply ActionNormlize wrapper by default?
                 "tag": "training",
-                "color": "dim_blue",
+                "color": "green",
             }
 
         # Env to collect samples.
@@ -72,7 +72,7 @@ class BaseTrainer(ABC):
             env_wrapper=None,
             verbose=verbose,
             tag="test",
-            color="dim_blue",
+            color="magenta",
         )
         self.env_test.seed(2 ** 31 - seed)
 
