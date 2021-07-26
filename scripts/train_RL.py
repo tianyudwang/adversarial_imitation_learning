@@ -218,7 +218,7 @@ if __name__ == "__main__":
     
     args = CLI()
     
-    path = pathlib.Path(__file__).parent
+    path = pathlib.Path(__file__).parent.resolve()
     print(path)
     
     cfg_path = path / "config" /'rl_configs.yaml'

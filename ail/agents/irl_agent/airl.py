@@ -1,20 +1,14 @@
 from typing import Union, Optional, Dict, Any
+from collections import defaultdict
 
 import torch as th
 import torch.nn.functional as F
+from torch.cuda.amp import autocast
 
 from ail.agents.irl_agent.irl_core import BaseIRLAgent
 from ail.buffer import ReplayBuffer, BufferTag
 from ail.common.type_alias import GymSpace, TensorDict
 from ail.network.discrim import DiscrimNet, DiscrimType
-
-
-try:
-    from icecream import install  # noqa
-
-    install()
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
 class AIRL(BaseIRLAgent):
@@ -25,6 +19,7 @@ class AIRL(BaseIRLAgent):
         device: Union[th.device, str],
         fp16: bool,
         seed: int,
+        max_grad_norm: Optional[float],
         epoch_disc: int,
         replay_batch_size: int,
         buffer_exp: Union[ReplayBuffer, str],
@@ -47,6 +42,7 @@ class AIRL(BaseIRLAgent):
             device,
             fp16,
             seed,
+            max_grad_norm,
             replay_batch_size,
             buffer_exp,
             buffer_kwargs,
@@ -72,22 +68,18 @@ class AIRL(BaseIRLAgent):
                 disc_cls = DiscrimNet
             else:
                 raise ValueError(f"Unknown discriminator class: {disc_cls}.")
-
-        self.disc = disc_cls(self.obs_dim, self.act_dim, **disc_kwargs)
+        
+        self.disc = disc_cls(self.obs_dim, self.act_dim, **disc_kwargs).to(self.device)
         self.lr_disc = lr_disc
         self.optim_disc = self.optim_cls(self.disc.parameters(), lr=self.lr_disc)
 
         self.learning_steps_disc = 0
         self.epoch_disc = epoch_disc
-        
+
         # Reward function args
-        self.subtract_logp = subtract_logp 
+        self.subtract_logp = subtract_logp
         self.rew_type = rew_type
-        self.rew_input_choice= rew_input_choice
-        
-        # Metric for the discriminator
-        self.acc_gen = []
-        self.acc_exp = []
+        self.rew_input_choice = rew_input_choice
 
     def __repr__(self) -> str:
         return "AIRL"
@@ -101,6 +93,7 @@ class AIRL(BaseIRLAgent):
          3. Update generator.
         """
         # TODO: find a way to work with off policies
+        disc_logs = defaultdict(list)
         for _ in range(self.epoch_disc):
             self.learning_steps_disc += 1
             # * Sample transitions from ``curret`` policy.
@@ -117,19 +110,17 @@ class AIRL(BaseIRLAgent):
                     data_exp["obs"], data_exp["acts"]
                 )
             # Update discriminator.
-            disc_logs = self.update_discriminator(data_gen, data_exp, log_this_batch)
-
-            # Not needed. Delete to save memory.
-            del data_gen, data_exp
-            # TODO: a deafult dict to handle multiple logs
+            disc_info = self.update_discriminator(data_gen, data_exp, log_this_batch)
+            if log_this_batch:
+                for k in disc_info.keys():
+                    disc_logs[k].append(disc_info[k])
+                disc_logs.update({
+                    "lr_disc": self.lr_disc,
+                    "learn_steps_disc":self.learning_steps_disc
+                })
+        
+        # TODO: buffer.get or sample()
         # Calculate rewards:
-        # # TODO: buffer.get or sample()
-        #     states,
-        #     actions,
-        #     dones,
-        #     log_pis,
-        #     next_states,
-
         if self.gen.buffer.tag == BufferTag.ROLLOUT:
             # Obtain entire batch of transitions from rollout buffer.
             data = self.gen.buffer.get()
@@ -145,17 +136,16 @@ class AIRL(BaseIRLAgent):
 
         # Calculate learning rewards.
         data["rews"] = self.disc.calculate_rewards(
-            rew_type=self.rew_type,
-            choice=self.rew_input_choice,
-            **data
+            rew_type=self.rew_type, choice=self.rew_input_choice, **data
         )
         # Sanity check length of data are equal.
         assert data["rews"].shape[0] == data["obs"].shape[0]
 
         # Update generator using estimated rewards.
         gen_logs = self.update_generator(data, log_this_batch)
-
-        return {}
+        
+        train_logs = {**gen_logs, **disc_logs}
+        return train_logs
 
     def update_generator(
         self, data: TensorDict, log_this_batch: bool = False
@@ -185,45 +175,33 @@ class AIRL(BaseIRLAgent):
         :param data_gen: batch of data from the current policy
         :param data_exp: batch of data from demonstrations
         """
-        # Obtain logits of the discriminator.
-        logits_gen = self.disc(subtract_logp=self.subtract_logp, **data_gen)
-        logits_exp = self.disc(subtract_logp=self.subtract_logp, **data_exp)
-
-        """
-        E_{exp} [log(D)] + E_{\pi} [log(1 - D)]
-        E_{exp} [log(sigmoid(f))] + E_{\pi} [log(1 - sigmoid(f))]
-        *Note: S(x) = 1 - S(-x) -> S(-x) = 1 - S(x)
-        """
-        loss_pi = -F.logsigmoid(-logits_gen).mean()
-        loss_exp = -F.logsigmoid(logits_exp).mean()
-        loss_disc = loss_pi + loss_exp
-
-        # TODO: one_gradient_step
         self.optim_disc.zero_grad(self.optim_set_to_none)
-        loss_disc.backward()
-        self.optim_disc.step()
+        with autocast(enabled=self.fp16):
+            # Obtain logits of the discriminator.
+            logits_gen = self.disc(subtract_logp=self.subtract_logp, **data_gen)
+            logits_exp = self.disc(subtract_logp=self.subtract_logp, **data_exp)
 
-        # TODO: remove this
+            """
+            E_{exp} [log(D)] + E_{\pi} [log(1 - D)]
+            E_{exp} [log(sigmoid(f))] + E_{\pi} [log(1 - sigmoid(f))]
+            *Note: S(x) = 1 - S(-x) -> S(-x) = 1 - S(x)
+            """
+            loss_pi = F.logsigmoid(-logits_gen).mean()
+            loss_exp = F.logsigmoid(logits_exp).mean()
+            loss_disc = -(loss_pi + loss_exp)
+
+        self.one_gradient_step(loss_disc, self.optim_disc, self.disc)        
+        
+        disc_logs ={}
         if log_this_batch:
             # Discriminator's accuracies.
             with th.no_grad():
-                acc_gen = (logits_gen.detach() < 0).float().mean().item()
-                acc_exp = (logits_exp.detach() > 0).float().mean().item()
-                self.acc_gen.append(acc_gen)
-                self.acc_exp.append(acc_exp)
-            if len(self.acc_gen) == self.epoch_disc:
-                import numpy as np
+                acc_gen = (logits_gen.detach() < 0).float().mean()
+                acc_exp = (logits_exp.detach() > 0).float().mean()
 
-                acc_gen = round(np.mean(self.acc_gen), 4)
-                acc_exp = round(np.mean(self.acc_exp), 4)
-                self.acc_gen.clear()
-                self.acc_exp.clear()
-                ic(acc_gen)
-                ic(acc_exp)
-            return {
+            disc_logs.update({
                 "disc_loss": loss_disc.detach(),
                 "acc_gen": acc_gen,
                 "acc_exp": acc_exp,
-            }
-        else:
-            return {}
+            })
+        return disc_logs 

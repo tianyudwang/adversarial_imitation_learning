@@ -103,7 +103,6 @@ def CLI():
     
     # How often (in terms of steps) to output training info.
     args.log_interval = args.gen_batch_size * args.log_every_n_updates
-
     return args
 
 
@@ -116,7 +115,7 @@ def run(args, cfg, path):
         fp16=args.fp16,
         seed=args.seed,
         gamma=cfg.ALGO.gamma,
-        max_grad_norm=cfg.ALGO.max_grad_norm,
+        max_grad_norm=100,#cfg.ALGO.max_grad_norm,
         optim_kwargs=dict(cfg.OPTIM),
     )
     
@@ -288,7 +287,7 @@ if __name__ == "__main__":
     args = CLI()
     
     # Path
-    path = pathlib.Path(__file__).parent
+    path = pathlib.Path(__file__).parent.resolve()
     print(f"File_dir: {path}")    
     
     cfg_path = path / "config" /'ail_configs.yaml'

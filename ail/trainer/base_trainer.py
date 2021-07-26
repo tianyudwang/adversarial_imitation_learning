@@ -123,6 +123,9 @@ class BaseTrainer(ABC):
             "entropy_coef": "info/actor/entropy_coef",
             "approx_kl": "info/actor/approx_kl",
             "clip_fraction": "info/actor/clip_fraction",
+            "disc_loss": "loss/disc",
+            "acc_gen": "info/disc/acc_gen",
+            "acc_exp": "info/disc/acc_exp",
         }
 
         # Log and Saving.

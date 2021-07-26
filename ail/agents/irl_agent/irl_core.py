@@ -5,6 +5,8 @@ import os
 import numpy as np
 import torch as th
 from torch import nn
+from torch.nn.utils import clip_grad_norm_
+
 
 from ail.agents.base import BaseAgent
 from ail.agents.rl_agent import RL_ALGO
@@ -22,6 +24,7 @@ class BaseIRLAgent(BaseAgent, ABC):
         device: Union[th.device, str],
         fp16: bool,
         seed: int,
+        max_grad_norm: Optional[float],
         replay_batch_size: int,
         buffer_exp: Union[ReplayBuffer, str],
         buffer_kwargs: Optional[Dict[str, Any]],
@@ -64,6 +67,10 @@ class BaseIRLAgent(BaseAgent, ABC):
             **gen_kwargs,
         )
 
+        # Other parameters.
+        self.max_grad_norm = max_grad_norm
+        self.clipping = max_grad_norm is not None
+        
         # Create Alias
         self.actor = self.gen.actor
 
@@ -118,3 +125,25 @@ class BaseIRLAgent(BaseAgent, ABC):
 
         # Discriminator
         th.save(self.disc, os.path.join(save_dir, "discrim.pth"))
+    
+    def one_gradient_step(
+        self,
+        loss: th.Tensor,
+        opt: th.optim.Optimizer,
+        net: nn.Module,
+    ) -> None:
+        """Take one gradient step with grad clipping.(AMP support)"""
+        if self.fp16:
+            # AMP.
+            self.scaler.scale(loss).backward()
+            if self.clipping:
+                self.scaler.unscale_(opt)
+                clip_grad_norm_(net.parameters(), max_norm=self.max_grad_norm)
+            self.scaler.step(opt)
+            self.scaler.update()
+        else:
+            # Unscale_update.
+            loss.backward()
+            if self.clipping:
+                clip_grad_norm_(net.parameters(), max_norm=self.max_grad_norm)
+            opt.step()
