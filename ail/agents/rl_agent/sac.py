@@ -322,13 +322,13 @@ class SAC(OffPolicyAgent):
 
         with autocast(enabled=self.fp16):
             # Get current Q-values estimation for each critic network
-            # * using action from the replay buffer
+            # * Using action from the replay buffer
             curr_qs1, curr_qs2 = self.critic(states, actions)
 
             # Bellman backup for Q functions
             with th.no_grad():
                 # * Target actions come from *current* policy
-                # * whereas by contrast, r and s' should come from the replay buffer.
+                # * Whereas by contrast, r and s' should come from the replay buffer.
                 next_actions, next_log_pis = self.actor.sample(next_states)
                 next_qs1, next_qs2 = self.critic_target(next_states, next_actions)
                 # clipped double-Q trick and takes the minimum Q-value between two Q approximators.

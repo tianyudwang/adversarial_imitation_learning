@@ -426,7 +426,13 @@ class BaseBuffer:
         Raises:
             ValueError: The arguments didn't have the same length.
         """
-        assert isinstance(transitions, dict), "transitions should be a dict"
+        if not isinstance(transitions, dict):
+            try:
+                transitions = dict(transitions)
+            except TypeError:
+                raise TypeError(
+                    "Prefer transitions to be a dict or a dictionary-like object"
+                )
         intersect = self._buffer.stored_keys.intersection(transitions.keys())
         # Remove unnecessary fields
         trans_dict = {k: transitions[k] for k in intersect}

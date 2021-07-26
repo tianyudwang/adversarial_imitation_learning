@@ -132,7 +132,7 @@ class PPO(OnPolicyAgent):
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
             "rews": asarray_shape2d(reward),
-            "dones": asarray_shape2d(mask),  # ? or done?
+            "dones": asarray_shape2d(mask), 
             "log_pis": asarray_shape2d(log_pi),
             "next_obs": asarray_shape2d(next_state),
         }
