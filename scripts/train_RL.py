@@ -49,7 +49,7 @@ def CLI():
     p.add_argument("--num_steps", type=int, default=0.5 * 1e6)
     p.add_argument("--rollout_length", type=int, default=None)
     p.add_argument("--batch_size", type=int, default=256)
-    p.add_argument("--buffer_size", type=int, default=1 * 1e6)
+    # p.add_argument("--buffer_size", type=int, default=1 * 1e6)
     p.add_argument("--log_every_n_updates", "-lg", type=int, default=20)
     p.add_argument("--eval_interval", type=int, default=5 * 1e3)
     p.add_argument("--num_eval_episodes", type=int, default=10)
@@ -68,7 +68,8 @@ def CLI():
     # Enforce type int
     args.num_steps = int(args.num_steps)
     args.batch_size = int(args.batch_size)
-    args.buffer_size = int(args.buffer_size)
+    args.log_every_n_updates = int(args.log_every_n_updates)
+    
     # How often (in terms of steps) to output training info.
     args.log_interval = args.batch_size * args.log_every_n_updates
 
@@ -94,8 +95,9 @@ def run(args, cfg, path):
         ppo_kwargs = dict(
             # buffer args
             batch_size=args.batch_size,  # PPO assums batch size == buffer_size
-            buffer_size=args.buffer_size,  # only used in SAC,
-            buffer_kwargs=dict(with_reward=True, extra_data=["log_pis"]),
+            buffer_kwargs=dict(
+                with_reward=cfg.PPO.with_reward,
+                extra_data=cfg.PPO.extra_data),
             # PPO only args
             epoch_ppo=cfg.PPO.epoch_ppo,
             gae_lambda=cfg.PPO.gae_lambda,
@@ -106,7 +108,7 @@ def run(args, cfg, path):
                 pi=cfg.PPO.pi,
                 vf=cfg.PPO.vf,
                 activation=cfg.PPO.activation,
-                critic_type="V",
+                critic_type=cfg.PPO.critic_type,
                 lr_actor=cfg.PPO.lr_actor,
                 lr_critic=cfg.PPO.lr_critic,
             ),
@@ -117,14 +119,16 @@ def run(args, cfg, path):
     elif rl_algo == "sac":
         sac_kwargs = dict(
             # buffer args
-            batch_size=args.batch_size,  # PPO assums batch size == buffer_size
-            buffer_size=args.buffer_size,  # only used in SAC,
-            buffer_kwargs=dict(with_reward=True),
+            batch_size=args.batch_size,  
+            buffer_size=cfg.SAC.buffer_size,  
+            buffer_kwargs=dict(
+                with_reward=cfg.SAC.with_reward, 
+                extra_data=cfg.SAC.extra_data),
             # SAC only args
             start_steps=cfg.SAC.start_steps,
             lr_alpha=cfg.SAC.lr_alpha,
             log_alpha_init=cfg.SAC.log_alpha_init,
-            tau=cfg.SAC.tau,  # 0.005
+            tau=cfg.SAC.tau,  
             # * Recommend to sync following two params to reduce overhead
             num_gradient_steps=cfg.SAC.num_gradient_steps,  # ! slow O(n)
             target_update_interval=cfg.SAC.target_update_interval,
@@ -134,7 +138,7 @@ def run(args, cfg, path):
                 pi=cfg.SAC.pi,
                 qf=cfg.SAC.qf,
                 activation=cfg.SAC.activation,
-                critic_type="twin",
+                critic_type=cfg.SAC.critic_type,
                 lr_actor=cfg.SAC.lr_actor,
                 lr_critic=cfg.SAC.lr_critic,
             ),
@@ -222,6 +226,8 @@ if __name__ == "__main__":
     cfg.merge_from_file(cfg_path)
     cfg.freeze()
     
+    print(cfg)
+    
     if args.debug:
         import numpy as np
 
@@ -235,18 +241,3 @@ if __name__ == "__main__":
         th.backends.cudnn.benchmark = cfg.CUDA.cudnn  # ? Does this useful for non-convolutions?
 
     run(args, cfg, path)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-   

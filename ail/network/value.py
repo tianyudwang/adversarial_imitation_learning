@@ -47,7 +47,7 @@ class StateFunction(BaseValue):
         hidden_units: Sequence[int],
         activation: Union[str, nn.Module],
         use_spectral_norm=False,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(obs_dim)
         self.net = build_mlp(
@@ -77,7 +77,7 @@ class StateActionFunction(BaseValue):
         hidden_units: Sequence[int],  # (64, 64),
         activation: Union[str, nn.Module],
         use_spectral_norm=False,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(obs_dim, act_dim)
         self.net = build_mlp(
@@ -126,7 +126,7 @@ def mlp_value(
     value_layers: Sequence[int],
     activation: Union[nn.Module, str],
     val_type: str,
-    **kwargs  # * use_spectral_norm should specified in kwargs
+    **kwargs,  # * use_spectral_norm should specified in kwargs
 ):
     if val_type in ["V", "v", "Vs", "vs"]:
         return StateFunction(state_dim, value_layers, activation, **kwargs)
@@ -139,4 +139,4 @@ def mlp_value(
             state_dim, action_dim, value_layers, activation, **kwargs
         )
     else:
-        raise ValueError()
+        raise ValueError(f"val_type: {val_type} not support.")

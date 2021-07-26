@@ -4,34 +4,42 @@ CUDA:
   # desc: torch.backends
   cudnn: true
 
-OPTIM:
-  # desc: Optimizer class and zero_grad input
-  optim_cls: adam
-  optim_set_to_none: true
-
 # LOG:
 #   log_every_n_updates: 20
 #   eval_interval: 5000
 #   num_eval_episodes: 10
 
-WANDB:
-  # desc: wandb.watch function inputs
-  log_param: true
-  log_type: gradients
-  log_freq: 1000
+# WANDB:
+#   # desc: wandb.watch function inputs
+#   log_param: true
+#   log_type: gradients
+#   log_freq: 1000
+
+OPTIM:
+  # desc: Optimizer class and zero_grad input
+  optim_cls: adam
+  optim_set_to_none: true
+
+ALGO:
+  max_grad_norm: 5   # Gradient clipping norm.
+  gamma: 0.99 
 
 PPO:
   # desc: PPO unique inputs
-  epoch_ppo: 10
+  epoch_ppo: 20
   gae_lambda: 0.97
   clip_eps: 0.2
   coef_ent: 0.01
 
+  batch_size: 1000
+  with_reward: false
+  extra_data: ["log_pis"]  
+
   # policy_kwargs
-  pi: [64, 64]
-  vf: [64,64]
-  activation: 'relu'
-  lr_actor: 3.0e-4
+  pi: [128, 128]
+  vf: [128, 128]
+  activation: "relu_inplace"
+  lr_actor: 1.0e-4
   lr_critic: 3.0e-4
 
 SAC:
@@ -43,9 +51,32 @@ SAC:
   log_alpha_init: 1.0
   lr_alpha: 3.0e-4
 
+  batch_size: 256
+  buffer_size: 1_000_000
+  with_reward: true     
+  extra_data: []        
+  
   # policy_kwargs
   pi: [128, 128]
   qf: [128, 128]
-  activation: 'relu'
+  activation: "relu_inplace"
   lr_actor: 7.3e-4
   lr_critic: 7.3e-4
+
+
+# Discriminator settings
+DISC:
+  spectral_norm: False  # Apply Spectral Norm.
+  dropout: False        # Enable dropout.
+
+  # Discriminator Architecture
+  hidden_units: [128, 128]  
+  hidden_activation: "relu_inplace" 
+
+  epoch_disc: 1  
+  lr_disc: 3.0e-4 
+
+AIRL:
+  subtract_logp: true
+  rew_type: "airl"
+  rew_input_choice: "logit"

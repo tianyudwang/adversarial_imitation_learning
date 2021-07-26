@@ -300,8 +300,8 @@ class SAC(OffPolicyAgent):
 
         with autocast(enabled=self.fp16):
             # Important: detach the variable from the graph
-            # so we don't change it with other losses
-            # see https://github.com/rail-berkeley/softlearning/issues/60
+            # So we don't change it with other losses
+            # See https://github.com/rail-berkeley/softlearning/issues/60
             self.alpha = th.exp(self.log_alpha.detach())
             loss_alpha = -(
                 self.log_alpha * (self.target_entropy + log_pis_new).detach()

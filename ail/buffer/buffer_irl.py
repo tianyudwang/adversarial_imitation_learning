@@ -310,6 +310,13 @@ class BaseBuffer:
         act_dtype: np.dtype = np.float32,
         with_reward=True,
     ):
+        if isinstance(capacity, float):
+            self.capacity = int(capacity)
+        elif isinstance(capacity, int):
+            self.capacity = capacity
+        else:
+            raise ValueError("capacity must be integer number.")
+
         params = [obs_shape, act_shape, obs_dtype, act_dtype]
         self.sample_shapes = {}
         self.dtypes = {}
@@ -355,7 +362,6 @@ class BaseBuffer:
             self.sample_shapes["rews"] = (1,)
             self.dtypes["rews"] = np.float32
 
-        self.capacity = capacity
         self.device = device
         self._buffer = None
 

@@ -265,7 +265,10 @@ class GAILDiscrim(DiscrimNet):
         )
 
     def forward(self, obs: th.Tensor, acts: th.Tensor, **kwargs):
-        """Naming `f` to keep consistent with base DiscrimNet."""
+        """
+        Output logits of discriminator.
+        Naming `f` to keep consistent with base DiscrimNet.
+        """
         return self.f(obs, acts)
 
     def calculate_rewards(
@@ -340,9 +343,10 @@ class AIRLStateDiscrim(DiscrimNet):
         = f_θ (s,a) - log \pi (a|s)
         """
         if log_pis is not None and subtract_logp:
-            # Discriminator's output is sigmoid(f - log_pi).
             # reshape log_pi to prevent size mismatch
             return self.f(obs, dones, next_obs, gamma) - log_pis.view(-1, 1)
+        elif log_pis is None and subtract_logp:
+            raise ValueError("log_pis is None! Can not subtract None.")
         else:
             return self.f(obs, dones, next_obs, gamma)
 
@@ -411,9 +415,10 @@ class AIRLStateActionDiscrim(DiscrimNet):
         **kwargs,
     ) -> th.Tensor:
         if log_pis is not None and subtract_logp:
-            # Discriminator's output is sigmoid(f - log_pi).
             # Reshape log_pi to prevent size mismatch.
             return self.f(obs, acts) - log_pis.view(-1, 1)
+        elif log_pis is None and subtract_logp:
+            raise ValueError("log_pis is None! Can not subtract None.")
         else:
             return self.f(obs, acts)
 
@@ -436,7 +441,6 @@ class AIRLStateActionDiscrim(DiscrimNet):
             reward_fn = self.reward_fn(rew_type, choice)
             logits = self.forward(obs, **kwargs)
             rews = reward_fn(logits)
-
         return rews
 
 

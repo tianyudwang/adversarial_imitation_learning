@@ -35,6 +35,9 @@ class AIRL(BaseIRLAgent):
         disc_kwargs: Dict[str, Any],
         lr_disc: float,
         optim_kwargs: Optional[Dict[str, Any]] = None,
+        subtract_logp: bool = True,
+        rew_type: str = "airl",
+        rew_input_choice: str = "logit",
         **kwargs,
     ):
 
@@ -76,7 +79,13 @@ class AIRL(BaseIRLAgent):
 
         self.learning_steps_disc = 0
         self.epoch_disc = epoch_disc
-
+        
+        # Reward function args
+        self.subtract_logp = subtract_logp 
+        self.rew_type = rew_type
+        self.rew_input_choice= rew_input_choice
+        
+        # Metric for the discriminator
         self.acc_gen = []
         self.acc_exp = []
 
@@ -135,7 +144,12 @@ class AIRL(BaseIRLAgent):
             raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
 
         # Calculate learning rewards.
-        data["rews"] = self.disc.calculate_rewards(**data)
+        data["rews"] = self.disc.calculate_rewards(
+            rew_type=self.rew_type,
+            choice=self.rew_input_choice,
+            **data
+        )
+        # Sanity check length of data are equal.
         assert data["rews"].shape[0] == data["obs"].shape[0]
 
         # Update generator using estimated rewards.
@@ -172,8 +186,8 @@ class AIRL(BaseIRLAgent):
         :param data_exp: batch of data from demonstrations
         """
         # Obtain logits of the discriminator.
-        logits_gen = self.disc(**data_gen)
-        logits_exp = self.disc(**data_exp)
+        logits_gen = self.disc(subtract_logp=self.subtract_logp, **data_gen)
+        logits_exp = self.disc(subtract_logp=self.subtract_logp, **data_exp)
 
         """
         E_{exp} [log(D)] + E_{\pi} [log(1 - D)]

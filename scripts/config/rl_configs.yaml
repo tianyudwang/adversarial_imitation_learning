@@ -4,25 +4,25 @@ CUDA:
   # desc: torch.backends
   cudnn: true
 
-OPTIM:
-  # desc: Optimizer class and zero_grad input
-  optim_cls: adam
-  optim_set_to_none: true
-
 # LOG:
 #   log_every_n_updates: 20
 #   eval_interval: 5000
 #   num_eval_episodes: 10
 
-WANDB:
-  # desc: wandb.watch function inputs
-  log_param: true
-  log_type: gradients
-  log_freq: 1000
+# WANDB:
+#   # desc: wandb.watch function inputs
+#   log_param: true
+#   log_type: gradients
+#   log_freq: 1000
+
+OPTIM:
+  # desc: Optimizer class and zero_grad input
+  optim_cls: adam
+  optim_set_to_none: true
 
 PPO:
   # desc: PPO unique inputs
-  epoch_ppo: 10
+  epoch_ppo: 20
   gae_lambda: 0.97
   clip_eps: 0.2
   coef_ent: 0.01
