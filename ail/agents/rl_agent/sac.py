@@ -47,7 +47,7 @@ class SAC(OffPolicyAgent):
     :param num_gradient_steps: How many gradient steps to do after each rollout
     :param target_update_interval: update the target network every ``target_network_update_freq``
         gradient steps.
-    :param log_alpha_init: init value of log_alpha.
+    :param log_alpha_init: Init value of log_alpha.
     :param gamma: discount factor.
     :param tau: soft update coefficient. ("Polyak update", between 0 and 1)
     :param max_grad_norm: Maximum norm for the gradient clipping.

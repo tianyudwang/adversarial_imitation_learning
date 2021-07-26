@@ -81,7 +81,7 @@ def run(args, cfg, path):
         # common args
         device=args.device,
         fp16=args.fp16,
-        seed=cfg.MISC.seed,
+        seed=args.seed,
         gamma=cfg.ALGO.gamma,
         max_grad_norm=cfg.ALGO.max_grad_norm,
         optim_kwargs=dict(cfg.OPTIM)

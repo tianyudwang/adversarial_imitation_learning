@@ -556,7 +556,7 @@ class ReplayBuffer(BaseBuffer):
                 self.dtypes.update(extra_dtypes)
             else:
                 raise ValueError("extra_dtypes should be Dict[str, np.dtype]")
-            
+
         self._init_buffer()
 
     def __repr__(self) -> str:
@@ -617,7 +617,7 @@ class RolloutBuffer(BaseBuffer):
                 self.dtypes.update(extra_dtypes)
             else:
                 raise ValueError("extra_dtypes should be Dict[str, np.dtype]")
-        
+
         self._init_buffer()
 
     def __repr__(self) -> str:

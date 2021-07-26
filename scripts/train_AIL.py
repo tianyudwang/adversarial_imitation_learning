@@ -10,6 +10,8 @@ import numpy as np
 import torch as th
 
 from ail.trainer import Trainer
+from config.config import get_cfg_defaults
+
 
 try:
     from icecream import install  # noqa
@@ -76,20 +78,19 @@ def CLI():
     p.add_argument("--log_every_n_updates", "-lg", type=int, default=20)
     p.add_argument("--eval_interval", type=int, default=5 * 1e3)
     p.add_argument("--num_eval_episodes", type=int, default=10)
+    p.add_argument("--save_freq", type=int, default=50_000, 
+                   help="Save model every `save_freq` steps")
 
     # Cuda options
     p.add_argument("--cuda", action="store_true")
     p.add_argument("--fp16", action="store_true")
-    p.add_argument("--optim_cls", type=str, default="adam")
 
     # Common hyperparams
-    p.add_argument("--gamma", type=float, default=0.99)
     p.add_argument("--seed", type=int, default=0)
 
     # Utility
     p.add_argument("--verbose", type=int, default=2)
     p.add_argument("--debug", action="store_true")
-    p.add_argument("--profiling", "-prof", action="store_true")
     p.add_argument("--use_wandb", "-wb", action="store_true")
     args = p.parse_args()
 
@@ -105,7 +106,7 @@ def CLI():
     return args
 
 
-def run(args):
+def run(args, cfg, path):
     """Training Configuration"""
 
     algo_kwargs = dict(
@@ -113,68 +114,68 @@ def run(args):
         device=args.device,
         fp16=args.fp16,
         seed=args.seed,
-        gamma=args.gamma,
+        gamma=cfg.ALGO.gamma,
         max_grad_norm=None,
-        optim_kwargs=dict(optim_cls=args.optim_cls, optim_set_to_none=True),
+        optim_kwargs=dict(cfg.OPTIM),
     )
-
-    if args.gen_algo.lower() == "ppo":
+    
+    gen_algo = args.gen_algo.lower()
+    if  gen_algo == "ppo":
         # state_ space, action space inside trainer
         ppo_kwargs = dict(
             # buffer args
             batch_size=args.batch_size,  # PPO assums batch size == buffer_size
             buffer_kwargs=dict(with_reward=False, extra_data=["log_pis"]),
             # PPO only args
-            epoch_ppo=20,
-            gae_lambda=0.97,
-            clip_eps=0.2,
-            coef_ent=0.01,
+            epoch_ppo=cfg.PPO.epoch_ppo,
+            gae_lambda=cfg.PPO.gae_lambda,
+            clip_eps=cfg.PPO.clip_eps,
+            coef_ent=cfg.PPO.coef_ent,
+            
             # poliy args: net arch, activation, lr
             policy_kwargs=dict(
-                pi=(128, 128),
-                vf=(128, 128),
-                activation="relu_inplace",
+                pi=cfg.PPO.pi,
+                vf=cfg.PPO.vf,
+                activation=cfg.PPO.activation,
                 critic_type="V",
-                lr_actor=3e-4,
-                lr_critic=3e-4,
+                lr_actor=cfg.PPO.lr_actor,
+                lr_critic=cfg.PPO.lr_critic,
             ),
         )
         gen_kwargs = {**algo_kwargs, **ppo_kwargs}
         sac_kwargs = None
 
-    elif args.gen_algo.lower() == "sac":
+    elif gen_algo == "sac":
         sac_kwargs = dict(
             # buffer args
             batch_size=args.batch_size,  # PPO assums batch size == buffer_size
             buffer_size=args.buffer_size,  # only used in SAC,
             buffer_kwargs=dict(with_reward=False, extra_data=["log_pis"]),
             # SAC only args
-            lr_alpha=3e-4,
-            log_alpha_init=1.0,
-            tau=0.005,
-            start_steps=10_000,
-            # * encourage to sync following two params to reduce overhead
-            num_gradient_steps=1,  # ! slow O(n)
-            target_update_interval=1,
-            # poliy args: net arch, activation, lr
+            start_steps=cfg.SAC.start_steps,
+            lr_alpha=cfg.SAC.lr_alpha,
+            log_alpha_init=cfg.SAC.log_alpha_init,
+            tau=cfg.SAC.tau,  # 0.005
+            # * Recommend to sync following two params to reduce overhead
+            num_gradient_steps=cfg.SAC.num_gradient_steps,  # ! slow O(n)
+            target_update_interval=cfg.SAC.target_update_interval,
+            
+           # poliy args: net arch, activation, lr
             policy_kwargs=dict(
-                pi=(128, 128),
-                qf=(128, 128),
-                activation="relu_inplace",
+                pi=cfg.SAC.pi,
+                qf=cfg.SAC.qf,
+                activation=cfg.SAC.activation,
                 critic_type="twin",
-                lr_actor=7.3 * 1e-4,
-                lr_critic=7.3 * 1e-4,
+                lr_actor=cfg.SAC.lr_actor,
+                lr_critic=cfg.SAC.lr_critic,
             ),
         )
         gen_kwargs = {**algo_kwargs, **sac_kwargs}
         ppo_kwargs = None
 
     else:
-        raise ValueError()
+        raise ValueError(f"RL ALgo (generator) {args.gen_algo} not Implemented.")
 
-    # Path
-    path = pathlib.Path(__file__).parent
-    print(f"File_dir: {path}")    
     
     # Demo data
     if args.demo_path is None:
@@ -194,18 +195,18 @@ def run(args):
             ),
             gen_algo=args.gen_algo,
             gen_kwargs=gen_kwargs,
-            disc_cls="airl_sa",
+            disc_cls="airl_sa",  # TODO: modify this
             disc_kwargs=dict(
-                hidden_units=(100, 100),
-                hidden_activation="relu_inplace",
-                gamma=args.gamma,
+                hidden_units=cfg.DISC.hidden_units,
+                hidden_activation=cfg.DISC.hidden_activation,
+                gamma=cfg.ALGO.gamma,
                 disc_kwargs={
-                    "spectral_norm": args.spectral_norm,
-                    "dropout": args.dropout,
-                },
+                    "spectral_norm": cfg.DISC.spectral_norm,
+                    "dropout": cfg.DISC.dropout,
+                }
             ),
-            epoch_disc=1,
-            lr_disc=1e-4,
+            epoch_disc=cfg.DISC.epoch_disc,
+            lr_disc=cfg.DISC.lr_disc,
         )
     )
 
@@ -213,15 +214,8 @@ def run(args):
     exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{time}")
     log_dir = path.joinpath("runs", exp_name)
     if not os.path.exists(log_dir):
-        os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(log_dir, exist_ok=True) 
 
-    # Mainly for wandb.watch function
-    wandb_kwargs = dict(
-        # strategy="hist",  # TODO: may implment this
-        log_param=True,
-        log_type="gradients",
-        log_freq=100,
-    )
 
     config = dict(
         num_steps=args.num_steps,
@@ -238,7 +232,7 @@ def run(args):
         log_interval=args.log_interval,
         verbose=args.verbose,
         use_wandb=args.use_wandb,
-        wandb_kwargs=wandb_kwargs,
+        wandb_kwargs=cfg.WANDB,
     )
 
     # Log with tensorboard and sync to wandb dashboard as well
@@ -277,21 +271,9 @@ def run(args):
     with open(os.path.join(log_dir, "hyperparams.yaml"), "w") as f:
         yaml.dump(algo_kwargs, f)
 
-    del algo_kwargs, gen_kwargs, ppo_kwargs, sac_kwargs, wandb_kwargs
+    del algo_kwargs, gen_kwargs, ppo_kwargs, sac_kwargs
 
-    if args.profiling:
-        import cProfile
-        import pstats
-
-        with cProfile.Profile() as pr:
-            trainer.run_training_loop()
-
-        stats = pstats.Stats(pr)
-        stats.sort_stats(pstats.SortKey.TIME)
-        stats.dump_stats(filename="run_profiling.prof")
-        stats.print_stats()
-    else:
-        trainer.run_training_loop()
+    trainer.run_training_loop()
 
 
 if __name__ == "__main__":
@@ -299,6 +281,15 @@ if __name__ == "__main__":
     os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # modify to assign a meaningful name
 
     args = CLI()
+    
+    # Path
+    path = pathlib.Path(__file__).parent
+    print(f"File_dir: {path}")    
+    
+    cfg_path = path / "config" /'ail_configs.yaml'
+    cfg = get_cfg_defaults()
+    cfg.merge_from_file(cfg_path)
+    cfg.freeze()
 
     if args.debug:
         np.seterr(all="raise")
@@ -307,6 +298,6 @@ if __name__ == "__main__":
     if args.cuda:
         # os.environ["OMP_NUM_THREADS"] = "1"
         # torch backends
-        th.backends.cudnn.benchmark = True  # ? Does this useful for non-convolutions?
+        th.backends.cudnn.benchmark = cfg.CUDA.cudnn  # ? Does this useful for non-convolutions?
 
-    run(args)
+    run(args, cfg, path)

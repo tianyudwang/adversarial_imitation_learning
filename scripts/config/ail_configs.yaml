@@ -1,11 +1,11 @@
 
 
 CUDA:
-  desc: torch.backends
+  # desc: torch.backends
   cudnn: true
 
 OPTIM:
-  desc: Optimizer class and zero_grad input
+  # desc: Optimizer class and zero_grad input
   optim_cls: adam
   optim_set_to_none: true
 
@@ -15,13 +15,13 @@ OPTIM:
 #   num_eval_episodes: 10
 
 WANDB:
-  desc: wandb.watch function inputs
+  # desc: wandb.watch function inputs
   log_param: true
   log_type: gradients
   log_freq: 1000
 
 PPO:
-  desc: PPO unique inputs
+  # desc: PPO unique inputs
   epoch_ppo: 10
   gae_lambda: 0.97
   clip_eps: 0.2
@@ -35,7 +35,7 @@ PPO:
   lr_critic: 3.0e-4
 
 SAC:
-  desc: SAC unique inputs
+  # desc: SAC unique inputs
   start_steps: 10_000
   num_gradient_steps: 1  # ! slow O(n)
   target_update_interval: 1  # Recommend to sync with num_gradient_steps.
