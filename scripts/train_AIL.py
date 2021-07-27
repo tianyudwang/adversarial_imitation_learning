@@ -68,7 +68,7 @@ def CLI():
     # p.add_argument("--dropout", "-dp", action="store_true")  # TODO: Implement and test
 
     # Total steps and batch size
-    p.add_argument("--num_steps", "-n", type=int, default=3 * 1e6)
+    p.add_argument("--num_steps", "-n", type=int, default=2 * 1e6)
     p.add_argument("--rollout_length", "-ep_len", type=int, default=None)
     p.add_argument("--gen_batch_size", "-gb", type=int, default=1_000)
     p.add_argument("--replay_batch_size", "-rbs", type=int, default=256)

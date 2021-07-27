@@ -55,7 +55,7 @@ SAC:
   start_steps: 10_000
   num_gradient_steps: 1      # deafult: 1 # ! slow O(n)
   target_update_interval: 1  # deafult: 1
-  tau: 0.005                 # default: 0.005
+  tau: 0.02                # default: 0.005
   log_alpha_init: 1.0        # default: 1.0
   lr_alpha: 3.0e-4           # default: 3.0e-4
 

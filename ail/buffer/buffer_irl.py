@@ -73,7 +73,7 @@ class Buffer:
     def full(self) -> bool:
         """Returns True if the buffer is full, False otherwise."""
         return self.size() == self.capacity
-    
+
     @classmethod
     def from_data(
         cls,
@@ -183,7 +183,7 @@ class Buffer:
         Stores new data samples, replacing old samples with FIFO priority.
         Requires that `size(data) <= self.capacity - self._idx`,
         where `size(data)` is the number of rows in every array in `data.values()`.
-        
+
         Updates `self._idx` to be the insertion point of the next call to `_store_easy` call,
         looping back to `self._idx = 0` if necessary.
         Also updates `self._n_data`.
@@ -217,7 +217,7 @@ class Buffer:
         """
         Uniformly sample `n_samples` samples from the buffer with replacement.
         :param: n_samples: The number of samples to randomly sample.
-        : return: A dictionary of samples (np.ndarray) 
+        : return: A dictionary of samples (np.ndarray)
             with shape `(n_samples) + self.sample_shape`.
         """
         # TODO: ERE (https://arxiv.org/pdf/1906.04009.pdf)
@@ -243,33 +243,39 @@ class Buffer:
         """
         if n_samples is None:
             assert self.full(), "Buffer is not full"
+            # Obatain all data in buffer.
             if shuffle:
                 # Same as uniform sampling whole buffer.
                 return self.sample(n_samples=self.capacity)
             else:
                 # Get all buffer data with order preserved.
-                path_slice = slice(0, self.capacity)
-                return self._get_batch_from_index(path_slice, shuffle=False)
+                return self._get_batch_from_index(batch_idxes=slice(0, self.capacity))
         else:
-            # obtain a slice of data in buffer
+            # Obtain a slice of data in buffer
             assert isinstance(n_samples, int), "n_samples must be integer."
             n_data = self.size()
             if n_samples > n_data:
                 raise ValueError(
-                    f"Cannot get {n_samples} of samplse, "
+                    f"Cannot get {n_samples} of samples, "
                     f"which exceeds {n_data} samples currrently store in buffer."
                 )
             if last_n:
-                # Obtain `last n_samples` data with index in range [n_data - n_samples, n_data) 
-                path_slice = slice(n_data - n_samples, n_data)
+                # Obtain `last n_samples` data with index in range [n_data - n_samples, n_data)
+                start, end = (n_data - n_samples), n_data
             else:
                 # Obtain data with index in range [0, n_samples)
-                path_slice = slice(0, n_samples)
-            return self._get_batch_from_index(path_slice, shuffle)
+                start, end = 0, n_samples
+
+            batch_idxes = (
+                np.random.randint(low=start, high=end, size=n_samples)
+                if shuffle
+                else slice(start, end)
+            )
+            return self._get_batch_from_index(batch_idxes)
 
     def _get_batch_from_index(
-        self, batch_idxes: Union[np.ndarray, slice],
-        shuffle: bool = False
+        self,
+        batch_idxes: Union[np.ndarray, slice],
     ) -> Dict[str, th.Tensor]:
         """
         Get a batch data based on index.
@@ -277,15 +283,9 @@ class Buffer:
         :param shuffle: If True, then return the samples in a random order.
         """
         assert isinstance(batch_idxes, (slice, np.ndarray))
-        if shuffle:
-            batch = {}
-            for k, buffer in self._arrays.items():
-                arr = buffer[batch_idxes]
-                np.random.shuffle(arr)
-                batch[k] = self.to_torch(arr)
-        else:
-            batch = {k: self.to_torch(buffer[batch_idxes]) for k, buffer in self._arrays.items()}
-        return batch
+        return {
+            k: self.to_torch(buffer[batch_idxes]) for k, buffer in self._arrays.items()
+        }
 
     def to_torch(self, array: np.ndarray, copy: bool = True, **kwargs) -> th.Tensor:
         """
