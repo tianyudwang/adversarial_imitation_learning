@@ -87,5 +87,5 @@ DISC:
 AIRL:
   # gail, logsigmoid best for hopper-v3
   subtract_logp: true
-  rew_type: "airl"   # default: "airl"
+  rew_type: "gail"  # "airl"   # default: "airl"
   rew_input_choice: "logsigmoid" # default: "logit"

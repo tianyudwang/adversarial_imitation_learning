@@ -190,7 +190,7 @@ def run(args, cfg, path):
             wandb.init(
                 project="AIL",
                 notes="tweak baseline",
-                tags=["baseline", f"{args.env_id}", f"{args.algo}"],
+                tags=["baseline", f"{args.env_id}", str(args.algo).upper()],
                 config=config,  # Hyparams & meta data
             )
             wandb.run.name = exp_name

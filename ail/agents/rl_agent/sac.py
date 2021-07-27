@@ -297,16 +297,15 @@ class SAC(OffPolicyAgent):
         As discussed in https://github.com/rail-berkeley/softlearning/issues/37
         """
         self.optim_alpha.zero_grad(set_to_none=self.optim_set_to_none)
-
-        with autocast(enabled=self.fp16):
-            # Important: detach the variable from the graph
-            # So we don't change it with other losses
-            # See https://github.com/rail-berkeley/softlearning/issues/60
-            self.alpha = th.exp(self.log_alpha.detach())
-            loss_alpha = -(
-                self.log_alpha * (self.target_entropy + log_pis_new).detach()
-            ).mean()
-        self.one_gradient_step(loss_alpha, self.optim_alpha, self.log_alpha)
+        # Important: detach the variable from the graph
+        # So we don't change it with other losses
+        # See https://github.com/rail-berkeley/softlearning/issues/60
+        self.alpha = th.exp(self.log_alpha.detach())
+        loss_alpha = -(
+            self.log_alpha * (self.target_entropy + log_pis_new).detach()
+        ).mean()
+        loss_alpha.backward()
+        self.optim_alpha.step()
         return loss_alpha.detach()
 
     def update_critic(

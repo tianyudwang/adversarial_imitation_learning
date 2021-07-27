@@ -70,6 +70,10 @@ class Buffer:
         ), "_ndata: integer in range(0, self.capacity + 1)."
         return self._n_data
 
+    def full(self) -> bool:
+        """Returns True if the buffer is full, False otherwise."""
+        return self.size() == self.capacity
+    
     @classmethod
     def from_data(
         cls,
@@ -177,8 +181,9 @@ class Buffer:
     def _store_easy(self, data: Dict[str, np.ndarray], truncate_ok=False) -> None:
         """
         Stores new data samples, replacing old samples with FIFO priority.
-        Requires that `size(data) <= self.capacity - self._idx`, where `size(data)` is
-        the number of rows in every array in `data.values()`.
+        Requires that `size(data) <= self.capacity - self._idx`,
+        where `size(data)` is the number of rows in every array in `data.values()`.
+        
         Updates `self._idx` to be the insertion point of the next call to `_store_easy` call,
         looping back to `self._idx = 0` if necessary.
         Also updates `self._n_data`.
@@ -190,6 +195,7 @@ class Buffer:
             Otherwise, store only the final `self.capacity` transitions.
         Note: serve as singe pair store
         """
+        assert isinstance(data, dict), "data must be a dictionary"
         # * Sample should has shape (1, n):
         # 1 is the number of samples, n is the dimension of that sample
         n_samples = np.unique([arr.shape[0] for arr in data.values()])
@@ -211,14 +217,15 @@ class Buffer:
         """
         Uniformly sample `n_samples` samples from the buffer with replacement.
         :param: n_samples: The number of samples to randomly sample.
-            samples (np.ndarray): An array with shape `(n_samples) + self.sample_shape`.
+        : return: A dictionary of samples (np.ndarray) 
+            with shape `(n_samples) + self.sample_shape`.
         """
         # TODO: ERE (https://arxiv.org/pdf/1906.04009.pdf)
-        assert isinstance(n_samples, int)
+        assert isinstance(n_samples, int), "n_samples must be int"
         assert self.size() != 0, "Buffer is empty"
         # Uniform sampling
         ind = np.random.randint(self.size(), size=n_samples)
-        return {k: self.to_torch(buffer[ind]) for k, buffer in self._arrays.items()}
+        return self._get_batch_from_index(ind)
 
     def get(
         self,
@@ -227,20 +234,22 @@ class Buffer:
         shuffle: bool = False,
     ) -> Dict[str, th.Tensor]:
         """
-        Returns samples in the buffer with order preserved.
+        Returns samples in the buffer.
         :param: n_samples: The number of samples to return.
             By default, return all samples in the buffer, if n_samples is None.
+        :param last_n: If True, then return the last `n_samples` samples.
+        :param shuffle: If True, then return the samples in a random order.
         return: Tensor Dict
         """
         if n_samples is None:
-            assert self.size() == self.capacity, "Buffer is not full"
+            assert self.full(), "Buffer is not full"
             if shuffle:
-                # Same as uniform sampling whole buffer
-                return self.sample(self.capacity)
+                # Same as uniform sampling whole buffer.
+                return self.sample(n_samples=self.capacity)
             else:
-                # get all buffer data with order preserved.
+                # Get all buffer data with order preserved.
                 path_slice = slice(0, self.capacity)
-                return self._get_samples(path_slice)
+                return self._get_batch_from_index(path_slice, shuffle=False)
         else:
             # obtain a slice of data in buffer
             assert isinstance(n_samples, int), "n_samples must be integer."
@@ -251,22 +260,32 @@ class Buffer:
                     f"which exceeds {n_data} samples currrently store in buffer."
                 )
             if last_n:
-                # Obtain the last n_samples
-                start = n_data - n_samples
-                return {
-                    k: self.to_torch(buffer[start:n_data])
-                    for k, buffer in self._arrays.items()
-                }
+                # Obtain `last n_samples` data with index in range [n_data - n_samples, n_data) 
+                path_slice = slice(n_data - n_samples, n_data)
             else:
                 # Obtain data with index in range [0, n_samples)
                 path_slice = slice(0, n_samples)
-            return self._get_samples(path_slice)
+            return self._get_batch_from_index(path_slice, shuffle)
 
-    def _get_samples(self, batch_idxes: Union[np.ndarray, slice]):
-        """Get a batch size or whole buffer size with order preserved."""
-        return {
-            k: self.to_torch(buffer[batch_idxes]) for k, buffer in self._arrays.items()
-        }
+    def _get_batch_from_index(
+        self, batch_idxes: Union[np.ndarray, slice],
+        shuffle: bool = False
+    ) -> Dict[str, th.Tensor]:
+        """
+        Get a batch data based on index.
+        :param batch_idxes: Index of batch.
+        :param shuffle: If True, then return the samples in a random order.
+        """
+        assert isinstance(batch_idxes, (slice, np.ndarray))
+        if shuffle:
+            batch = {}
+            for k, buffer in self._arrays.items():
+                arr = buffer[batch_idxes]
+                np.random.shuffle(arr)
+                batch[k] = self.to_torch(arr)
+        else:
+            batch = {k: self.to_torch(buffer[batch_idxes]) for k, buffer in self._arrays.items()}
+        return batch
 
     def to_torch(self, array: np.ndarray, copy: bool = True, **kwargs) -> th.Tensor:
         """
