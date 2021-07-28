@@ -4,7 +4,7 @@ from typing import Sequence, Union, Optional
 import torch as th
 from torch import nn
 
-from ail.common.pytorch_util import build_mlp
+from ail.common.pytorch_util import build_mlp, count_vars
 
 
 class BaseValue(nn.Module, ABC):
@@ -20,6 +20,9 @@ class BaseValue(nn.Module, ABC):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.net = None
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}"
 
     @abstractmethod
     def forward(self, *args, **kwargs) -> th.Tensor:
@@ -56,6 +59,9 @@ class StateFunction(BaseValue):
             use_spectral_norm=use_spectral_norm,
         )
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}: {self.net}, Total params: {count_vars(self.net)}"
+
     def forward(self, state: th.Tensor) -> th.Tensor:
         """self.net()"""
         # TODO: Critical to ensure v has right shape.
@@ -86,6 +92,9 @@ class StateActionFunction(BaseValue):
             use_spectral_norm=use_spectral_norm,
         )
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}: {self.net}, Total params: {count_vars(self.net)}"
+
     def forward(self, state, action):
         # TODO: Critical to ensure q has right shape.
         return self.net(th.cat([state, action], dim=-1))
@@ -107,6 +116,13 @@ class TwinnedStateActionFunction(BaseValue):
         self.net2 = build_mlp(
             [obs_dim + act_dim] + list(hidden_units) + [1],
             activation,
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}:\n"
+            f"{self.net1}, Total params: {count_vars(self.net1)}\n"
+            f"{self.net2}, Total params: {count_vars(self.net2)}"
         )
 
     def forward(self, states, actions):

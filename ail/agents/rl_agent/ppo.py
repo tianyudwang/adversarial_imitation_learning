@@ -7,7 +7,7 @@ from torch.cuda.amp import autocast
 
 from ail.agents.rl_agent.rl_core import OnPolicyAgent
 from ail.common.math import normalize
-from ail.common.type_alias import TensorDict, GymEnv, GymSpace
+from ail.common.type_alias import AlgoTags, GymEnv, GymSpace, TensorDict
 from ail.common.pytorch_util import asarray_shape2d, obs_as_tensor, disable_gradient
 
 
@@ -107,8 +107,10 @@ class PPO(OnPolicyAgent):
         self.gae_lambda = gae_lambda
         self.coef_ent = coef_ent
 
+        self.tag = AlgoTags.PPO
+
     def __repr__(self) -> str:
-        return "PPO"
+        return f"{self.__class__.__name__}"
 
     def is_update(self, step: int) -> bool:
         """Whether or not to update the agent"""

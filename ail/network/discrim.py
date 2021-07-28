@@ -8,6 +8,7 @@ import torch.nn.functional as F
 
 from ail.network.value import StateFunction, StateActionFunction
 from ail.common.type_alias import Activation
+from ail.common.pytorch_util import count_vars
 
 
 class ArchType(Enum):
@@ -70,6 +71,7 @@ class DiscrimNet(nn.Module, ABC):
         action_dim: Optional[int] = None,
         hidden_units: Sequence[int] = (128, 128),
         hidden_activation: Activation = nn.ReLU(inplace=True),
+        init_model=True,
         **disc_kwargs,
     ):
         super().__init__()
@@ -89,9 +91,11 @@ class DiscrimNet(nn.Module, ABC):
         )  # TODO: apply drop out between hidden layers
 
         # Init Discriminator
-        self.init_model = disc_kwargs.get("init_model", True)
-        if self.init_model:
+        if init_model:
             self._init_model(disc_type)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}"
 
     def _init_model(self, disc_type: ArchType) -> None:
         if disc_type == ArchType.s:
@@ -179,7 +183,8 @@ class DiscrimNet(nn.Module, ABC):
                 raise ValueError(f"Choice logit not supported for Gail.")
             else:
                 raise ValueError(
-                    f"Choice {choices} not supported. " f"Valid choices are {choices}."
+                    f"Choice {choices} not supported with rew_type gail. "
+                    f"Valid choices are {choices}."
                 )
 
         elif rew_type == "airl":
@@ -264,6 +269,11 @@ class GAILDiscrim(DiscrimNet):
             disc_kwargs=disc_kwargs,
         )
 
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}: {self.f}, Total params: {count_vars(self.f)}"
+        )
+
     def forward(self, obs: th.Tensor, acts: th.Tensor, **kwargs):
         """
         Output logits of discriminator.
@@ -308,6 +318,13 @@ class AIRLStateDiscrim(DiscrimNet):
             hidden_units=hidden_units,
             hidden_activation=hidden_activation,
             disc_kwargs=disc_kwargs,
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}:\n"
+            f"{self.g}, Total params: {count_vars(self.net1)}\n"
+            f"{self.h}, Total params: {count_vars(self.net2)}"
         )
 
     def f(
@@ -358,7 +375,6 @@ class AIRLStateDiscrim(DiscrimNet):
         gamma: float,
         log_pis: Optional[th.Tensor] = None,
         subtract_logp: bool = True,
-        rew_type="airl",
         choice="logit",
         **kwargs,
     ) -> th.Tensor:
@@ -373,7 +389,7 @@ class AIRLStateDiscrim(DiscrimNet):
             "gamma": gamma,
         }
         with th.no_grad():
-            reward_fn = self.reward_fn(rew_type, choice)
+            reward_fn = self.reward_fn(rew_type="airl", choice=choice)
             logits = self.forward(obs, **kwargs)
             rews = reward_fn(logits)
         return rews
@@ -406,6 +422,11 @@ class AIRLStateActionDiscrim(DiscrimNet):
             **disc_kwargs,
         )
 
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}: {self.f}, Total params: {count_vars(self.f)}"
+        )
+
     def forward(
         self,
         obs: th.Tensor,
@@ -428,7 +449,6 @@ class AIRLStateActionDiscrim(DiscrimNet):
         acts: th.Tensor,
         log_pis: Optional[th.Tensor] = None,
         subtract_logp: bool = True,
-        rew_type="airl",
         choice="logit",
         **kwargs,
     ) -> th.Tensor:
@@ -437,8 +457,9 @@ class AIRLStateActionDiscrim(DiscrimNet):
             "log_pis": log_pis,
             "subtract_logp": subtract_logp,
         }
+        # TODO: apply reward bound
         with th.no_grad():
-            reward_fn = self.reward_fn(rew_type, choice)
+            reward_fn = self.reward_fn(rew_type="airl", choice=choice)
             logits = self.forward(obs, **kwargs)
             rews = reward_fn(logits)
         return rews

@@ -208,7 +208,6 @@ def run(args, cfg, path):
             epoch_disc=cfg.DISC.epoch_disc,
             lr_disc=cfg.DISC.lr_disc,
             subtract_logp = cfg.AIRL.subtract_logp,
-            rew_type = cfg.AIRL.rew_type,
             rew_input_choice = cfg.AIRL.rew_input_choice,
         )
     )
@@ -280,7 +279,6 @@ def run(args, cfg, path):
     del algo_kwargs, gen_kwargs, ppo_kwargs, sac_kwargs
 
     trainer.run_training_loop()
-
 
 if __name__ == "__main__":
     # ENVIRONMENT VARIABLE

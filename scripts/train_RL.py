@@ -215,7 +215,6 @@ def run(args, cfg, path):
 
     trainer.run_training_loop()
 
-
 if __name__ == "__main__":
     # ENVIRONMENT VARIABLE
     os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # modify to assign a meaningful name

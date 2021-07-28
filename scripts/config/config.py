@@ -115,8 +115,13 @@ _C.AIRL = CN()
 _C.AIRL.disc_cls = "airl_sa"   # Choices = ["airl_so", "airl_sa"].
 _C.AIRL.subtract_logp = True   # Subtract log_p from discrtiminator logits.
 # Reward formulation
-_C.AIRL.rew_type = "airl"      # Choices = ["airl", "gail"].
 _C.AIRL.rew_input_choice = "logit" # Choices = ["logsigmoid", "softplus", "logti"].
+
+# GAIL only args
+_C.GAIL = CN()
+_C.GAIL.disc_cls = "gail"
+# Reward formulation
+_C.GAIL.rew_input_choice = "logit" # Choices = ["logsigmoid", "softplus"].
 
 
 def get_cfg_defaults():

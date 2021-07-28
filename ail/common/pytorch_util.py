@@ -69,17 +69,19 @@ def enable_gradient(net: nn.Module) -> None:
         param.requires_grad = True
 
 
-def init_gpu(use_gpu=True, gpu_id=0) -> th.device:
+def init_gpu(use_gpu=True, gpu_id=0, verbose=False) -> th.device:
     """Initialize device. ('cuda:0' or 'cpu')"""
     if th.cuda.is_available() and use_gpu:
         device = th.device("cuda:" + str(gpu_id))
-        Console.info(f"Using GPU id {gpu_id}.\n")
+        if verbose:
+            Console.info(f"Using GPU id {gpu_id}.\n")
     else:
         device = th.device("cpu")
         if not th.cuda.is_available():
             Console.warn("GPU not detected. Defaulting to CPU.\n")
         elif not use_gpu:
-            Console.info("Device: set to use CPU.\n")
+            if verbose:
+                Console.info("Device: set to use CPU.\n")
     return device
 
 
@@ -108,7 +110,7 @@ def obs_as_tensor(
 def to_torch(
     array: Union[np.ndarray, Tuple, List],
     device: Union[th.device, str],
-    copy: bool = True,
+    copy: bool = False,
 ) -> th.Tensor:
     """
     Convert a numpy array to a PyTorch tensor.

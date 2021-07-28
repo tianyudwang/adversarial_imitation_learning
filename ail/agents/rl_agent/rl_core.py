@@ -75,6 +75,9 @@ class BaseRLAgent(BaseAgent, ABC):
         self.max_grad_norm = max_grad_norm
         self.clipping = max_grad_norm is not None
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}"
+
     def info(self) -> Dict[nn.Module, int]:
         """
         Count variables.
@@ -333,6 +336,9 @@ class OnPolicyAgent(BaseRLAgent):
                 self.critic.parameters(), lr=self.lr_critic
             )
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}"
+
     def _setup_models(self) -> None:
         """Build model for actor and critic and send to proper device."""
         # Actor.
@@ -428,3 +434,6 @@ class OffPolicyAgent(BaseRLAgent):
         #     self.optim_critic = self.optim_cls(
         #         self.critic.parameters(), lr=self.lr_critic
         #     )
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}"

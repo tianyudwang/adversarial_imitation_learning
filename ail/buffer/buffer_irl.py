@@ -1,4 +1,4 @@
-from typing import Dict, Mapping, Optional, Tuple, Union
+from typing import Dict, Mapping, Optional, Tuple, Union, Set
 from enum import Enum, auto
 import os
 
@@ -10,10 +10,10 @@ from ail.common.type_alias import GymEnv
 
 class Buffer:
     __slots__ = [
-        "capacity",
-        "sample_shapes",
+        "_capacity",
+        "_sample_shapes",
         "_arrays",
-        "stored_keys",
+        "_stored_keys",
         "_n_data",
         "_idx",
         "device",
@@ -44,16 +44,16 @@ class Buffer:
 
         if sample_shapes.keys() != dtypes.keys():
             raise KeyError("sample_shape and dtypes keys don't match")
-        self.capacity = capacity
-        self.sample_shapes = {k: tuple(shape) for k, shape in sample_shapes.items()}
+        self._capacity = capacity
+        self._sample_shapes = {k: tuple(shape) for k, shape in sample_shapes.items()}
 
         # The underlying NumPy arrays (which actually store the data).
         self._arrays = {
             k: np.zeros((capacity,) + shape, dtype=dtypes[k])
-            for k, shape in self.sample_shapes.items()
+            for k, shape in self._sample_shapes.items()
         }
 
-        self.stored_keys = set(self.sample_shapes.keys())
+        self._stored_keys = set(self._sample_shapes.keys())
 
         # An integer in `range(0, self.capacity + 1)`.
         # This attribute is the return value of `self.size()`.
@@ -62,17 +62,29 @@ class Buffer:
         self._idx = 0
         self.device = device
 
+    @property
+    def capacity(self) -> int:
+        return self._capacity
+
+    @property
+    def sample_shapes(self) -> Mapping[str, Tuple[int, ...]]:
+        return self._sample_shapes
+
+    @property
+    def stored_keys(self) -> Set[str]:
+        return self._stored_keys
+
     def size(self) -> int:
         """Returns the number of samples currently stored in the buffer."""
         # _ndata: integer in `range(0, self.capacity + 1)`.
         assert (
-            0 <= self._n_data <= self.capacity
+            0 <= self._n_data <= self._capacity
         ), "_ndata: integer in range(0, self.capacity + 1)."
         return self._n_data
 
     def full(self) -> bool:
         """Returns True if the buffer is full, False otherwise."""
-        return self.size() == self.capacity
+        return self.size() == self._capacity
 
     @classmethod
     def from_data(
@@ -141,7 +153,7 @@ class Buffer:
             sample's key store in buffer
         """
         data_keys = set(data.keys())
-        expected_keys = set(self.sample_shapes.keys())
+        expected_keys = set(self._sample_shapes.keys())
         missing_keys = expected_keys - data_keys
         unexpected_keys = data_keys - expected_keys
 
@@ -158,19 +170,19 @@ class Buffer:
         if n_samples == 0:
             raise ValueError("Trying to store empty data.")
 
-        if n_samples > self.capacity:
+        if n_samples > self._capacity:
             if not truncate_ok:
                 raise ValueError("Not enough capacity to store data.")
             else:
-                data = {k: data[k][-self.capacity :] for k in data.keys()}
+                data = {k: data[k][-self._capacity :] for k in data.keys()}
 
         for k in data.keys():
-            if data[k].shape[1:] != self.sample_shapes[k]:
+            if data[k].shape[1:] != self._sample_shapes[k]:
                 raise ValueError(f"Wrong data shape for {k}")
 
         new_idx = self._idx + n_samples
-        if new_idx > self.capacity:
-            n_remain = self.capacity - self._idx
+        if new_idx > self._capacity:
+            n_remain = self._capacity - self._idx
             # Need to loop around the buffer. Break into two "easy" calls.
             self._store_easy({k: data[k][:n_remain] for k in data.keys()}, truncate_ok)
             assert self._idx == 0
@@ -202,16 +214,16 @@ class Buffer:
         assert len(n_samples) == 1
 
         n_samples = n_samples[0]
-        assert n_samples <= self.capacity - self._idx
+        assert n_samples <= self._capacity - self._idx
         idx_hi = self._idx + n_samples
 
         for k in data.keys():
             if not truncate_ok:
-                if self._n_data + n_samples > self.capacity:
+                if self._n_data + n_samples > self._capacity:
                     raise ValueError("exceed buffer capacity")
             self._arrays[k][self._idx : idx_hi] = data[k]
-        self._idx = idx_hi % self.capacity
-        self._n_data = int(min(self._n_data + n_samples, self.capacity))
+        self._idx = idx_hi % self._capacity
+        self._n_data = int(min(self._n_data + n_samples, self._capacity))
 
     def sample(self, n_samples: int) -> Dict[str, th.Tensor]:
         """
@@ -246,10 +258,10 @@ class Buffer:
             # Obatain all data in buffer.
             if shuffle:
                 # Same as uniform sampling whole buffer.
-                return self.sample(n_samples=self.capacity)
+                return self.sample(n_samples=self._capacity)
             else:
                 # Get all buffer data with order preserved.
-                return self._get_batch_from_index(batch_idxes=slice(0, self.capacity))
+                return self._get_batch_from_index(batch_idxes=slice(0, self._capacity))
         else:
             # Obtain a slice of data in buffer
             assert isinstance(n_samples, int), "n_samples must be integer."
@@ -410,6 +422,9 @@ class BaseBuffer:
         self.device = device
         self._buffer = None
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}"
+
     def _init_buffer(self) -> None:
         """Initiate Buffer"""
         if len(self.sample_shapes) == 0:
@@ -427,9 +442,18 @@ class BaseBuffer:
             device=self.device,
         )
 
+    def stored_keys(self) -> Set[str]:
+        return self._buffer.stored_keys
+
     def size(self) -> int:
         """Returns the number of samples stored in the buffer."""
         return self._buffer.size()
+
+    def full(self) -> bool:
+        """Returns whether the buffer is full."""
+        return self._buffer.full()
+
+    # def data_keys
 
     def store(
         self,
@@ -453,7 +477,7 @@ class BaseBuffer:
                     "Prefer transitions to be a dict or a dictionary-like object"
                 )
 
-        intersect = self._buffer.stored_keys.intersection(transitions.keys())
+        intersect = self._buffer._stored_keys.intersection(transitions.keys())
 
         # Remove unnecessary fields
         trans_dict = {k: transitions[k] for k in intersect}
@@ -478,7 +502,7 @@ class BaseBuffer:
                 raise TypeError(
                     "Prefer transitions to be a dict or a dictionary-like object"
                 )
-        intersect = self._buffer.stored_keys.intersection(transitions.keys())
+        intersect = self._buffer._stored_keys.intersection(transitions.keys())
         # Remove unnecessary fields
         trans_dict = {k: transitions[k] for k in intersect}
         self._buffer.store(trans_dict, truncate_ok=truncate_ok)
@@ -617,7 +641,7 @@ class ReplayBuffer(BaseBuffer):
         self._init_buffer()
 
     def __repr__(self) -> str:
-        return "ReplayBuffer"
+        return f"{self.__class__.__name__} (capacity={self.capacity}, data={self.stored_keys()}, size={self.size()})"
 
 
 class RolloutBuffer(BaseBuffer):
@@ -678,7 +702,7 @@ class RolloutBuffer(BaseBuffer):
         self._init_buffer()
 
     def __repr__(self) -> str:
-        return "RolloutBuffer"
+        return f"{self.__class__.__name__} (capacity={self.capacity}, data={self.stored_keys()}, size={self.size()})"
 
 
 class BufferType(Enum):

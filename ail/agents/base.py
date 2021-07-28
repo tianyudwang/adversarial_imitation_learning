@@ -48,7 +48,7 @@ class BaseAgent(nn.Module):
         self.state_space = state_space
         self.action_space = action_space
 
-        # shapes of space useful for buffer.
+        # Shapes of space useful for buffer.
         self.state_shape = get_obs_shape(state_space)
         if isinstance(action_space, Box):
             self.action_shape = action_space.shape
@@ -59,25 +59,21 @@ class BaseAgent(nn.Module):
         self.obs_dim = get_flat_obs_dim(state_space)
         self.act_dim = get_act_dim(action_space)
 
-        # Action limits.
-        self.act_low = action_space.low
-        self.act_high = action_space.high
-
         # Device management.
-        self.device = init_gpu(use_gpu=(device == "cuda"))
+        self.device = init_gpu(use_gpu=(device == "cuda"), verbose=True)
+
         # Use automatic mixed precision training in GPU
         self.fp16 = all([fp16, th.cuda.is_available(), device == "cuda"])
         self.scaler = GradScaler() if self.fp16 else None
 
         # Optimizer kwargs.
-        self.optim_kwargs = {} if optim_kwargs is None else optim_kwargs
+        optim_kwargs = {} if optim_kwargs is None else optim_kwargs
+        optim_cls = optim_kwargs.get("optim_cls")
+        self.optim_set_to_none = optim_kwargs.get("optim_set_to_none", False)
 
-        optim_cls = self.optim_kwargs.get("optim_cls", "adam")
         if isinstance(optim_cls, str):
             self.optim_cls = OPT[optim_cls.lower()].value
         elif isinstance(optim_cls, th.optim.Optimizer):
             self.optim_cls = optim_cls
         else:
             raise ValueError("optim_cls must be a string or an torch. optim.Optimizer.")
-
-        self.optim_set_to_none = self.optim_kwargs.get("optim_set_to_none", False)

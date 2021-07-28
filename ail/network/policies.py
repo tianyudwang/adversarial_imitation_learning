@@ -3,7 +3,7 @@ from typing import Tuple, Sequence
 import torch as th
 from torch import nn
 
-from ail.common.pytorch_util import build_mlp
+from ail.common.pytorch_util import build_mlp, count_vars
 from ail.common.math import reparameterize, evaluate_lop_pi
 from ail.common.type_alias import Activation
 
@@ -24,6 +24,9 @@ class StateIndependentPolicy(nn.Module):
         )
         # TODO: allow log_std init
         self.log_stds = nn.Parameter(th.zeros(1, act_dim))
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}: {self.net}, Total params: {count_vars(self.net)}"
 
     def forward(self, states: th.Tensor):
         return th.tanh(self.net(states))
@@ -49,6 +52,9 @@ class StateDependentPolicy(nn.Module):
             sizes=[obs_dim] + list(hidden_units) + [2 * act_dim],
             activation=hidden_activation,
         )
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}: {self.net}, Total params: {count_vars(self.net)}"
 
     def forward(self, states: th.Tensor) -> th.Tensor:
         return th.tanh(self.net(states).chunk(2, dim=-1)[0])

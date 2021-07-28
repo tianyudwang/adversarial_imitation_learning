@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, auto
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple, Union
 
@@ -68,3 +68,10 @@ class Extra_dtypes:
 
 EXTRA_SHAPES = Extra_shape()
 EXTRA_DTYPES = Extra_dtypes()
+
+
+class AlgoTags(Enum):
+    PPO = auto()
+    SAC = auto()
+    AIRL = auto()
+    # GAIL = auto()
