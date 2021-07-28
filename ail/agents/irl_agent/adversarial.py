@@ -8,10 +8,10 @@ from torch.cuda.amp import autocast
 from ail.agents.irl_agent.irl_core import BaseIRLAgent
 from ail.buffer import ReplayBuffer, BufferTag
 from ail.common.type_alias import GymSpace, TensorDict
-from ail.network.discrim import DiscrimNet, DiscrimType
+from ail.network.discrim import DiscrimNet
 
 
-class AIRL(BaseIRLAgent):
+class Adversarial(BaseIRLAgent):
     def __init__(
         self,
         state_space: GymSpace,
@@ -26,13 +26,13 @@ class AIRL(BaseIRLAgent):
         buffer_kwargs: Dict[str, Any],
         gen_algo,
         gen_kwargs: Dict[str, Any],
-        disc_cls: Union[DiscrimNet, str],
+        disc_cls: DiscrimNet,
         disc_kwargs: Dict[str, Any],
         lr_disc: float,
-        optim_kwargs: Optional[Dict[str, Any]] = None,
-        subtract_logp: bool = True,
-        rew_type: str = "airl",
-        rew_input_choice: str = "logit",
+        optim_kwargs: Optional[Dict[str, Any]],
+        subtract_logp: bool,
+        rew_type: str,
+        rew_input_choice: str,
         **kwargs,
     ):
 
@@ -51,24 +51,6 @@ class AIRL(BaseIRLAgent):
             optim_kwargs,
         )
 
-        if disc_kwargs is None:
-            disc_kwargs = {}
-
-        # Discriminator
-        if isinstance(disc_cls, str):
-            disc_cls = disc_cls.lower()
-            if disc_cls not in ["airl", "airl_so", "airl_sa"]:
-                raise ValueError(
-                    f"No string string conversion of discriminator class {disc_cls}."
-                )
-            disc_cls = DiscrimType[disc_cls].value
-
-        else:
-            if isinstance(disc_cls, DiscrimNet):
-                disc_cls = DiscrimNet
-            else:
-                raise ValueError(f"Unknown discriminator class: {disc_cls}.")
-
         self.disc = disc_cls(self.obs_dim, self.act_dim, **disc_kwargs).to(self.device)
         self.lr_disc = lr_disc
         self.optim_disc = self.optim_cls(self.disc.parameters(), lr=self.lr_disc)
@@ -82,7 +64,7 @@ class AIRL(BaseIRLAgent):
         self.rew_input_choice = rew_input_choice
 
     def __repr__(self) -> str:
-        return "AIRL"
+        return f"{self.__class__.__name__}"
 
     def update(self, log_this_batch: bool = False) -> Dict[str, Any]:
         """
@@ -92,17 +74,16 @@ class AIRL(BaseIRLAgent):
          2. Update discriminator.
          3. Update generator.
         """
-        # TODO: find a way to work with off policies
         disc_logs = defaultdict(list)
         for _ in range(self.epoch_disc):
             self.learning_steps_disc += 1
             # * Sample transitions from ``curret`` policy.
-            # ? shuffule data or random samples?
-            # TODO: may add shuffle option in data get().
             if self.gen.buffer.tag == BufferTag.ROLLOUT:
                 data_gen = self.gen.buffer.sample(self.replay_batch_size)
+
             elif self.gen.buffer.tag == BufferTag.REPLAY:
                 data_gen = self.gen.buffer.get(self.replay_batch_size, last_n=True)
+
             else:
                 raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
 
@@ -112,8 +93,9 @@ class AIRL(BaseIRLAgent):
             # Calculate log probabilities of geberator's actions.
             # And evaluate log probabilities of expert actions.
             # Based on current generator's action distribution.
+            # See: https://arxiv.org/pdf/1710.11248.pdf appendix A.2
             with th.no_grad():
-                # ? maybe we don't need to calculate the log probs of the expert actions?
+                # TODO: invesitgate log_pi in generator
                 data_exp["log_pis"] = self.gen.actor.evaluate_log_pi(
                     data_exp["obs"], data_exp["acts"]
                 )
@@ -128,8 +110,8 @@ class AIRL(BaseIRLAgent):
                         "learn_steps_disc": self.learning_steps_disc,
                     }
                 )
+            del data_gen, data_exp, disc_info
 
-        # TODO: buffer.get or sample()
         # Calculate rewards:
         if self.gen.buffer.tag == BufferTag.ROLLOUT:
             # Obtain entire batch of transitions from rollout buffer.
@@ -145,9 +127,7 @@ class AIRL(BaseIRLAgent):
             raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
 
         # Calculate learning rewards.
-        data["rews"] = self.disc.calculate_rewards(
-            rew_type=self.rew_type, choice=self.rew_input_choice, **data
-        )
+        data["rews"] = self.disc.calculate_rewards(choice=self.rew_input_choice, **data)
         # Sanity check length of data are equal.
         assert data["rews"].shape[0] == data["obs"].shape[0]
 

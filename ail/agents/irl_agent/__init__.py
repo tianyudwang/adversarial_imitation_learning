@@ -1,3 +1,3 @@
-from ail.agents.irl_agent.airl import AIRL
+from ail.agents.irl_agent.ail import AIRL, GAIL
 
-IRL_ALGOR = {"airl": AIRL}
+IRL_ALGO = {"airl": AIRL, "gail": GAIL}

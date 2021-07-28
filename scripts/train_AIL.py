@@ -160,6 +160,7 @@ def run(args, cfg, path):
             # * Recommend to sync following two params to reduce overhead.
             num_gradient_steps=cfg.SAC.num_gradient_steps,  # ! slow O(n)
             target_update_interval=cfg.SAC.target_update_interval,
+            use_as_generator = True,
             
            # poliy args: net arch, activation, lr.
             policy_kwargs=dict(
@@ -212,6 +213,8 @@ def run(args, cfg, path):
         )
     )
 
+    ic(algo_kwargs)
+    
     time = datetime.now().strftime("%Y%m%d-%H%M")
     exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{time}")
     log_dir = path.joinpath("runs", exp_name)

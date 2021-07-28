@@ -586,8 +586,6 @@ class BufferTag(Enum):
 class ReplayBuffer(BaseBuffer):
     """Replay Buffer for Transitions."""
 
-    tag = BufferTag.REPLAY
-
     def __init__(
         self,
         capacity: int,
@@ -639,15 +637,18 @@ class ReplayBuffer(BaseBuffer):
                 raise ValueError("extra_dtypes should be Dict[str, np.dtype]")
 
         self._init_buffer()
-
+        self._tag = BufferTag.REPLAY
+        
     def __repr__(self) -> str:
         return f"{self.__class__.__name__} (capacity={self.capacity}, data={self.stored_keys()}, size={self.size()})"
+    
+    @property
+    def tag(self) -> BufferTag:
+        return self._tag
 
 
 class RolloutBuffer(BaseBuffer):
-    """Rollout Buffer for Transitions."""
-
-    tag = BufferTag.ROLLOUT
+    """Rollout Buffer for Transitions.""" 
 
     def __init__(
         self,
@@ -700,9 +701,14 @@ class RolloutBuffer(BaseBuffer):
                 raise ValueError("extra_dtypes should be Dict[str, np.dtype]")
 
         self._init_buffer()
+        self._tag = BufferTag.ROLLOUT
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__} (capacity={self.capacity}, data={self.stored_keys()}, size={self.size()})"
+
+    @property
+    def tag(self) -> BufferTag:
+        return self._tag
 
 
 class BufferType(Enum):

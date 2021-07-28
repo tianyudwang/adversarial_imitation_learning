@@ -2,6 +2,7 @@ from typing import Union, Optional, Tuple, Dict, Any
 from collections import defaultdict
 from copy import deepcopy
 import os
+import math
 
 import numpy as np
 import torch as th
@@ -15,8 +16,9 @@ from ail.common.pytorch_util import (
     disable_gradient,
     enable_gradient,
     obs_as_tensor,
+    to_torch,
 )
-from ail.common.type_alias import TensorDict, GymEnv, GymSpace
+from ail.common.type_alias import AlgoTags, GymEnv, GymSpace, TensorDict
 from ail.network.policies import StateDependentPolicy
 from ail.network.value import mlp_value
 
@@ -89,6 +91,7 @@ class SAC(OffPolicyAgent):
         init_buffer: bool = True,
         init_models: bool = True,
         expert_mode: bool = False,
+        use_as_generator: bool = False,
         **kwargs,
     ):
         super().__init__(
@@ -110,7 +113,7 @@ class SAC(OffPolicyAgent):
         )
         if expert_mode:
             self.actor = StateDependentPolicy(
-                self.obs_dim, self.act_dim, self.units_actor, "relu"
+                self.obs_dim, self.act_dim, self.units_actor, "relu_inplace"
             ).to(self.device)
         else:
             self._setup_models()
@@ -137,6 +140,12 @@ class SAC(OffPolicyAgent):
         self.tau = tau
         self.one = th.ones(1, device=self.device)  # a constant for quick soft update
 
+        self.tag = AlgoTags.SAC
+        self.use_as_generator = use_as_generator
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}"
+
     def _setup_models(self) -> None:
         # TODO: (Yifan) Build the model inside off policy class latter.
 
@@ -157,7 +166,7 @@ class SAC(OffPolicyAgent):
         # Set target param equalto main param. Using deep copy instead.
         self.critic_target = deepcopy(self.critic).to(self.device).eval()
 
-        # Sanity check for zip in soft_update.
+        # Sanity check for zip() in soft_update.
         assert count_vars(self.critic_target) == count_vars(self.critic)
 
         # Freeze target networks with respect to optimizers (only update via polyak averaging)
@@ -166,9 +175,6 @@ class SAC(OffPolicyAgent):
         # Config optimizer
         self.optim_actor = self.optim_cls(self.actor.parameters(), lr=self.lr_actor)
         self.optim_critic = self.optim_cls(self.critic.parameters(), lr=self.lr_critic)
-
-    def __repr__(self) -> str:
-        return "SAC"
 
     def is_update(self, step: int) -> bool:
         """Whether or not to update the agent"""
@@ -190,13 +196,17 @@ class SAC(OffPolicyAgent):
         if step <= self.start_steps:
             # Random uniform sampling.
             action = env.action_space.sample()
-            # TODO: (Yifan) may enable this in AIRL, test the case without it.
-            # log_pi = self.actor.evaluate_log_pi(
-            #     th.as_tensor(state, dtype=th.float, device=self.device),
-            #     th.as_tensor(action, dtype=th.float, device=self.device)
-            # )
+            
+            # * Need to apply tanh transoform to the action to make it in range [-1, 1]
+            log_pi = self.actor.evaluate_log_pi(
+                to_torch(state, self.device), th.tanh(to_torch(action, self.device))
+            ) if self.use_as_generator else None
+                
         else:
             action, log_pi = self.explore(obs_as_tensor(state, self.device))
+        
+        if log_pi is not None:
+            assert not math.isnan(log_pi)
 
         next_state, reward, done, info = env.step(action)
         mask = False if t == env._max_episode_steps else done
@@ -205,10 +215,16 @@ class SAC(OffPolicyAgent):
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
             "rews": asarray_shape2d(reward),
-            "dones": asarray_shape2d(mask),  # ? or done?
-            # "log_pis": asarray_shape2d(log_pi), # * not store log_pi for pure SAC
+            "dones": asarray_shape2d(mask),  
             "next_obs": asarray_shape2d(next_state),
         }
+
+        # * No need to store log_pi for pure SAC, useful when use SAC as generator
+        if self.use_as_generator:
+            assert (
+                "log_pis" in self.buffer.stored_keys()
+            ), "Need initialize log_pis in buffer"
+            data["log_pis"] = asarray_shape2d(log_pi)
 
         # Store transitions (s, a, r, s',d).
         # * ALLOW size larger than buffer capcity.

@@ -248,6 +248,12 @@ class DiscrimNet(nn.Module, ABC):
         return x
 
 
+class DiscrimTag(Enum):
+    GAIL_DISCRIM = auto()
+    AIRL_STATE_ONLY_DISCRIM = auto()
+    AIRL_STATE_ACTION_DISCRIM = auto()
+
+
 class GAILDiscrim(DiscrimNet):
     def __init__(
         self,
@@ -268,11 +274,16 @@ class GAILDiscrim(DiscrimNet):
             hidden_activation=hidden_activation,
             disc_kwargs=disc_kwargs,
         )
+        self._tag = DiscrimTag.GAIL_DISCRIM
 
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}: {self.f}, Total params: {count_vars(self.f)}"
         )
+    
+    @property
+    def tag(self):
+        return self._tag
 
     def forward(self, obs: th.Tensor, acts: th.Tensor, **kwargs):
         """
@@ -290,7 +301,7 @@ class GAILDiscrim(DiscrimNet):
         """
         with th.no_grad():
             reward_fn = self.reward_fn("gail", choice)
-            logits = self.forward(obs, acts ** kwargs)
+            logits = self.forward(obs, acts, **kwargs)
             rews = reward_fn(logits)
         return rews
 
@@ -319,6 +330,7 @@ class AIRLStateDiscrim(DiscrimNet):
             hidden_activation=hidden_activation,
             disc_kwargs=disc_kwargs,
         )
+        self._tag = DiscrimTag.AIRL_STATE_ONLY_DISCRIM
 
     def __repr__(self) -> str:
         return (
@@ -327,6 +339,10 @@ class AIRLStateDiscrim(DiscrimNet):
             f"{self.h}, Total params: {count_vars(self.net2)}"
         )
 
+    @property
+    def tag(self):
+        return self._tag    
+    
     def f(
         self, obs: th.Tensor, dones: th.FloatTensor, next_obs: th.Tensor, gamma: float
     ) -> th.Tensor:
@@ -421,12 +437,17 @@ class AIRLStateActionDiscrim(DiscrimNet):
             hidden_activation,
             **disc_kwargs,
         )
+        self._tag = DiscrimTag.AIRL_STATE_ACTION_DISCRIM
 
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}: {self.f}, Total params: {count_vars(self.f)}"
         )
 
+    @property
+    def tag(self):
+        return self._tag    
+    
     def forward(
         self,
         obs: th.Tensor,
@@ -464,9 +485,7 @@ class AIRLStateActionDiscrim(DiscrimNet):
             rews = reward_fn(logits)
         return rews
 
-
 class DiscrimType(Enum):
     gail = GAILDiscrim
-    airl = AIRLStateDiscrim
     airl_so = AIRLStateDiscrim
     airl_sa = AIRLStateActionDiscrim
