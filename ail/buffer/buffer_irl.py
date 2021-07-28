@@ -638,17 +638,17 @@ class ReplayBuffer(BaseBuffer):
 
         self._init_buffer()
         self._tag = BufferTag.REPLAY
-        
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__} (capacity={self.capacity}, data={self.stored_keys()}, size={self.size()})"
-    
+
     @property
     def tag(self) -> BufferTag:
         return self._tag
 
 
 class RolloutBuffer(BaseBuffer):
-    """Rollout Buffer for Transitions.""" 
+    """Rollout Buffer for Transitions."""
 
     def __init__(
         self,

@@ -280,7 +280,7 @@ class GAILDiscrim(DiscrimNet):
         return (
             f"{self.__class__.__name__}: {self.f}, Total params: {count_vars(self.f)}"
         )
-    
+
     @property
     def tag(self):
         return self._tag
@@ -341,8 +341,8 @@ class AIRLStateDiscrim(DiscrimNet):
 
     @property
     def tag(self):
-        return self._tag    
-    
+        return self._tag
+
     def f(
         self, obs: th.Tensor, dones: th.FloatTensor, next_obs: th.Tensor, gamma: float
     ) -> th.Tensor:
@@ -446,8 +446,8 @@ class AIRLStateActionDiscrim(DiscrimNet):
 
     @property
     def tag(self):
-        return self._tag    
-    
+        return self._tag
+
     def forward(
         self,
         obs: th.Tensor,
@@ -484,6 +484,7 @@ class AIRLStateActionDiscrim(DiscrimNet):
             logits = self.forward(obs, **kwargs)
             rews = reward_fn(logits)
         return rews
+
 
 class DiscrimType(Enum):
     gail = GAILDiscrim

@@ -62,7 +62,9 @@ class BaseTrainer(ABC):
             }
 
         # Env to collect samples.
-        self.env = maybe_make_env(env, verbose=verbose, **env_kwargs)
+        self.env = maybe_make_env(
+            env, verbose=verbose, tag="training", color="green", **env_kwargs
+        )
         self.seed = seed
         self.env.seed(seed)
 

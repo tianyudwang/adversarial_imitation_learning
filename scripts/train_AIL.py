@@ -1,11 +1,13 @@
 import os
 import pathlib
 import sys
+import re
 import argparse
 from copy import deepcopy
 from datetime import datetime
 
 import yaml
+import pandas as pd
 import numpy as np
 import torch as th
 
@@ -33,6 +35,7 @@ def CLI():
     p = argparse.ArgumentParser()
     p.add_argument(
         "--env_id",
+        "-env",
         type=str,
         default="InvertedPendulum-v2",
         choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
@@ -41,21 +44,21 @@ def CLI():
     p.add_argument(
         "--algo",
         type=str,
-        default="airl",
         choices=[
             "airl",
             "gail",
         ],
+        required=True,
         help="Adversarial imitation algo to use.",
     )
     p.add_argument(
         "--gen_algo",
         type=str,
-        default="ppo",
         choices=[
             "ppo",
             "sac",
         ],
+        required=True,
         help="RL algo to use as generator.",
     )
     p.add_argument(
@@ -70,9 +73,8 @@ def CLI():
     # Total steps and batch size
     p.add_argument("--num_steps", "-n", type=int, default=2 * 1e6)
     p.add_argument("--rollout_length", "-ep_len", type=int, default=None)
-    p.add_argument("--gen_batch_size", "-gb", type=int, default=1_000)
-    p.add_argument("--replay_batch_size", "-rbs", type=int, default=256)
-    # p.add_argument("--buffer_size", type=int, default=1 * 1e6)
+    p.add_argument("--gen_batch_size", "-gb", type=int, default=1_024)
+    p.add_argument("--replay_batch_size", "-rbs", type=int, default=1_024)
 
     # Logging and evaluation
     p.add_argument("--log_every_n_updates", "-lg", type=int, default=20)
@@ -209,17 +211,13 @@ def run(args, cfg, path):
             epoch_disc=cfg.DISC.epoch_disc,
             lr_disc=cfg.DISC.lr_disc,
             subtract_logp = cfg.AIRL.subtract_logp,
-            rew_input_choice = cfg.AIRL.rew_input_choice,
+            rew_input_choice = cfg.DISC.rew_input_choice,
         )
     )
-
-    ic(algo_kwargs)
     
     time = datetime.now().strftime("%Y%m%d-%H%M")
     exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{time}")
     log_dir = path.joinpath("runs", exp_name)
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir, exist_ok=True)
 
     
     config = dict(
@@ -227,38 +225,50 @@ def run(args, cfg, path):
         env=args.env_id,
         algo=args.algo,
         algo_kwargs=algo_kwargs,
-        env_kwargs={
-            "env_wrapper": cfg.ENV.wrapper,  # ? Should we apply ActionClip wrapper by default?
-            "tag": "training",
-            "color": "green"},
+        env_kwargs={"env_wrapper": cfg.ENV.wrapper},
         max_ep_len=args.rollout_length,
         seed=args.seed,
         eval_interval=args.eval_interval,
         num_eval_episodes=args.num_eval_episodes,
-        save_freq=50_000,
+        save_freq=args.save_freq,
         log_dir=log_dir,
         log_interval=args.log_interval,
         verbose=args.verbose,
         use_wandb=args.use_wandb,
         wandb_kwargs=cfg.WANDB,
     )
-
+    
     # Log with tensorboard and sync to wandb dashboard as well.
     # https://docs.wandb.ai/guides/integrations/tensorboard
     if args.use_wandb:
+        # Not to store expert data in wandb.
+        config_copy = deepcopy(config)
+        config_copy["algo_kwargs"]["buffer_kwargs"].pop("transitions")
+        # Remove unnecessary fields.
+        entries_to_remove = (
+            "num_eval_episodes",
+            "eval_interval",
+            "log_dir",
+            "log_interval",
+            "save_freq",
+            "verbose",
+            "use_wandb",
+            "wandb_kwargs",
+        )
+        for k in entries_to_remove:
+            config_copy.pop(k)
+        # df = pd.json_normalize(config_copy, sep='_').to_dict(orient='records')[0]
+        # config_copy={k.replace("algo_kwargs_", ""): v for k, v in df.items()}
+        
         try:
             import wandb
-
-            # Not to store expert data in wandb.
-            config_copy = deepcopy(config)
-            config_copy["algo_kwargs"]["buffer_kwargs"].pop("transitions")
 
             # Save API key for convenience or you have to login every time.
             wandb.login()
             wandb.init(
                 project="AIL",
                 notes="tweak baseline",
-                tags=["baseline", f"{args.env_id}", str(args.algo).upper()],
+                tags=["baseline", f"{args.env_id}", str(args.algo).upper(), str(args.gen_algo).upper()],
                 config=config_copy,  # Hyparams & meta data.
             )
             wandb.run.name = exp_name
@@ -269,11 +279,13 @@ def run(args, cfg, path):
     # Create Trainer.
     trainer = Trainer(**config)
 
-    # It's a dict of data too large to store.
+    
+     # It's a dict of data too large to store.
     algo_kwargs["buffer_kwargs"].pop("transitions")
-    # algo kwargs
-    print("-" * 35, f"{args.algo}", "-" * 35)
-    ic(algo_kwargs)
+    if args.verbose:       
+        # algo kwargs
+        print("-" * 35, f"{args.algo}", "-" * 35)
+        ic(algo_kwargs)
 
     # Saving hyperparams to yaml file.
     with open(os.path.join(log_dir, "hyperparams.yaml"), "w") as f:
@@ -293,7 +305,7 @@ if __name__ == "__main__":
     path = pathlib.Path(__file__).parent.resolve()
     print(f"File_dir: {path}")    
     
-    cfg_path = path / "config" /'ail_configs.yaml'
+    cfg_path = path / "config" /"ail_configs.yaml"
     cfg = get_cfg_defaults()
     cfg.merge_from_file(cfg_path)
     cfg.freeze()

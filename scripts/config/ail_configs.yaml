@@ -4,16 +4,16 @@ CUDA:
   # desc: torch.backends
   cudnn: true
 
-# LOG:
-#   log_every_n_updates: 20
-#   eval_interval: 5000
-#   num_eval_episodes: 10
+LOG:
+  log_every_n_updates: 20
+  eval_interval: 5000
+  num_eval_episodes: 10
 
-# WANDB:
-#   # desc: wandb.watch function inputs
-#   log_param: true
-#   log_type: gradients
-#   log_freq: 1000
+WANDB:
+  # desc: wandb.watch function inputs
+  log_param: true
+  log_type: gradients
+  log_freq: 1000
 
 ENV:
   wrapper: []  #[clip_act]  # default: [clip_action]
@@ -83,8 +83,13 @@ DISC:
 
   epoch_disc: 1  
   lr_disc: 1.0e-4 
+  rew_input_choice: "logsigmoid" # default: "logit"
+
 
 AIRL:
-  # gail, logsigmoid best for hopper-v3
+  disc_cls: airl_sa  
   subtract_logp: true
-  rew_input_choice: "logsigmoid" # default: "logit"
+
+
+# record
+# gail, logsigmoid best for hopper-v3

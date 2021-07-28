@@ -9,7 +9,6 @@ from ail.network.discrim import DiscrimNet, DiscrimTag, DiscrimType
 
 
 class AIRL(Adversarial):
-    
     def __init__(
         self,
         state_space: GymSpace,
@@ -32,10 +31,10 @@ class AIRL(Adversarial):
         rew_input_choice: str = "logit",
         **kwargs,
     ):
-        
+
         if disc_kwargs is None:
-            disc_kwargs = {}  
-        
+            disc_kwargs = {}
+
         # Discriminator
         if isinstance(disc_cls, str):
             disc_cls = disc_cls.lower()
@@ -47,7 +46,10 @@ class AIRL(Adversarial):
 
         else:
             if isinstance(disc_cls, DiscrimNet) and disc_cls.tag in list(DiscrimTag):
-                if disc_cls.tag == DiscrimTag.AIRL_STATE_ONLY_DISCRIM or disc_cls.tag == DiscrimTag.AIRL_STATE_ACTION_DISCRIM:
+                if (
+                    disc_cls.tag == DiscrimTag.AIRL_STATE_ONLY_DISCRIM
+                    or disc_cls.tag == DiscrimTag.AIRL_STATE_ACTION_DISCRIM
+                ):
                     disc_cls = DiscrimNet
                 elif disc_cls.tag == DiscrimTag.GAIL_DISCRIM:
                     raise ValueError("Using GAIL DiscrimNet for AIRL is not Allowed.")
@@ -75,11 +77,10 @@ class AIRL(Adversarial):
             "airl",
             rew_input_choice,
             **kwargs,
-    )
+        )
 
 
 class GAIL(Adversarial):
-    
     def __init__(
         self,
         state_space: GymSpace,
@@ -100,31 +101,31 @@ class GAIL(Adversarial):
         rew_input_choice: str = "logsigmoid",
         **kwargs,
     ):
-        
+
         if disc_kwargs is None:
-            disc_kwargs = {}  
-        
+            disc_kwargs = {}
+
         # Discriminator
         disc_cls = DiscrimType["gail"].value
 
         super().__init__(
-        state_space,
-        action_space,
-        device,
-        fp16,
-        seed,
-        max_grad_norm,
-        epoch_disc,
-        replay_batch_size,
-        buffer_exp,
-        buffer_kwargs,
-        gen_algo,
-        gen_kwargs,
-        disc_cls,
-        disc_kwargs,
-        lr_disc,
-        optim_kwargs,
-        False,
-        "gail",
-        rew_input_choice,
-    )
+            state_space,
+            action_space,
+            device,
+            fp16,
+            seed,
+            max_grad_norm,
+            epoch_disc,
+            replay_batch_size,
+            buffer_exp,
+            buffer_kwargs,
+            gen_algo,
+            gen_kwargs,
+            disc_cls,
+            disc_kwargs,
+            lr_disc,
+            optim_kwargs,
+            False,
+            "gail",
+            rew_input_choice,
+        )
