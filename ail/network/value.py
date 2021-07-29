@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Sequence, Union, Optional
+from typing import Sequence, Union, Optional, Tuple
 
 import torch as th
 from torch import nn
@@ -49,14 +49,19 @@ class StateFunction(BaseValue):
         obs_dim: int,
         hidden_units: Sequence[int],
         activation: Union[str, nn.Module],
-        use_spectral_norm=False,
+        output_activation: Union[str, nn.Module] = nn.Identity(),
         **kwargs,
     ):
         super().__init__(obs_dim)
         self.net = build_mlp(
             [obs_dim] + list(hidden_units) + [1],
             activation,
-            use_spectral_norm=use_spectral_norm,
+            output_activation,
+            kwargs.get("use_spectral_norm", False),
+            kwargs.get("dropout_input", False),
+            kwargs.get("dropout_hidden", False),
+            kwargs.get("dropout_input_rate", 0.1),
+            kwargs.get("dropout_hidden_rate", 0.1),
         )
 
     def __repr__(self) -> str:
@@ -64,7 +69,6 @@ class StateFunction(BaseValue):
 
     def forward(self, state: th.Tensor) -> th.Tensor:
         """self.net()"""
-        # TODO: Critical to ensure v has right shape.
         return self.net(state)
 
     def get_value(self, state: th.Tensor) -> th.Tensor:
@@ -80,42 +84,55 @@ class StateActionFunction(BaseValue):
         self,
         obs_dim: int,
         act_dim: int,
-        hidden_units: Sequence[int],  # (64, 64),
+        hidden_units: Sequence[int],
         activation: Union[str, nn.Module],
-        use_spectral_norm=False,
+        output_activation: Union[str, nn.Module] = nn.Identity(),
         **kwargs,
     ):
         super().__init__(obs_dim, act_dim)
         self.net = build_mlp(
             [obs_dim + act_dim] + list(hidden_units) + [1],
             activation,
-            use_spectral_norm=use_spectral_norm,
+            output_activation,
+            kwargs.get("use_spectral_norm", False),
+            kwargs.get("dropout_input", False),
+            kwargs.get("dropout_hidden", False),
+            kwargs.get("dropout_input_rate", 0.1),
+            kwargs.get("dropout_hidden_rate", 0.1),
         )
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}: {self.net}, Total params: {count_vars(self.net)}"
 
-    def forward(self, state, action):
-        # TODO: Critical to ensure q has right shape.
+    def forward(self, state: th.Tensor, action: th.Tensor) -> th.Tensor:
         return self.net(th.cat([state, action], dim=-1))
 
-    def get_value(self, state, action):
+    def get_value(self, state: th.Tensor, action: th.Tensor) -> th.Tensor:
+        """The output has shape (n,)"""
         return self.net(th.cat([state, action], dim=-1)).squeeze(-1)
 
 
 class TwinnedStateActionFunction(BaseValue):
     def __init__(
-        self, obs_dim, act_dim, hidden_units, activation, **kwargs  # (256, 256),
+        self,
+        obs_dim: int,
+        act_dim: int,
+        hidden_units: Sequence[int],
+        activation: Union[str, nn.Module],
+        output_activation: Union[str, nn.Module] = nn.Identity(),
+        **kwargs,
     ):
         super().__init__(obs_dim, act_dim)
 
         self.net1 = build_mlp(
             [obs_dim + act_dim] + list(hidden_units) + [1],
             activation,
+            output_activation,
         )
         self.net2 = build_mlp(
             [obs_dim + act_dim] + list(hidden_units) + [1],
             activation,
+            output_activation,
         )
 
     def __repr__(self) -> str:
@@ -125,15 +142,17 @@ class TwinnedStateActionFunction(BaseValue):
             f"{self.net2}, Total params: {count_vars(self.net2)}"
         )
 
-    def forward(self, states, actions):
+    def forward(
+        self, states: th.Tensor, actions: th.Tensor
+    ) -> Tuple[th.Tensor, th.Tensor]:
         xs = th.cat([states, actions], dim=-1)
         return self.net1(xs), self.net2(xs)
 
-    def q1(self, states, actions):
+    def q1(self, states: th.Tensor, actions: th.Tensor) -> th.Tensor:
         return self.net1(th.cat([states, actions], dim=-1))
 
-    def get_value(self, state, action):
-        pass
+    def get_value(self, states: th.Tensor, actions: th.Tensor) -> th.Tensor:
+        return self.net1(th.cat([states, actions], dim=-1)).squeeze(-1)
 
 
 def mlp_value(
@@ -142,17 +161,21 @@ def mlp_value(
     value_layers: Sequence[int],
     activation: Union[nn.Module, str],
     val_type: str,
+    output_activation: Union[str, nn.Module] = nn.Identity(),
     **kwargs,  # * use_spectral_norm should specified in kwargs
-):
-    if val_type in ["V", "v", "Vs", "vs"]:
-        return StateFunction(state_dim, value_layers, activation, **kwargs)
-    elif val_type in ["Qsa", "qsa", "Q", "q"]:
-        return StateActionFunction(
-            state_dim, action_dim, value_layers, activation, **kwargs
+) -> nn.Module:
+    val_type = val_type.lower()
+    if val_type in ["v", "vs"]:
+        return StateFunction(
+            state_dim, value_layers, activation, output_activation, **kwargs
         )
-    elif val_type in ["Twin", "twin"]:
+    elif val_type in ["q", "qsa"]:
+        return StateActionFunction(
+            state_dim, action_dim, value_layers, activation, output_activation, **kwargs
+        )
+    elif val_type in ["twin", "twinstate"]:
         return TwinnedStateActionFunction(
-            state_dim, action_dim, value_layers, activation, **kwargs
+            state_dim, action_dim, value_layers, activation, output_activation, **kwargs
         )
     else:
         raise ValueError(f"val_type: {val_type} not support.")

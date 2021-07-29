@@ -1,4 +1,4 @@
-from typing import Tuple, Sequence
+from typing import Tuple, Sequence, Union
 
 import torch as th
 from torch import nn
@@ -15,12 +15,14 @@ class StateIndependentPolicy(nn.Module):
         act_dim: int,
         hidden_units: Sequence[int],
         hidden_activation: Activation,
+        output_activation: Union[str, nn.Module] = nn.Identity(),
     ):
         super().__init__()
 
         self.net = build_mlp(
-            sizes=[obs_dim] + list(hidden_units) + [act_dim],
-            activation=hidden_activation,
+            [obs_dim] + list(hidden_units) + [act_dim],
+            hidden_activation,
+            output_activation,
         )
         # TODO: allow log_std init
         self.log_stds = nn.Parameter(th.zeros(1, act_dim))
@@ -45,12 +47,14 @@ class StateDependentPolicy(nn.Module):
         act_dim: int,
         hidden_units: Sequence[int],
         hidden_activation: Activation,
+        output_activation: Union[str, nn.Module] = nn.Identity(),
     ):
         super().__init__()
 
         self.net = build_mlp(
-            sizes=[obs_dim] + list(hidden_units) + [2 * act_dim],
-            activation=hidden_activation,
+            [obs_dim] + list(hidden_units) + [2 * act_dim],
+            hidden_activation,
+            output_activation,
         )
 
     def __repr__(self) -> str:

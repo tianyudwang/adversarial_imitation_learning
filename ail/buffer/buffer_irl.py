@@ -516,12 +516,17 @@ class BaseBuffer:
         """
         return self._buffer.sample(n_samples)
 
-    def get(self, n_samples: Optional[int] = None, last_n=True) -> Dict[str, th.Tensor]:
+    def get(
+        self,
+        n_samples: Optional[int] = None,
+        last_n: bool = True,
+        shuffle: bool = False,
+    ) -> Dict[str, th.Tensor]:
         """
         Obtain a batch of samples with size = n_samples. (order preserved)
             By default, return all samples in the buffer, if n_samples is None.
         """
-        return self._buffer.get(n_samples, last_n)
+        return self._buffer.get(n_samples, last_n, shuffle)
 
     @classmethod
     def from_data(

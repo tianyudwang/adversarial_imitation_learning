@@ -13,7 +13,11 @@ def build_mlp(
     sizes: Sequence[int],
     activation: Activation = "relu",
     output_activation: Activation = nn.Identity(),
-    use_spectral_norm=False,
+    use_spectral_norm: bool = False,
+    dropout_input: bool = False,
+    dropout_hidden: bool = False,
+    dropout_input_rate: float = 0.1,
+    dropout_hidden_rate: float = 0.1,
 ) -> nn.Module:
     """
     Build a feedforward neural network.
@@ -34,11 +38,17 @@ def build_mlp(
     if isinstance(output_activation, str):
         output_activation = StrToActivation[output_activation.lower()].value
 
-    layers = []
+    layers = [nn.Dropout(dropout_input_rate, inplace=True)] if dropout_input else []
     for j in range(len(sizes) - 1):
         activation_fn = activation if j < (len(sizes) - 2) else output_activation
         if use_spectral_norm:
             layers += [spectral_norm(nn.Linear(sizes[j], sizes[j + 1])), activation_fn]
+        elif dropout_hidden:
+            layers += [
+                nn.Linear(sizes[j], sizes[j + 1]),
+                nn.Dropout(dropout_hidden_rate, inplace=True),
+                activation_fn,
+            ]
         else:
             layers += [nn.Linear(sizes[j], sizes[j + 1]), activation_fn]
     return nn.Sequential(*layers)

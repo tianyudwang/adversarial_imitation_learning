@@ -86,9 +86,7 @@ class DiscrimNet(nn.Module, ABC):
 
         # Regularization
         self.spectral_norm = disc_kwargs.get("spectral_norm", False)
-        self.dropout = disc_kwargs.get(
-            "dropout", False
-        )  # TODO: apply drop out between hidden layers
+        self.dropout = disc_kwargs.get("dropout", False)
 
         # Init Discriminator
         if init_model:
