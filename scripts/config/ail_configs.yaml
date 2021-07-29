@@ -16,7 +16,7 @@ WANDB:
   log_freq: 1000
 
 ENV:
-  wrapper: []  #[clip_act]  # default: [clip_action]
+  wrapper: [clip_act]  # default: []
 
 
 OPTIM:
@@ -74,8 +74,8 @@ SAC:
 
 # Discriminator settings
 DISC:
-  spectral_norm: false  # Apply Spectral Norm.
-  dropout: false        # Enable dropout.
+  spectral_norm: false  # default: false
+  dropout: false        # default: false
 
   # Discriminator Architecture
   hidden_units: [128, 128]  

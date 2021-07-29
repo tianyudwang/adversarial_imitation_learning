@@ -139,7 +139,7 @@ class BaseTrainer(ABC):
         self.log_interval = log_interval
 
         # Progress param
-        self.n_steps_pbar = tqdm(range(1, num_steps + 1))
+        self.n_steps_pbar = tqdm(range(1, num_steps + 1), dynamic_ncols=True)
         self.best_ret = -float("inf")
         self.rs = RunningStats()
 
@@ -177,9 +177,9 @@ class BaseTrainer(ABC):
             while not done:
                 obs = obs_as_tensor(obs, self.device)
                 if t < stochastic_eval_episodes:
-                    act, _ = self.algo.explore(obs)
+                    act, _ = self.algo.explore(obs, scale=True)
                 else:
-                    act = self.algo.exploit(obs)
+                    act = self.algo.exploit(obs, scale=True)
                 obs, reward, done, _ = self.env_test.step(act)
                 ep_ret += reward
                 ep_len += 1

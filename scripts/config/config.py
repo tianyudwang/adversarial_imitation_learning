@@ -113,7 +113,7 @@ _C.DISC.rew_input_choice = "logit" # Choices = ["logsigmoid", "softplus", "logti
 
 # AIRL only args
 _C.AIRL = CN()
-_C.AIR.disc_cls = "airl_sa"   # Choices = ["airl_so", "airl_sa"].
+_C.AIRL.disc_cls = "airl_sa"   # Choices = ["airl_so", "airl_sa"].
 _C.AIRL.subtract_logp = True   # Subtract log_p from discrtiminator logits.
 
 

@@ -1,6 +1,8 @@
-from typing import Union, Optional, Dict, Any
+from typing import Union, Optional, Dict, Any, Tuple
+import warnings
 
 from gym.spaces import Box
+import numpy as np
 import torch as th
 from torch import nn
 from torch.cuda.amp import GradScaler
@@ -45,19 +47,45 @@ class BaseAgent(nn.Module):
         set_random_seed(self.seed)
 
         # env spaces.
-        self.state_space = state_space
-        self.action_space = action_space
+        self._state_space = state_space
+        self._action_space = action_space
 
         # Shapes of space useful for buffer.
-        self.state_shape = get_obs_shape(state_space)
+        self._state_shape = get_obs_shape(state_space)
         if isinstance(action_space, Box):
-            self.action_shape = action_space.shape
+            self._action_shape = action_space.shape
         else:
             raise NotImplementedError()
 
         # Space dimension and action dimension.
-        self.obs_dim = get_flat_obs_dim(state_space)
-        self.act_dim = get_act_dim(action_space)
+        self._obs_dim = get_flat_obs_dim(state_space)
+        self._act_dim = get_act_dim(action_space)
+
+        # Action limits.
+        self._act_low = action_space.low
+        self._act_high = action_space.high
+
+        assert (self._act_low < self._act_high).all()
+        self._act_half_range = (self._act_high - self._act_low) / 2.0
+
+        self._symmetric_action_space = all(
+            [
+                isinstance(self._action_space, Box),
+                (abs(self._act_low) == abs(self._act_high)).all(),
+            ]
+        )
+
+        self._normalized_action_space = all(
+            [
+                isinstance(self._action_space, Box),
+                (self._act_low == -1).all(),
+                (self._act_high == 1).all(),
+                self._symmetric_action_space,
+            ]
+        )
+
+        if not self._symmetric_action_space:
+            warnings.warn(f"Not symmetric action_space.")
 
         # Device management.
         self.device = init_gpu(use_gpu=(device == "cuda"), verbose=True)
@@ -77,3 +105,47 @@ class BaseAgent(nn.Module):
             self.optim_cls = optim_cls
         else:
             raise ValueError("optim_cls must be a string or an torch. optim.Optimizer.")
+
+    @property
+    def state_space(self) -> GymSpace:
+        return self._state_space
+
+    @property
+    def action_space(self) -> GymSpace:
+        return self._action_space
+
+    @property
+    def state_shape(self) -> Tuple[int, ...]:
+        return self._state_shape
+
+    @property
+    def action_shape(self) -> Tuple[int, ...]:
+        return self._action_shape
+
+    @property
+    def obs_dim(self) -> int:
+        return self._obs_dim
+
+    @property
+    def action_dim(self) -> int:
+        return self._act_dim
+
+    @property
+    def act_low(self) -> np.ndarray:
+        return self._act_low
+
+    @property
+    def act_high(self) -> np.ndarray:
+        return self._act_high
+
+    @property
+    def act_half_range(self) -> np.ndarray:
+        return self._act_half_range
+
+    @property
+    def symmetric_action_space(self) -> bool:
+        return self._symmetric_action_space
+
+    @property
+    def normalized_action_space(self) -> bool:
+        return self._normalized_action_space

@@ -12,6 +12,37 @@ from ail.network.discrim import DiscrimNet
 
 
 class Adversarial(BaseIRLAgent):
+    """
+    Base class for adversarial imitation learning algorithms like GAIL and AIRL.
+
+    :param state_space: state space.
+    :param action_space: action space.
+    :param device: PyTorch device to which the values will be converted.
+    :param seed: random seed.
+    :param max_grad_norm: Maximum norm for the gradient clipping
+    :param epoch_disc: Number of epoch when update the discriminator
+    :param replay_batch_size: Replay batch size for training the discriminator
+    :param buffer_exp: Replay buffer that store expert demostrations
+    :param buffer_kwargs: Arguments to be passed to the buffer.
+        eg. : {
+            with_reward: False,
+            extra_data: ["log_pis"]
+            }
+    :param gen_algo: RL algorithm for the generator.
+    :param gen_kwargs: Kwargs to be passed to the generator.
+    :param disc_cls: Class for DiscrimNet,
+    :param disc_kwargs: Expected kwargs to be passed to the DiscrimNet.
+    :param lr_disc: learning rate for the discriminator
+    :param optim_kwargs: arguments to be passed to the optimizer.
+        eg. : {
+            "optim_cls": adam,
+            "optim_set_to_none": True, # which set grad to None instead of zero.
+            }
+    :param subtract_logp: wheteher to subtract log_pis from the learning reward.
+    :param rew_type: GAIL or AIRL flavor of learning reward.
+    :param rew_input_choice: Using logit or logsigmoid or softplus to calculate reward function
+    """
+
     def __init__(
         self,
         state_space: GymSpace,
@@ -77,7 +108,7 @@ class Adversarial(BaseIRLAgent):
         disc_logs = defaultdict(list)
         for _ in range(self.epoch_disc):
             self.learning_steps_disc += 1
-            # * Sample transitions from ``curret`` policy.
+            # * Sample transitions from ``current`` policy.
             if self.gen.buffer.tag == BufferTag.ROLLOUT:
                 data_gen = self.gen.buffer.sample(self.replay_batch_size)
 
@@ -90,7 +121,7 @@ class Adversarial(BaseIRLAgent):
             # Samples transitions from expert's demonstrations.
             data_exp = self.buffer_exp.sample(self.replay_batch_size)
 
-            # Calculate log probabilities of geberator's actions.
+            # Calculate log probabilities of generator's actions.
             # And evaluate log probabilities of expert actions.
             # Based on current generator's action distribution.
             # See: https://arxiv.org/pdf/1710.11248.pdf appendix A.2

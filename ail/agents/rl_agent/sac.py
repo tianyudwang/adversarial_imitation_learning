@@ -195,24 +195,36 @@ class SAC(OffPolicyAgent):
 
         if step <= self.start_steps:
             # Random uniform sampling.
-            action = env.action_space.sample()
-
+            scaled_action = env.action_space.sample()
             # * Need to apply tanh transoform to the action to make it in range [-1, 1]
+            action = (
+                np.tanh(scaled_action, dtype=np.float32)
+                if not self.normalized_action_space
+                else scaled_action
+            )
+
             log_pi = (
                 self.actor.evaluate_log_pi(
-                    to_torch(state, self.device), th.tanh(to_torch(action, self.device))
+                    to_torch(state, self.device), to_torch(action, self.device)
                 )
                 if self.use_as_generator
                 else None
             )
 
         else:
-            action, log_pi = self.explore(obs_as_tensor(state, self.device))
+            action, log_pi = self.explore(
+                obs_as_tensor(state, self.device), scale=False
+            )
+            scaled_action = (
+                self.scale_action(action)
+                if not self.normalized_action_space
+                else action
+            )
 
         if log_pi is not None:
             assert not math.isnan(log_pi)
 
-        next_state, reward, done, info = env.step(action)
+        next_state, reward, done, info = env.step(scaled_action)
         mask = False if t == env._max_episode_steps else done
 
         data = {

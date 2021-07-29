@@ -93,11 +93,11 @@ class BaseIRLAgent(BaseAgent, ABC):
         return self.gen.step(env, state, t, step)
 
     def explore(self, state: th.Tensor) -> Tuple[np.ndarray, th.Tensor]:
-        assert isinstance(state, th.Tensor)
+        """Same as generator/policy explore."""
         return self.gen.explore(state)
 
     def exploit(self, state) -> np.ndarray:
-        assert isinstance(state, th.Tensor)
+        """Same as generator/policy exploit"""
         return self.gen.exploit(state)
 
     def is_update(self, step: int) -> bool:
@@ -105,6 +105,13 @@ class BaseIRLAgent(BaseAgent, ABC):
 
     @abstractmethod
     def update(self, *args, **kwargs) -> Dict[str, Any]:
+        """
+        Main loop
+         1. Interact with the environment using the current generator/ policy.
+            and store the experience in a replay buffer (implementing in step()).
+         2. Update discriminator.
+         3. Update generator.
+        """
         raise NotImplementedError()
 
     @abstractmethod
@@ -118,6 +125,7 @@ class BaseIRLAgent(BaseAgent, ABC):
         raise NotImplementedError()
 
     def save_models(self, save_dir: str) -> None:
+        """Save both actor and discrimNet"""
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         # Generator

@@ -46,7 +46,7 @@ def CLI():
         ],
         help="RL algo to use",
     )
-    p.add_argument("--num_steps", type=int, default=0.5 * 1e6)
+    p.add_argument("--num_steps", "-n", type=int, default=0.5 * 1e6)
     p.add_argument("--rollout_length", type=int, default=None)
     p.add_argument("--batch_size", type=int, default=256)
     # p.add_argument("--buffer_size", type=int, default=1 * 1e6)
@@ -163,10 +163,7 @@ def run(args, cfg, path):
         env=args.env_id,
         algo=args.algo,
         algo_kwargs=algo_kwargs,
-        env_kwargs={
-                "env_wrapper": cfg.ENV.wrapper,  # ? Should we apply ActionNormlize wrapper by default?
-                "tag": "training",
-                "color": "green"},
+        env_kwargs={"env_wrapper": cfg.ENV.wrapper},
         max_ep_len=args.rollout_length,
         seed=args.seed,
         eval_interval=args.eval_interval,

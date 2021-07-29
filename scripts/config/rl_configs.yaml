@@ -17,7 +17,7 @@ CUDA:
 
 
 ENV:
-  wrapper: ["normalize_act"]
+  wrapper: [clip_act]
 
 
 OPTIM:
@@ -47,7 +47,7 @@ SAC:
   start_steps: 10_000
   num_gradient_steps: 1  # ! slow O(n)
   target_update_interval: 1  # Recommend to sync with num_gradient_steps.
-  tau: 0.005
+  tau: 0.01
   log_alpha_init: 1.0
   lr_alpha: 3.0e-4
 

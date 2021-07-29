@@ -42,10 +42,10 @@ class PPO(OnPolicyAgent):
             "optim_cls": adam,
             "optim_set_to_none": True, # which set grad to None instead of zero.
             }
-    :param buffer_kwargs: arguments to be passed to the buffer.
+    :param buffer_kwargs: Arguments to be passed to the buffer.
         eg. : {
-            with_reward:True,
-            extra_data:["log_pis"]
+            with_reward: True,
+            extra_data: ["log_pis"]
             }
     :param init_buffer: Whether to create the buffer during initialization.
     :param init_models: Whether to create the models during initialization.
@@ -124,8 +124,11 @@ class PPO(OnPolicyAgent):
         return: next_state, episode length
         """
         t += 1
-        action, log_pi = self.explore(obs_as_tensor(state, self.device))
-        next_state, reward, done, info = env.step(action)
+        action, log_pi = self.explore(obs_as_tensor(state, self.device), scale=False)
+        scale_action = (
+            self.scale_action(action) if not self.normalized_action_space else action
+        )
+        next_state, reward, done, info = env.step(scale_action)
 
         # * (Yifan) Intuitively, mask make sence that agent keeps alive which is not done by env
         mask = False if t == env._max_episode_steps else done

@@ -93,19 +93,47 @@ class BaseRLAgent(BaseAgent, ABC):
         """Intereact with environment and store the transition."""
         raise NotImplementedError()
 
-    def explore(self, state: th.Tensor) -> Tuple[np.ndarray, th.Tensor]:
-        """Sample actions from action distribution."""
+    def explore(self, state: th.Tensor, scale: bool) -> Tuple[np.ndarray, th.Tensor]:
+        """
+        Sample actions from action distribution.
+        :param state: observations
+        :param unscale: whether to unscale the action.
+        Note we apply tanh() to wrap the action into [-1, 1].
+        Simply rescale back to the range of the env by a scalar.
+        For example:
+            env.action_space = Box(low=-3, high=3, shape=(1,))
+            action = action * scale
+            where scale = (env.action_space.high - env.action_space.low)/2
+        """
         assert isinstance(state, th.Tensor)
         with th.no_grad():
             action, log_pi = self.actor.sample(state.unsqueeze_(0))
-        return to_numpy(action)[0], log_pi
+            action = to_numpy(action)[0]
+        if scale:
+            action = self.scale_action(action)
+        return action, log_pi
 
-    def exploit(self, state) -> np.ndarray:
+    def exploit(self, state: th.Tensor, scale: bool) -> np.ndarray:
         """Sample mean/mode actions from action distribution."""
         assert isinstance(state, th.Tensor)
         with th.no_grad():
             action = self.actor(state.unsqueeze_(0))
-        return to_numpy(action)[0]
+            action = to_numpy(action)[0]
+        if scale:
+            action = self.scale_action(action)
+        return action
+
+    def scale_action(self, action: np.ndarray) -> np.ndarray:
+        """
+        Scale the action from [-1, 1] to the range of the environment's action space.
+
+        :param action: action in range [-1, 1] to be scaled.
+        :return: action in range [-a, a] where a = action_space.high - action_space.low
+        """
+        scaled_action = self.act_low + (action + 1.0) * self.act_half_range
+        # Clip action ensures that matches the range of the environment.
+        np.clip(scaled_action, self.act_low, self.act_high, out=scaled_action)
+        return scaled_action
 
     @abstractmethod
     def is_update(self, step) -> bool:
