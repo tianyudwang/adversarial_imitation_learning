@@ -127,7 +127,7 @@ class BaseAgent(nn.Module):
         return self._obs_dim
 
     @property
-    def action_dim(self) -> int:
+    def act_dim(self) -> int:
         return self._act_dim
 
     @property
