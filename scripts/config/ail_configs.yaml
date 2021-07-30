@@ -26,7 +26,7 @@ OPTIM:
 
 
 ALGO:
-  max_grad_norm: 0.5  # default: None
+  max_grad_norm: 5  # default: None
   gamma: 0.99         # default: 0.99
 
 
@@ -37,57 +37,60 @@ PPO:
   clip_eps: 0.2     # default: 0.2
   coef_ent: 0.01    # default: 0.0
 
-  # batch_size: 1000  # default: 1000
   with_reward: false  # dont use reward for ail 
-  extra_data: ["log_pis"]  
+  extra_data: ["log_pis"]  # no need to change this
 
   # PPO policy_kwargs
-  pi: [128, 128]     # default: [64, 64]
-  vf: [128, 128]     # default: [64, 64]
-  activation: "relu_inplace" # default: "relu"
-  lr_actor: 7.3e-4   # default: 3.0e-4
-  lr_critic: 1.0e-3  # default: 3.0e-4
-  orthogonal_init: true  # default: false
+  pi: [128, 128]              # default: [64, 64]
+  vf: [128, 128]              # default: [64, 64]
+  activation: "relu_inplace"  # default: "relu"
+  lr_actor: 3.0e-4            # default: 3.0e-4
+  lr_critic: 1.0e-3           # default: 3.0e-4
+  orthogonal_init: false       # default: false
 
 
 SAC:
   # desc: SAC unique inputs
   start_steps: 10_000
-  num_gradient_steps: 1      # deafult: 1 # ! slow O(n)
-  target_update_interval: 1  # deafult: 1
-  tau: 0.02                # default: 0.005
-  log_alpha_init: 1.0        # default: 1.0
-  lr_alpha: 3.0e-4           # default: 3.0e-4
+  num_gradient_steps: 1       # deafult: 1 # ! slow O(n)
+  target_update_interval: 1   # deafult: 1
+  tau: 0.02                   # default: 0.005
+  log_alpha_init: 1.0         # default: 1.0
+  lr_alpha: 3.0e-4            # default: 3.0e-4
 
-  batch_size: 256            # default: 256        
-  buffer_size: 1_000_000     # default: 1_000_000
-  with_reward: false         # dont use reward for ail     
-  extra_data: []             # default: []
+  batch_size: 256             # default: 256        
+  buffer_size: 1_000_000      # default: 1_000_000
+  with_reward: false          # dont use reward for ail     
+  extra_data: []              # default: []
   
   # SAC policy_kwargs
-  pi: [128, 128]        # default: [128, 128]
-  qf: [128, 128]        # default: [128, 128]
+  pi: [128, 128]              # default: [128, 128]
+  qf: [128, 128]              # default: [128, 128]
   activation: "relu_inplace"  # default: "relu"
-  lr_actor: 7.3e-4      # default: 7.3e-4
-  lr_critic: 7.3e-4     # default: 7.3e-4
+  lr_actor: 7.3e-4            # default: 7.3e-4
+  lr_critic: 7.3e-4           # default: 7.3e-4
 
 
 # Discriminator settings
 DISC:
-  spectral_norm: false  # default: false
-  dropout: false        # default: false
-
+  use_spectral_norm: true    # default: false
+  dropout_input: false        # default: false
+  dropout_input_rate: 0.5     # default: 0.1
+  dropout_hidden: false       # default: false
+  dropout_hidden_rate: 0.75   # default: 0.1
+  
   # Discriminator Architecture
-  hidden_units: [128, 128]  
+  hidden_units: [128, 128]    # default: [64, 64]  
   hidden_activation: "relu_inplace" 
 
   epoch_disc: 1  
-  lr_disc: 1.0e-4 
-  rew_input_choice: "logsigmoid" # default: "logit"
+  lr_disc: 1.0e-4
+  # choice = ["logsigmoid", "softplus", "logit"]
+  rew_input_choice: "logit" # default: "logsigmoid" 
 
 
 AIRL:
-  disc_cls: airl_sa  
+  disc_cls: airl_so  
   subtract_logp: true
 
 

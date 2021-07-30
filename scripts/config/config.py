@@ -99,8 +99,11 @@ _C.SAC.lr_critic =7.3 * 1e-4  # Q-function learning rate.
 
 # Discriminator settings
 _C.DISC = CN()
-_C.DISC.spectral_norm = False  # Apply Spectral Norm.
-_C.DISC.dropout = False        # Enable dropout.
+_C.DISC.use_spectral_norm = False  # Apply Spectral Norm.
+_C.DISC.dropout_input = False      # Enable dropout at input.
+_C.DISC.dropout_input_rate = 0.1   # Input dropout rate.
+_C.DISC.dropout_hidden = False     # Enable dropout between hidden layers.
+_C.DISC.dropout_hidden_rate = 0.1  # Hidden layer dropout rate.
 
 # Discriminator Architecture
 _C.DISC.hidden_units = [128, 128]  # Discriminator hidden layers & sizes.

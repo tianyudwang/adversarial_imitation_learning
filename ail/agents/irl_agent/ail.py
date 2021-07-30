@@ -42,6 +42,7 @@ class AIRL(Adversarial):
                 raise ValueError(
                     f"No string string conversion of AIRL discriminator class {disc_cls}."
                 )
+            self.name = disc_cls.upper()
             disc_cls = DiscrimType[disc_cls].value
 
         else:
@@ -55,6 +56,7 @@ class AIRL(Adversarial):
                     raise ValueError("Using GAIL DiscrimNet for AIRL is not Allowed.")
             else:
                 raise ValueError(f"Unknown discriminator class: {disc_cls}.")
+            self.name = None
 
         super().__init__(
             state_space,
@@ -78,6 +80,12 @@ class AIRL(Adversarial):
             rew_input_choice,
             **kwargs,
         )
+
+    def __repr__(self):
+        if self.name is None:
+            return self.__class__.__name__
+        else:
+            return f"{self.name}"
 
 
 class GAIL(Adversarial):

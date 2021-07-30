@@ -84,37 +84,34 @@ class DiscrimNet(nn.Module, ABC):
         self.hidden_units = hidden_units
         self.hidden_activation = hidden_activation
 
-        # Regularization
-        self.spectral_norm = disc_kwargs.get("spectral_norm", False)
-        self.dropout = disc_kwargs.get("dropout", False)
-
+        # Regularization should be define in dsic_kwargs
+        """
+        disc_kwargs: {
+            'dropout_hidden': True,
+            'dropout_hidden_rate': 0.1,
+            'dropout_input': True,
+            'dropout_input_rate': 0.1,
+            'use_spectral_norm': False}
+        """
         # Init Discriminator
         if init_model:
-            self._init_model(disc_type)
+            self._init_model(disc_type, **disc_kwargs)
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}"
-
-    def _init_model(self, disc_type: ArchType) -> None:
+    def _init_model(self, disc_type: ArchType, **disc_kwargs) -> None:
         if disc_type == ArchType.s:
-            self.hidden_units_r = self.disc_kwargs.get(
-                "hidden_units_r", self.hidden_units
-            )
-            self.hidden_units_v = self.disc_kwargs.get(
-                "hidden_units_v", self.hidden_units
-            )
-
+            self.hidden_units_r = disc_kwargs.get("hidden_units_r", self.hidden_units)
+            self.hidden_units_v = disc_kwargs.get("hidden_units_v", self.hidden_units)
             self.g = StateFunction(
                 self.state_dim,
                 self.hidden_units_r,
                 self.hidden_activation,
-                self.spectral_norm,
+                **disc_kwargs,
             )
             self.h = StateFunction(
                 self.state_dim,
                 self.hidden_units_v,
                 self.hidden_activation,
-                self.spectral_norm,
+                **disc_kwargs,
             )
 
         elif disc_type == ArchType.sa:
@@ -123,7 +120,7 @@ class DiscrimNet(nn.Module, ABC):
                 self.action_dim,
                 self.hidden_units,
                 self.hidden_activation,
-                self.spectral_norm,
+                **disc_kwargs,
             )
 
         elif disc_type == ArchType.ss:
@@ -267,17 +264,12 @@ class GAILDiscrim(DiscrimNet):
         super().__init__(
             ArchType.sa,
             state_dim,
-            action_dim=action_dim,
-            hidden_units=hidden_units,
-            hidden_activation=hidden_activation,
-            disc_kwargs=disc_kwargs,
+            action_dim,
+            hidden_units,
+            hidden_activation,
+            **disc_kwargs,
         )
         self._tag = DiscrimTag.GAIL_DISCRIM
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}: {self.f}, Total params: {count_vars(self.f)}"
-        )
 
     @property
     def tag(self):
@@ -313,36 +305,31 @@ class AIRLStateDiscrim(DiscrimNet):
     def __init__(
         self,
         state_dim: int,
+        action_dim: int,
         hidden_units: Sequence[int],
         hidden_activation: Activation,
+        gamma: float,
         **disc_kwargs,
     ):
         if disc_kwargs is None:
             disc_kwargs = {}
-
         super().__init__(
             ArchType.s,
             state_dim,
-            action_dim=None,
-            hidden_units=hidden_units,
-            hidden_activation=hidden_activation,
-            disc_kwargs=disc_kwargs,
+            None,
+            hidden_units,
+            hidden_activation,
+            **disc_kwargs,
         )
+        self.gamma = gamma
         self._tag = DiscrimTag.AIRL_STATE_ONLY_DISCRIM
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}:\n"
-            f"{self.g}, Total params: {count_vars(self.net1)}\n"
-            f"{self.h}, Total params: {count_vars(self.net2)}"
-        )
 
     @property
     def tag(self):
         return self._tag
 
     def f(
-        self, obs: th.Tensor, dones: th.FloatTensor, next_obs: th.Tensor, gamma: float
+        self, obs: th.Tensor, dones: th.FloatTensor, next_obs: th.Tensor
     ) -> th.Tensor:
         """
         f(s, a, s' ) = g_θ (s) + \gamma h_φ (s') − h_φ (s)
@@ -355,14 +342,13 @@ class AIRLStateDiscrim(DiscrimNet):
         v_s = self.h(obs)
         next_vs = self.h(next_obs)
         # * Reshape (1-done) to (n,1) to prevent boardcasting mismatch in case done is (n,).
-        return r_s + gamma * (1 - dones).view(-1, 1) * next_vs - v_s
+        return r_s + self.gamma * (1 - dones).view(-1, 1) * next_vs - v_s
 
     def forward(
         self,
         obs: th.Tensor,
         dones: th.Tensor,
         next_obs: th.Tensor,
-        gamma: float,
         log_pis: Optional[th.Tensor] = None,
         subtract_logp: bool = True,
         **kwargs,
@@ -375,18 +361,17 @@ class AIRLStateDiscrim(DiscrimNet):
         """
         if log_pis is not None and subtract_logp:
             # reshape log_pi to prevent size mismatch
-            return self.f(obs, dones, next_obs, gamma) - log_pis.view(-1, 1)
+            return self.f(obs, dones, next_obs) - log_pis.view(-1, 1)
         elif log_pis is None and subtract_logp:
             raise ValueError("log_pis is None! Can not subtract None.")
         else:
-            return self.f(obs, dones, next_obs, gamma)
+            return self.f(obs, dones, next_obs)
 
     def calculate_rewards(
         self,
         obs: th.Tensor,
         dones: th.Tensor,
         next_obs: th.Tensor,
-        gamma: float,
         log_pis: Optional[th.Tensor] = None,
         subtract_logp: bool = True,
         choice="logit",
@@ -400,7 +385,6 @@ class AIRLStateDiscrim(DiscrimNet):
             "next_obs": next_obs,
             "log_pis": log_pis,
             "subtract_logp": subtract_logp,
-            "gamma": gamma,
         }
         with th.no_grad():
             reward_fn = self.reward_fn(rew_type="airl", choice=choice)
@@ -436,11 +420,6 @@ class AIRLStateActionDiscrim(DiscrimNet):
             **disc_kwargs,
         )
         self._tag = DiscrimTag.AIRL_STATE_ACTION_DISCRIM
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}: {self.f}, Total params: {count_vars(self.f)}"
-        )
 
     @property
     def tag(self):

@@ -41,9 +41,11 @@ def build_mlp(
     layers = [nn.Dropout(dropout_input_rate, inplace=True)] if dropout_input else []
     for j in range(len(sizes) - 1):
         activation_fn = activation if j < (len(sizes) - 2) else output_activation
+
         if use_spectral_norm:
             layers += [spectral_norm(nn.Linear(sizes[j], sizes[j + 1])), activation_fn]
-        elif dropout_hidden:
+
+        elif dropout_hidden and j < (len(sizes) - 2):
             layers += [
                 nn.Linear(sizes[j], sizes[j + 1]),
                 nn.Dropout(dropout_hidden_rate, inplace=True),

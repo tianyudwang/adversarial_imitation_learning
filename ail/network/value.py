@@ -21,9 +21,6 @@ class BaseValue(nn.Module, ABC):
         self.action_dim = action_dim
         self.net = None
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}"
-
     @abstractmethod
     def forward(self, *args, **kwargs) -> th.Tensor:
         """
@@ -64,9 +61,6 @@ class StateFunction(BaseValue):
             kwargs.get("dropout_hidden_rate", 0.1),
         )
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}: {self.net}, Total params: {count_vars(self.net)}"
-
     def forward(self, state: th.Tensor) -> th.Tensor:
         """self.net()"""
         return self.net(state)
@@ -101,9 +95,6 @@ class StateActionFunction(BaseValue):
             kwargs.get("dropout_hidden_rate", 0.1),
         )
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}: {self.net}, Total params: {count_vars(self.net)}"
-
     def forward(self, state: th.Tensor, action: th.Tensor) -> th.Tensor:
         return self.net(th.cat([state, action], dim=-1))
 
@@ -133,13 +124,6 @@ class TwinnedStateActionFunction(BaseValue):
             [obs_dim + act_dim] + list(hidden_units) + [1],
             activation,
             output_activation,
-        )
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}:\n"
-            f"{self.net1}, Total params: {count_vars(self.net1)}\n"
-            f"{self.net2}, Total params: {count_vars(self.net2)}"
         )
 
     def forward(

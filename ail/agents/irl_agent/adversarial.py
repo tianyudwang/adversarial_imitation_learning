@@ -81,7 +81,6 @@ class Adversarial(BaseIRLAgent):
             gen_kwargs,
             optim_kwargs,
         )
-
         self.disc = disc_cls(self.obs_dim, self.act_dim, **disc_kwargs).to(self.device)
         self.lr_disc = lr_disc
         self.optim_disc = self.optim_cls(self.disc.parameters(), lr=self.lr_disc)

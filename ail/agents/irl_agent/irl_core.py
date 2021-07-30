@@ -92,13 +92,13 @@ class BaseIRLAgent(BaseAgent, ABC):
         """
         return self.gen.step(env, state, t, step)
 
-    def explore(self, state: th.Tensor) -> Tuple[np.ndarray, th.Tensor]:
+    def explore(self, state: th.Tensor, scale: bool) -> Tuple[np.ndarray, th.Tensor]:
         """Same as generator/policy explore."""
-        return self.gen.explore(state)
+        return self.gen.explore(state, scale)
 
-    def exploit(self, state) -> np.ndarray:
+    def exploit(self, state, scale: bool) -> np.ndarray:
         """Same as generator/policy exploit"""
-        return self.gen.exploit(state)
+        return self.gen.exploit(state, scale)
 
     def is_update(self, step: int) -> bool:
         return self.gen.is_update(step)
