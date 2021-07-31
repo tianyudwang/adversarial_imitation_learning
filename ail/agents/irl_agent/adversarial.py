@@ -110,6 +110,8 @@ class Adversarial(BaseIRLAgent):
             # * Sample transitions from ``current`` policy.
             if self.gen.buffer.tag == BufferTag.ROLLOUT:
                 data_gen = self.gen.buffer.sample(self.replay_batch_size)
+                # data_gen = self.gen.buffer.get(self.replay_batch_size)
+
 
             elif self.gen.buffer.tag == BufferTag.REPLAY:
                 data_gen = self.gen.buffer.get(self.replay_batch_size, last_n=True)

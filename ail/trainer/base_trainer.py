@@ -51,6 +51,7 @@ class BaseTrainer(ABC):
         seed: int,
         verbose: int,
         use_wandb: bool,
+        eval_behavior_type: str = "mix",
         **kwargs,
     ):
 
@@ -133,9 +134,19 @@ class BaseTrainer(ABC):
         # Log and Saving.
         self.save_freq = save_freq
         self.eval_interval = eval_interval
-
+        
         self.num_eval_episodes = num_eval_episodes
-        self.stochastic_eval_episodes = num_eval_episodes // 2
+        
+        eval_behavior_type = eval_behavior_type.lower()
+        if eval_behavior_type == "deterministic":
+            self.stochastic_eval_episodes = 0
+        elif eval_behavior_type == "mix":
+            self.stochastic_eval_episodes = num_eval_episodes // 2
+        else:
+            raise ValueError(
+                f"Unrecognized evaluation behavior type: {eval_behavior_type}. "
+                f"Valid options are [deterministic, mix]."
+            )    
         self.log_interval = log_interval
 
         # Progress param
@@ -167,16 +178,16 @@ class BaseTrainer(ABC):
         train_returns, train_ep_lens = [], []
         valid_returns, valid_ep_lens = [], []
         # visualize result from half explore and half exploit
-        stochastic_eval_episodes = self.num_eval_episodes // 2
         for t in range(self.num_eval_episodes):
             obs = self.env_test.reset()
             ep_ret = 0.0
             ep_len = 0
             done = False
-
+            deterministic = False if t < self.stochastic_eval_episodes else True
+            
             while not done:
                 obs = obs_as_tensor(obs, self.device)
-                if t < stochastic_eval_episodes:
+                if not deterministic:
                     act, _ = self.algo.explore(obs, scale=True)
                 else:
                     act = self.algo.exploit(obs, scale=True)
@@ -185,7 +196,6 @@ class BaseTrainer(ABC):
                 ep_len += 1
 
             self.rs.push(ep_ret)
-            deterministic = False if t < stochastic_eval_episodes else True
             if deterministic:
                 valid_ep_lens.append(ep_len)
                 valid_returns.append(ep_ret)
@@ -267,13 +277,14 @@ class BaseTrainer(ABC):
         time_logs["time_elapsed "] = self.duration(self.start_time)
 
         # Train
-        train_logs["ep_len_mean"] = np.mean(train_ep_lens)
-        (
-            train_logs["ep_return_mean"],
-            train_logs["std_return"],
-            train_logs["max_return"],
-            train_logs["min_return"],
-        ) = get_stats(train_returns)
+        if len(train_returns) > 0 and len(train_ep_lens) > 0:
+            train_logs["ep_len_mean"] = np.mean(train_ep_lens)
+            (
+                train_logs["ep_return_mean"],
+                train_logs["std_return"],
+                train_logs["max_return"],
+                train_logs["min_return"],
+            ) = get_stats(train_returns)
 
         # Eval
         eval_logs["ep_len_mean"] = np.mean(eval_ep_lens)
@@ -316,15 +327,17 @@ class BaseTrainer(ABC):
         eval_logs: Dict[str, Any],
     ) -> None:
         # Train logs
-        self.writer.add_scalar(
-            "return/train/ep_len", train_logs.get("ep_len_mean"), step
-        )
-        self.writer.add_scalar(
-            "return/train/ep_rew_mean", train_logs.get("ep_return_mean"), step
-        )
-        self.writer.add_scalar(
-            "return/train/ep_rew_std", train_logs.get("std_return"), step
-        )
+        if self.stochastic_eval_episodes > 0:
+
+            self.writer.add_scalar(
+                "return/train/ep_len", train_logs.get("ep_len_mean"), step
+            )
+            self.writer.add_scalar(
+                "return/train/ep_rew_mean", train_logs.get("ep_return_mean"), step
+            )
+            self.writer.add_scalar(
+                "return/train/ep_rew_std", train_logs.get("std_return"), step
+            )
 
         # Test log
         self.writer.add_scalar("return/test/ep_len", eval_logs.get("ep_len_mean"), step)

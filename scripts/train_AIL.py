@@ -1,13 +1,11 @@
 import os
 import pathlib
 import sys
-import re
 import argparse
 from copy import deepcopy
 from datetime import datetime
 
 import yaml
-import pandas as pd
 import numpy as np
 import torch as th
 
@@ -73,12 +71,13 @@ def CLI():
     # Total steps and batch size
     p.add_argument("--num_steps", "-n", type=int, default=2 * 1e6)
     p.add_argument("--rollout_length", "-ep_len", type=int, default=None)
-    p.add_argument("--gen_batch_size", "-gb", type=int, default=1_024)
+    p.add_argument("--gen_batch_size", "-gbs", type=int, default=1_024)
     p.add_argument("--replay_batch_size", "-rbs", type=int, default=1_024)
 
     # Logging and evaluation
     p.add_argument("--log_every_n_updates", "-lg", type=int, default=20)
     p.add_argument("--eval_interval", type=int, default=5 * 1e3)
+    p.add_argument("--eval_mode", type=str, default="mix")
     p.add_argument("--num_eval_episodes", type=int, default=10)
     p.add_argument("--save_freq", type=int, default=50_000, 
                    help="Save model every `save_freq` steps.")
@@ -232,6 +231,7 @@ def run(args, cfg, path):
         max_ep_len=args.rollout_length,
         seed=args.seed,
         eval_interval=args.eval_interval,
+        eval_behavior_type=args.eval_mode,
         num_eval_episodes=args.num_eval_episodes,
         save_freq=args.save_freq,
         log_dir=log_dir,
@@ -251,6 +251,7 @@ def run(args, cfg, path):
         entries_to_remove = (
             "num_eval_episodes",
             "eval_interval",
+            "eval_behavior_type"
             "log_dir",
             "log_interval",
             "save_freq",
@@ -260,6 +261,8 @@ def run(args, cfg, path):
         )
         for k in entries_to_remove:
             config_copy.pop(k)
+        
+        # import pandas as pd             
         # df = pd.json_normalize(config_copy, sep='_').to_dict(orient='records')[0]
         # config_copy={k.replace("algo_kwargs_", ""): v for k, v in df.items()}
         
@@ -271,7 +274,13 @@ def run(args, cfg, path):
             wandb.init(
                 project="AIL",
                 notes="tweak baseline",
-                tags=["baseline", f"{args.env_id}", str(args.algo).upper(), str(args.gen_algo).upper()],
+                tags=[
+                    "baseline",
+                    f"{args.env_id}",
+                    str(args.algo).upper(),
+                    str(args.gen_algo).upper(),
+                    str(cfg.DISC.rew_input_choice)
+                ],
                 config=config_copy,  # Hyparams & meta data.
             )
             wandb.run.name = exp_name

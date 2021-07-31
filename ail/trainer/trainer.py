@@ -45,6 +45,7 @@ class Trainer(BaseTrainer):
         max_ep_len=None,
         seed: int = 42,
         eval_interval: int = 5_000,
+        eval_behavior_type: str = "mix",
         num_eval_episodes: int = 10,
         save_freq: int = 50_000,
         log_dir: str = "runs",
@@ -67,6 +68,7 @@ class Trainer(BaseTrainer):
             seed,
             verbose,
             use_wandb,
+            eval_behavior_type,
             **kwargs,
         )
 
