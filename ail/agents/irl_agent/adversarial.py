@@ -7,6 +7,7 @@ from torch.cuda.amp import autocast
 
 from ail.agents.irl_agent.irl_core import BaseIRLAgent
 from ail.buffer import ReplayBuffer, BufferTag
+from ail.common.math import normalize
 from ail.common.type_alias import GymSpace, TensorDict
 from ail.network.discrim import DiscrimNet
 
@@ -66,6 +67,7 @@ class Adversarial(BaseIRLAgent):
         rew_input_choice: str,
         rew_clip: bool,
         max_rew_magnitude: float,
+        obs_normalization: Optional[str],
         **kwargs,
     ):
         assert max_rew_magnitude > 0, "max_rew_magnitude must be greater than 0"
@@ -97,6 +99,30 @@ class Adversarial(BaseIRLAgent):
         self.rew_clip = rew_clip
         self.max_rew_magnitude = max_rew_magnitude
 
+        if obs_normalization is not None:
+            assert isinstance(
+                obs_normalization, str
+            ), "obs_normalization should be a string"
+            if obs_normalization == "fixed":
+                self.exp_obs_mean, self.exp_obs_std = self.buffer_exp.data_mean_std(
+                    key="obs"
+                )
+                (
+                    self.exp_next_obs_mean,
+                    self.exp_next_obs_std,
+                ) = self.buffer_exp.data_mean_std(key="next_obs")
+
+                self.normalize_obs = True
+            elif obs_normalization == "online":
+                self.normalize_obs = True
+                raise NotImplementedError()
+            else:
+                raise ValueError(
+                    f"Valid inputs of obs_normalization: ['fixed', 'online']."
+                )
+        else:
+            self.normalize_obs = False
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
 
@@ -114,8 +140,6 @@ class Adversarial(BaseIRLAgent):
             # * Sample transitions from ``current`` policy.
             if self.gen.buffer.tag == BufferTag.ROLLOUT:
                 data_gen = self.gen.buffer.sample(self.replay_batch_size)
-                # data_gen = self.gen.buffer.get(self.replay_batch_size)
-
 
             elif self.gen.buffer.tag == BufferTag.REPLAY:
                 data_gen = self.gen.buffer.get(self.replay_batch_size, last_n=True)
@@ -126,15 +150,36 @@ class Adversarial(BaseIRLAgent):
             # Samples transitions from expert's demonstrations.
             data_exp = self.buffer_exp.sample(self.replay_batch_size)
 
+            if self.normalize_obs:
+                data_gen["obs"] = normalize(
+                    data_gen["obs"], self.exp_obs_mean, self.exp_obs_std
+                )
+                data_exp["obs"] = normalize(
+                    data_exp["obs"], self.exp_obs_mean, self.exp_obs_std
+                )
+                data_gen["next_obs"] = normalize(
+                    data_gen["next_obs"], self.exp_next_obs_mean, self.exp_next_obs_std
+                )
+                data_exp["next_obs"] = normalize(
+                    data_exp["next_obs"], self.exp_next_obs_mean, self.exp_next_obs_std
+                )
+                # ic(data_gen["obs"].mean(0), data_gen["next_obs"].mean(0))
+                # ic(data_gen["obs"].std(0), data_gen["next_obs"].std(0))
+                # ic(data_exp["obs"].mean(0), data_exp["next_obs"].mean(0))
+                # ic(data_exp["obs"].std(0), data_exp["next_obs"].std(0))
+                
+            import ipdb; ipdb.set_trace()
+            # self.buffer_exp._buffer._arrays.keys()
+                
             # Calculate log probabilities of generator's actions.
             # And evaluate log probabilities of expert actions.
             # Based on current generator's action distribution.
             # See: https://arxiv.org/pdf/1710.11248.pdf appendix A.2
-            with th.no_grad():
-                # TODO: invesitgate log_pi in generator
-                data_exp["log_pis"] = self.gen.actor.evaluate_log_pi(
-                    data_exp["obs"], data_exp["acts"]
-                )
+            if self.subtract_logp:
+                with th.no_grad():
+                    data_exp["log_pis"] = self.gen.actor.evaluate_log_pi(
+                        data_exp["obs"], data_exp["acts"]
+                    )
             # Update discriminator.
             disc_info = self.update_discriminator(data_gen, data_exp, log_this_batch)
             if log_this_batch:
@@ -162,15 +207,21 @@ class Adversarial(BaseIRLAgent):
         else:
             raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
 
+        if self.normalize_obs:
+            data["obs"] = normalize(data["obs"], self.exp_obs_mean, self.exp_obs_std)
+            data["next_obs"] = normalize(
+                data["next_obs"], self.exp_next_obs_mean, self.exp_next_obs_std
+            )
+
         # Calculate learning rewards.
         data["rews"] = self.disc.calculate_rewards(choice=self.rew_input_choice, **data)
         # Sanity check length of data are equal.
         assert data["rews"].shape[0] == data["obs"].shape[0]
-        
+
         # Reward Clipping
         if self.rew_clip:
             data["rews"].clamp_(-self.max_rew_magnitude, self.max_rew_magnitude)
-        
+
         # Update generator using estimated rewards.
         gen_logs = self.update_generator(data, log_this_batch)
 

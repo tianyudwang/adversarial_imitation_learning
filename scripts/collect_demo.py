@@ -1,6 +1,8 @@
 import argparse
 import pathlib
+from pprint import pprint
 
+import yaml
 import gym
 import numpy as np
 import torch as th
@@ -30,7 +32,7 @@ SB3_ALGO = {
 
 
 def collect_demo(
-    env, algo, buffer_size: int, device, seed=0, render=False, sb3_model=None
+    env, algo, buffer_size: int, device, seed=0, render=False, sb3_model=None, save_dir=None
 ):
     env = maybe_make_env(env, tag="Expert", verbose=2)
     env.seed(seed)
@@ -60,7 +62,7 @@ def collect_demo(
                 th.as_tensor(state, dtype=th.float32), deterministic=True
             )
         elif algo is not None:
-            action = algo.exploit(th.as_tensor(state, dtype=th.float32))
+            action = algo.exploit(th.as_tensor(state, dtype=th.float32), scale=False)
         else:
             raise ValueError("Please provide either sb3_model or cumstom algo")
 
@@ -97,6 +99,10 @@ def collect_demo(
         f"Mean return of the expert is "
         f"{np.mean(total_return):.3f} +/- {np.std(total_return):.3f}"
     )
+    info = {
+        "return_mean": np.mean(total_return).item(),
+        "return_std": np.std(total_return).item(),
+    }
 
     fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(8, 6))
     ax[0].plot(total_return)
@@ -105,8 +111,9 @@ def collect_demo(
     ax[1].set_title("Episode Length")
     fig.supxlabel("Time Step")
     plt.tight_layout()
+    fig.savefig(save_dir / "return.png")
     plt.show()
-    return demo_buffer
+    return demo_buffer, info
 
 
 if __name__ == "__main__":
@@ -119,8 +126,14 @@ if __name__ == "__main__":
         choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
         help="Envriment to interact with",
     )
+    p.add_argument(
+        "--algo",
+        type=str, 
+        choices=["ppo","sac","sb3_ppo","sb3_sac"]
+    )
+    p.add_argument("--hidden_size", "-hid", type=int, default=64)
+    p.add_argument("--layers", "-l", type= int, default=2)
     p.add_argument("--buffer_size", type=int, default=1_000 * 11)
-    p.add_argument("--algo", type=str, default="")
     p.add_argument("--render", "-r", action="store_true")
     p.add_argument("--seed", type=int, default=0)
     args = p.parse_args()
@@ -128,8 +141,10 @@ if __name__ == "__main__":
     # run only on cpu for testing
     device = th.device("cpu")
 
-    path = pathlib.Path.cwd()
-    demo_dir = path.parent / "rl-trained-agents" / args.env_id
+    path = pathlib.Path(__file__).parent.resolve()
+    print(path,'\n')
+    
+    demo_dir = path.parent / "ail" / "rl-trained-agents" / args.env_id
 
     if not args.weight:
         if args.algo.startswith("sb3"):
@@ -137,6 +152,8 @@ if __name__ == "__main__":
         else:
             args.weight = demo_dir / args.algo / f"{args.env_id}_actor.pth"
 
+    print(args.weight, '\n')
+    
     if args.algo.startswith("sb3"):
         sb3_model = SB3_ALGO[args.algo].load(args.weight)
         algo = None
@@ -144,15 +161,17 @@ if __name__ == "__main__":
         dummy_env = gym.make(args.env_id)
         sb3_model = None
         algo = ALGO[args.algo].load(
-            dummy_env,
             path=args.weight,
+            policy_kwargs={"pi": [args.hidden_size] * args.layers},
+            env=dummy_env,
             device=device,
             seed=args.seed,
         )
 
     print(f"weight_dir: {args.weight}\n")
-
-    buffer = collect_demo(
+    
+    save_dir = path / "transitions" / args.env_id
+    buffer, ret_info = collect_demo(
         env=args.env_id,
         algo=algo,
         buffer_size=args.buffer_size,
@@ -160,9 +179,33 @@ if __name__ == "__main__":
         render=args.render,
         seed=args.seed,
         sb3_model=sb3_model,
+        save_dir=save_dir,
     )
-
-    save_dir = path / "transitions" / args.env_id / f"size{args.buffer_size}"
-    print(f"Saving to {save_dir}")
+     
+    data_path = save_dir / f"{args.algo}_size{args.buffer_size}"
+    print(f"\nSaving to {data_path}")
     # * default save with .npz
-    buffer.save(save_dir)
+    buffer.save(data_path)
+
+
+    data = dict(np.load(f"{data_path}.npz"))
+    obs = data["obs"]
+    act = data["acts"]
+    dones = data["dones"],
+    next_obs = data["next_obs"]
+    
+    obs_norm = (-1 <= obs).all() and (obs <= 1).all()
+    act_norm = (-1 <= act).all() and (act <= 1).all()
+    next_obs_norm = (-1 <= next_obs).all() and (next_obs <= 1).all()
+    
+    
+    info ={
+        "action in [-1, 1]": act_norm.item(),
+        "observation in [-1, 1]": obs_norm.item(),
+        "next_observation in [-1, 1]": next_obs_norm.item()
+    }
+    pprint(info)
+    info.update(ret_info)
+    # Saving hyperparams to yaml file.
+    with open(save_dir / "info.yaml", "w") as f:
+        yaml.dump(info, f)

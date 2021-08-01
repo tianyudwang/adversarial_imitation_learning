@@ -91,6 +91,9 @@ DISC:
   rew_input_choice: logit
   rew_clip: true        # default: False
   max_rew_magnitude: 1.0   # default: 10.0
+  
+  # obs_normalization: fixed # default: None
+  
 
 AIRL:
   disc_cls: airl_sa  

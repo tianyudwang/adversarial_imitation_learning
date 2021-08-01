@@ -115,6 +115,8 @@ _C.DISC.lr_disc = 3e-4  # Discriminator learning rate.
 _C.DISC.rew_input_choice = "logit" # Choices = ["logsigmoid", "softplus", "logti"].
 _C.DISC.rew_clip = False           # Clipping rewards.
 _C.DISC.max_rew_magnitude = 10.0   # Reward clipping magnitude.
+_C.DISC.obs_normalization = None  # Normalization of observations.
+
 
 # AIRL only args
 _C.AIRL = CN()

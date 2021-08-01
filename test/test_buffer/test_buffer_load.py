@@ -27,7 +27,7 @@ action = env.action_space.sample()
 next_state, reward, done, info = env.step(action)
 
 # Path
-path = pathlib.Path.cwd()
+path = pathlib.Path(__file__).parent.resolve()
 print(f"current_dir: {path}")
 
 data_path = path.parent.parent / "scripts" / "transitions" / env_id / "size11000.npz"
@@ -52,3 +52,7 @@ print(asizeof.asizeof(buffer))
 a = BufferTag.REPLAY
 
 print(a == buffer.tag)
+
+
+def normalize_obs():
+    pass

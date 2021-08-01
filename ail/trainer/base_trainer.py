@@ -138,9 +138,9 @@ class BaseTrainer(ABC):
         # Log and Saving.
         self.save_freq = save_freq
         self.eval_interval = eval_interval
-        
+
         self.num_eval_episodes = num_eval_episodes
-        
+
         eval_behavior_type = eval_behavior_type.lower()
         if eval_behavior_type == "mode":
             self.stochastic_eval_episodes = 0
@@ -150,7 +150,7 @@ class BaseTrainer(ABC):
             raise ValueError(
                 f"Unrecognized evaluation behavior type: {eval_behavior_type}. "
                 f"Valid options are [stochastic, mode, average]."
-            )    
+            )
         self.log_interval = log_interval
 
         # Progress param
@@ -188,7 +188,7 @@ class BaseTrainer(ABC):
             ep_len = 0
             done = False
             deterministic = False if t < self.stochastic_eval_episodes else True
-            
+
             while not done:
                 obs = obs_as_tensor(obs, self.device)
                 if not deterministic:

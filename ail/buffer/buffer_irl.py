@@ -1,11 +1,13 @@
 from typing import Dict, Mapping, Optional, Tuple, Union, Set
 from enum import Enum, auto
 import os
+import warnings
 
 import numpy as np
 import torch as th
 
 from ail.common.type_alias import GymEnv
+from ail.common.math import normalize
 
 
 class Buffer:
@@ -40,10 +42,10 @@ class Buffer:
         dtypes: Mapping[str, np.dtype],
         device: Union[th.device, str],
     ):
-        assert isinstance(capacity, int), "capacity must be integer"
+        assert isinstance(capacity, int), "capacity must be integer."
 
         if sample_shapes.keys() != dtypes.keys():
-            raise KeyError("sample_shape and dtypes keys don't match")
+            raise KeyError("sample_shape and dtypes keys don't match.")
         self._capacity = capacity
         self._sample_shapes = {k: tuple(shape) for k, shape in sample_shapes.items()}
 
@@ -124,7 +126,7 @@ class Buffer:
         if len(data) == 0:
             raise ValueError("No keys in data.")
         if len(data_capacities) > 1:
-            raise ValueError("Keys map to different length values")
+            raise ValueError("Keys map to different length values.")
         if capacity is None:
             capacity = data_capacities[0]
 
@@ -157,9 +159,9 @@ class Buffer:
         missing_keys = expected_keys - data_keys
         unexpected_keys = data_keys - expected_keys
 
-        if len(missing_keys) and not missing_ok > 0:
+        if missing_keys and not missing_ok:
             raise ValueError(f"Missing keys {missing_keys}")
-        if len(unexpected_keys) > 0:
+        if unexpected_keys:
             raise ValueError(f"Unexpected keys {unexpected_keys}")
 
         n_samples = np.unique([arr.shape[0] for arr in data.values()])
@@ -178,7 +180,7 @@ class Buffer:
 
         for k in data.keys():
             if data[k].shape[1:] != self._sample_shapes[k]:
-                raise ValueError(f"Wrong data shape for {k}")
+                raise ValueError(f"Wrong data shape for {k}.")
 
         new_idx = self._idx + n_samples
         if new_idx > self._capacity:
@@ -208,8 +210,7 @@ class Buffer:
         Note: serve as singe pair store
         """
         assert isinstance(data, dict), "data must be a dictionary"
-        # * Sample should has shape (1, n):
-        # 1 is the number of samples, n is the dimension of that sample
+        # shape (1, n): 1 is the number of samples, n is the dimension of that sample
         n_samples = np.unique([arr.shape[0] for arr in data.values()])
         assert len(n_samples) == 1
 
@@ -334,12 +335,20 @@ class Buffer:
             obs=self._arrays["obs"],
             acts=self._arrays["acts"],
             dones=self._arrays["dones"],
-            nxet_obs=self._arrays["next_obs"],
+            next_obs=self._arrays["next_obs"],
         )
 
 
 class BaseBuffer:
-    __slots__ = ["capacity", "sample_shapes", "dtypes", "device", "_buffer"]
+    __slots__ = [
+        "capacity",
+        "sample_shapes",
+        "dtypes",
+        "device",
+        "_buffer",
+        "obs_mean",
+        "obs_std",
+    ]
 
     """
     Base class that represent a buffer (rollout or replay).
@@ -453,7 +462,16 @@ class BaseBuffer:
         """Returns whether the buffer is full."""
         return self._buffer.full()
 
-    # def data_keys
+    def data_mean_std(self, key: str) -> Tuple[float, float]:
+        """
+        Calbulate mean and std of the data in the buffer.
+        """
+        assert (
+            key in self.stored_keys()
+        ), f"{key} not in stored_keys {self.stored_keys()}."
+        obs_mean = self._buffer._arrays[key].mean(axis=0)
+        obs_std = np.maximum(self._buffer._arrays[key].std(axis=0), 0.001)
+        return obs_mean, obs_std
 
     def store(
         self,
@@ -476,8 +494,15 @@ class BaseBuffer:
                 raise TypeError(
                     "Prefer transitions to be a dict or a dictionary-like object"
                 )
+        keys = set(transitions.keys())
+        intersect = self._buffer._stored_keys & keys
+        difference = self._buffer._stored_keys - keys
+        ignore = keys - self._buffer._stored_keys
 
-        intersect = self._buffer._stored_keys.intersection(transitions.keys())
+        if difference:
+            warnings.warn(f"Unfulfill keys: {difference}.")
+        if ignore:
+            warnings.warn(f"Ignore keys: {ignore}.")
 
         # Remove unnecessary fields
         trans_dict = {k: transitions[k] for k in intersect}
@@ -500,9 +525,18 @@ class BaseBuffer:
                 transitions = dict(transitions)
             except TypeError:
                 raise TypeError(
-                    "Prefer transitions to be a dict or a dictionary-like object"
+                    "Prefer transitions to be a dict or a dictionary-like object."
                 )
-        intersect = self._buffer._stored_keys.intersection(transitions.keys())
+        keys = set(transitions.keys())
+        intersect = self._buffer._stored_keys & keys
+        difference = self._buffer._stored_keys - keys
+        ignore = keys - self._buffer._stored_keys
+
+        if difference:
+            warnings.warn(f"Unfulfill keys: {difference}.")
+        if ignore:
+            warnings.warn(f"Ignore keys: {ignore}.")
+        
         # Remove unnecessary fields
         trans_dict = {k: transitions[k] for k in intersect}
         self._buffer.store(trans_dict, truncate_ok=truncate_ok)

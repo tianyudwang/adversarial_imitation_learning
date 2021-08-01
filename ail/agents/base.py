@@ -96,7 +96,7 @@ class BaseAgent(nn.Module):
 
         # Optimizer kwargs.
         optim_kwargs = {} if optim_kwargs is None else optim_kwargs
-        optim_cls = optim_kwargs.get("optim_cls")
+        optim_cls = optim_kwargs.get("optim_cls", "adam")
         self.optim_set_to_none = optim_kwargs.get("optim_set_to_none", False)
 
         if isinstance(optim_cls, str):

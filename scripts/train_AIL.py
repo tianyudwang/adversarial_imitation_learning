@@ -63,10 +63,6 @@ def CLI():
         "--demo_path", "-demo", type=str, help="Path to demo"
     )  # required=True,
 
-    # TODO: add more arguments to control discriminator
-    # Discriminator features
-    # p.add_argument("--spectral_norm", "-sn", action="store_true")
-    # p.add_argument("--dropout", "-dp", action="store_true")  # TODO: Implement and test
 
     # Total steps and batch size
     p.add_argument("--num_steps", "-n", type=int, default=2 * 1e6)
@@ -183,9 +179,14 @@ def run(args, cfg, path):
     # Demo data.
     if args.demo_path is None:
         # TODO: REMOVE THIS
-        args.demo_path = (
-            path / "transitions" / args.env_id / "size11000.npz"
-        )
+        try:
+            args.demo_path = (
+                path / "transitions" / args.env_id / "ppo_size11000.npz"
+            )
+        except FileNotFoundError:
+            args.demo_path = (
+                path / "transitions" / args.env_id / "sac_size11000.npz"
+            )
         
     transitions = dict(np.load(args.demo_path))
 
@@ -195,7 +196,7 @@ def run(args, cfg, path):
             buffer_exp="replay",
             buffer_kwargs=dict(
                 with_reward=False,
-                transitions=transitions,  # * transitions must be a dict
+                transitions=transitions,  # * transitions must be a dict-like object
             ),
             gen_algo=args.gen_algo,
             gen_kwargs=gen_kwargs,
@@ -216,6 +217,7 @@ def run(args, cfg, path):
             rew_input_choice = cfg.DISC.rew_input_choice,
             rew_clip = cfg.DISC.rew_clip,
             max_rew_magnitude = cfg.DISC.max_rew_magnitude,
+            obs_normalization = cfg.DISC.obs_normalization,
         )
     )
     
@@ -309,10 +311,8 @@ def run(args, cfg, path):
 
     trainer.run_training_loop()
 
-if __name__ == "__main__":
-    # ENVIRONMENT VARIABLE
-    os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # Modify to assign a meaningful name.
 
+def main():
     args = CLI()
     
     # Path
@@ -338,3 +338,9 @@ if __name__ == "__main__":
         os.environ["OMP_NUM_THREADS"] = "2"
     
     run(args, cfg, path)
+
+if __name__ == "__main__":
+    # ENVIRONMENT VARIABLE
+    os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # Modify to assign a meaningful name.
+    main()
+    
