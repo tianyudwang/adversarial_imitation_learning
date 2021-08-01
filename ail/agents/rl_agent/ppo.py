@@ -130,7 +130,7 @@ class PPO(OnPolicyAgent):
         )
         next_state, reward, done, info = env.step(scale_action)
 
-        # * (Yifan) Intuitively, mask make sence that agent keeps alive which is not done by env
+        # * (Yifan) Intuitively, mask make sense that agent keeps alive which is not done by env
         mask = False if t == env._max_episode_steps else done
 
         data = {

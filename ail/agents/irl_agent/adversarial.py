@@ -104,17 +104,11 @@ class Adversarial(BaseIRLAgent):
                 obs_normalization, str
             ), "obs_normalization should be a string"
             if obs_normalization == "fixed":
-                self.exp_obs_mean, self.exp_obs_std = self.buffer_exp.data_mean_std(
-                    key="obs"
-                )
-                (
-                    self.exp_next_obs_mean,
-                    self.exp_next_obs_std,
-                ) = self.buffer_exp.data_mean_std(key="next_obs")
-
                 self.normalize_obs = True
+                self.normalize_mode = "fixed"
             elif obs_normalization == "online":
                 self.normalize_obs = True
+                self.normalize_mode = "online"
                 raise NotImplementedError()
             else:
                 raise ValueError(
@@ -151,25 +145,16 @@ class Adversarial(BaseIRLAgent):
             data_exp = self.buffer_exp.sample(self.replay_batch_size)
 
             if self.normalize_obs:
-                data_gen["obs"] = normalize(
-                    data_gen["obs"], self.exp_obs_mean, self.exp_obs_std
-                )
-                data_exp["obs"] = normalize(
-                    data_exp["obs"], self.exp_obs_mean, self.exp_obs_std
-                )
-                data_gen["next_obs"] = normalize(
-                    data_gen["next_obs"], self.exp_next_obs_mean, self.exp_next_obs_std
-                )
-                data_exp["next_obs"] = normalize(
-                    data_exp["next_obs"], self.exp_next_obs_mean, self.exp_next_obs_std
-                )
-                # ic(data_gen["obs"].mean(0), data_gen["next_obs"].mean(0))
-                # ic(data_gen["obs"].std(0), data_gen["next_obs"].std(0))
-                # ic(data_exp["obs"].mean(0), data_exp["next_obs"].mean(0))
-                # ic(data_exp["obs"].std(0), data_exp["next_obs"].std(0))
                 
-            import ipdb; ipdb.set_trace()
-            # self.buffer_exp._buffer._arrays.keys()
+                data_gen["obs"] = self.fix_normalize_obs(data_gen["obs"], data_exp["obs"])
+                data_exp["obs"] = self.fix_normalize_obs(data_exp["obs"], data_exp["obs"])
+                data_gen["next_obs"] = self.fix_normalize_obs(data_gen["next_obs"], data_exp["next_obs"])
+                data_exp["next_obs"] = self.fix_normalize_obs(data_exp["next_obs"], data_exp["next_obs"])
+                ic(data_gen["obs"].mean(0), data_gen["next_obs"].mean(0))
+                ic(data_gen["obs"].std(0), data_gen["next_obs"].std(0))
+                ic(data_exp["obs"].mean(0), data_exp["next_obs"].mean(0))
+                ic(data_exp["obs"].std(0), data_exp["next_obs"].std(0))
+                
                 
             # Calculate log probabilities of generator's actions.
             # And evaluate log probabilities of expert actions.
@@ -207,11 +192,11 @@ class Adversarial(BaseIRLAgent):
         else:
             raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
 
-        if self.normalize_obs:
-            data["obs"] = normalize(data["obs"], self.exp_obs_mean, self.exp_obs_std)
-            data["next_obs"] = normalize(
-                data["next_obs"], self.exp_next_obs_mean, self.exp_next_obs_std
-            )
+        # if self.normalize_obs:
+        #     data["obs"] = normalize(data["obs"], exp_obs_mean, exp_obs_std)
+        #     data["next_obs"] = normalize(
+        #         data["next_obs"], exp_next_obs_mean, exp_next_obs_std
+        #     )
 
         # Calculate learning rewards.
         data["rews"] = self.disc.calculate_rewards(choice=self.rew_input_choice, **data)
@@ -288,3 +273,15 @@ class Adversarial(BaseIRLAgent):
                 }
             )
         return disc_logs
+    
+    def fix_normalize_obs(self, input_obs, obs_exp: th.Tensor):
+        """
+        Normalize expert's observations.
+        :param obs_exp: expert's observations which has shape (batch_size, obs_dim)
+        :return: normalized input_obs with approximately zero mean and std one
+        """
+        exp_obs_mean, exp_obs_std = obs_exp.mean(axis=0), obs_exp.std(axis=0)
+        return normalize(input_obs, exp_obs_mean, exp_obs_std)
+        
+        
+        

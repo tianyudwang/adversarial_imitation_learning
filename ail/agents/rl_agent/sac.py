@@ -225,6 +225,7 @@ class SAC(OffPolicyAgent):
             assert not math.isnan(log_pi)
 
         next_state, reward, done, info = env.step(scaled_action)
+        # * (Yifan) Intuitively, mask make sense that agent keeps alive which is not done by env
         mask = False if t == env._max_episode_steps else done
 
         data = {

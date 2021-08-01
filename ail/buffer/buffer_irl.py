@@ -462,16 +462,6 @@ class BaseBuffer:
         """Returns whether the buffer is full."""
         return self._buffer.full()
 
-    def data_mean_std(self, key: str) -> Tuple[float, float]:
-        """
-        Calbulate mean and std of the data in the buffer.
-        """
-        assert (
-            key in self.stored_keys()
-        ), f"{key} not in stored_keys {self.stored_keys()}."
-        obs_mean = self._buffer._arrays[key].mean(axis=0)
-        obs_std = np.maximum(self._buffer._arrays[key].std(axis=0), 0.001)
-        return obs_mean, obs_std
 
     def store(
         self,

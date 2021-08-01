@@ -8,7 +8,6 @@ import torch.nn.functional as F
 
 from ail.network.value import StateFunction, StateActionFunction
 from ail.common.type_alias import Activation
-from ail.common.pytorch_util import count_vars
 
 
 class ArchType(Enum):
@@ -45,14 +44,36 @@ class DiscrimNet(nn.Module, ABC):
     where f is a discriminator logit (a learnable function represented as MLP)
 
     Choice of reward function:
-    • r(s, a) = − ln(1 − D) = softplus(h) (used in the original GAIL paper),
-    • r(s, a) = ln D − ln(1 − D) = h (introduced in AIRL).
-    • r(s, a) = ln D = −softplus(−h),       # ! Currently not working.
-    • r(s, a) = −h exp(h) (introduced in FAIRL) # ! Not Implemented.
-    # TODO: clip rewards with the absolute values higher than max reward magnitude
-    # * The GAIL paper uses the inverse convention in which
-    # * D denotes the probability as being classified as non-expert.
-
+    1. r(s, a) = − ln(1 − D) = softplus(h) (used in the original GAIL paper),
+    2. r(s, a) = ln D − ln(1 − D) = h (introduced in AIRL).
+    3. r(s, a) = ln D = −softplus(−h),            # ! Not Implemented.
+    4. r(s, a) = −h exp(h) (introduced in FAIRL)  # ! Not Implemented.
+    
+    * The original GAIL paper uses the inverse convention in which
+    * D denotes the probability as being classified as non-expert.
+    
+    ---------------------------------------------------------------------------
+    BIAS IN REWARD FUNCTIONS:
+    (1) Strictly positive reward worked well for environments that require a survival bonus.
+    (2) Able to assign both positive and negative rewards for each time step. 
+        -Positive: this leading to sub-optimal policies (and training instability)
+        in environments with a survival bonus.
+        -Negative: this assigns rewards with a negative bias(in the beginning of training).
+            It is common for learned agents to finish an episode 
+            earlier. (to avoid additional negative penalty)
+            instead of trying to imitate the expert.
+    (3) Strictly negative reward often used for tasks with a per step penalty.
+        However, this variant assigns only negative rewards
+        and cannot learn a survival bonus.
+    
+    **Also notes that the choice of a specific reward function might already
+    provide strong prior knowledge that helps the RL algorithm
+    to move towards recovering the expertpolicy,
+    irrespective of the quality of the learned reward.
+    
+    More discussion: https://arxiv.org/pdf/1809.02925.pdf section 4.1, 4.1.1, 5.2
+    
+    ---------------------------------------------------------------------------
     The objective of the discriminator is to
     minimize cross-entropy loss
     between expert demonstrations and generated samples:
@@ -86,12 +107,13 @@ class DiscrimNet(nn.Module, ABC):
 
         # Regularization should be define in dsic_kwargs
         """
-        disc_kwargs: {
-            'dropout_hidden': True,
-            'dropout_hidden_rate': 0.1,
-            'dropout_input': True,
-            'dropout_input_rate': 0.1,
-            'use_spectral_norm': False}
+        Example:
+            disc_kwargs: {
+                'dropout_hidden': True,
+                'dropout_hidden_rate': 0.1,
+                'dropout_input': True,
+                'dropout_input_rate': 0.1,
+                'use_spectral_norm': False}
         """
         # Init Discriminator
         if init_model:
@@ -437,7 +459,7 @@ class AIRLStateActionDiscrim(DiscrimNet):
             # Reshape log_pi to prevent size mismatch.
             return self.f(obs, acts) - log_pis.view(-1, 1)
         elif log_pis is None and subtract_logp:
-            raise ValueError("log_pis is None! Can not subtract None.")
+            raise ValueError("log_pis is None! Cannot subtract None.")
         else:
             return self.f(obs, acts)
 

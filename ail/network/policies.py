@@ -3,7 +3,7 @@ from typing import Tuple, Sequence, Union
 import torch as th
 from torch import nn
 
-from ail.common.pytorch_util import build_mlp, count_vars
+from ail.common.pytorch_util import build_mlp
 from ail.common.math import reparameterize, evaluate_lop_pi
 from ail.common.type_alias import Activation
 
