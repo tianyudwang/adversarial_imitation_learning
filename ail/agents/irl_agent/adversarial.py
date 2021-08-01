@@ -64,9 +64,11 @@ class Adversarial(BaseIRLAgent):
         subtract_logp: bool,
         rew_type: str,
         rew_input_choice: str,
+        rew_clip: bool,
+        max_rew_magnitude: float,
         **kwargs,
     ):
-
+        assert max_rew_magnitude > 0, "max_rew_magnitude must be greater than 0"
         super().__init__(
             state_space,
             action_space,
@@ -92,6 +94,8 @@ class Adversarial(BaseIRLAgent):
         self.subtract_logp = subtract_logp
         self.rew_type = rew_type
         self.rew_input_choice = rew_input_choice
+        self.rew_clip = rew_clip
+        self.max_rew_magnitude = max_rew_magnitude
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
@@ -162,7 +166,11 @@ class Adversarial(BaseIRLAgent):
         data["rews"] = self.disc.calculate_rewards(choice=self.rew_input_choice, **data)
         # Sanity check length of data are equal.
         assert data["rews"].shape[0] == data["obs"].shape[0]
-
+        
+        # Reward Clipping
+        if self.rew_clip:
+            data["rews"].clamp_(-self.max_rew_magnitude, self.max_rew_magnitude)
+        
         # Update generator using estimated rewards.
         gen_logs = self.update_generator(data, log_this_batch)
 

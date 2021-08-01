@@ -26,7 +26,7 @@ OPTIM:
 
 
 ALGO:
-  # max_grad_norm: 0.5  # default: None
+  max_grad_norm: 0.5  # default: None
   gamma: 0.99         # default: 0.99
 
 
@@ -38,13 +38,13 @@ PPO:
   coef_ent: 0.01   # default: 0.0
 
   with_reward: false  # dont use reward for ail 
-  extra_data: ["log_pis"]  # no need to change this
+  # extra_data: [log_pis]  # no need to change this
 
   # PPO policy_kwargs
-  pi: [128, 128]              # default: [64, 64]
-  vf: [128, 128]              # default: [64, 64]
-  activation: "relu_inplace"  # default: "relu"
-  lr_actor: 3.0e-4            # default: 3.0e-4
+  pi: [256, 256]              # default: [64, 64]
+  vf: [256, 256]              # default: [64, 64]
+  activation: relu_inplace  # default: "relu"
+  lr_actor: 3.0e-4            # default: 3.0e-4 
   lr_critic: 3.0e-4           # default: 3.0e-4
   orthogonal_init: false       # default: false
 
@@ -73,24 +73,27 @@ SAC:
 
 # Discriminator settings
 DISC:
-  use_spectral_norm: true    # default: false
-  dropout_input: false        # default: false
+  use_spectral_norm: false    # default: false
+  # dropout_input: true        # default: false
   dropout_input_rate: 0.5     # default: 0.1
-  dropout_hidden: false       # default: false
+  # dropout_hidden: true       # default: false
   dropout_hidden_rate: 0.75   # default: 0.1
   
   # Discriminator Architecture
-  hidden_units: [100, 100]    # default: [128, 128] 
-  hidden_activation: "relu_inplace" 
+  hidden_units: [64]    # default: [128, 128] 
+  hidden_activation: relu_inplace
 
   epoch_disc: 1  
-  lr_disc: 1.0e-4
-  # choice = ["logsigmoid", "softplus", "logit"]
-  rew_input_choice: logit # default: "logsigmoid" 
-
+  lr_disc: 3.0e-5
+  # choice = ["logsigmoid", "softplus", "logit"] # default: "logsigmoid"
+  # rew_input_choice: logsigmoid
+  # rew_input_choice: softplus
+  rew_input_choice: logit
+  rew_clip: true        # default: False
+  max_rew_magnitude: 1.0   # default: 10.0
 
 AIRL:
-  disc_cls: airl_so  
+  disc_cls: airl_sa  
   subtract_logp: false  # deafult: true
 
 
@@ -114,8 +117,9 @@ AIRL:
 #   airl_sa:
 #   gail:
 
-# Hopper:
+# Hopper: 
 #   desc:
+      # ppo: pi_lr 7.3e-4, vf_lr 3.0e-4
 #   airl_so:
 #   airl_sa:
 #   gail:

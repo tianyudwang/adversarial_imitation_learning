@@ -283,7 +283,7 @@ class GAILDiscrim(DiscrimNet):
         return self.f(obs, acts)
 
     def calculate_rewards(
-        self, obs: th.Tensor, acts: th.Tensor, choice="logit", **kwargs
+        self, obs: th.Tensor, acts: th.Tensor, choice: str = "logsigmoid", **kwargs
     ):
         """
         (GAIL) is to maximize E_{\pi} [-log(1 - D)].
@@ -374,7 +374,7 @@ class AIRLStateDiscrim(DiscrimNet):
         next_obs: th.Tensor,
         log_pis: Optional[th.Tensor] = None,
         subtract_logp: bool = True,
-        choice="logit",
+        choice: str = "logit",
         **kwargs,
     ) -> th.Tensor:
         """
@@ -447,7 +447,7 @@ class AIRLStateActionDiscrim(DiscrimNet):
         acts: th.Tensor,
         log_pis: Optional[th.Tensor] = None,
         subtract_logp: bool = True,
-        choice="logit",
+        choice: str = "logit",
         **kwargs,
     ) -> th.Tensor:
         kwargs = {

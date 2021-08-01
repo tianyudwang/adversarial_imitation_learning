@@ -26,6 +26,10 @@ class Trainer(BaseTrainer):
         By default, equals to env's own time limit.
     :param eval_interval: How often to evaluate current policy
         By default, we enforce to create a copy of training env for evaluation.
+    :param eval_behavior_type:
+        stochastic: sample from the distribution (same as behavioral policy used during training),
+        mode: use the mode of the Gaussian instead of sampling,
+        average: sample half and use mode half and take the average of them.
     :param save_freq: How often to save the current policy.
     :param log_dir: path to log directory
     :param log_interval: How often to output training info.
@@ -45,7 +49,7 @@ class Trainer(BaseTrainer):
         max_ep_len=None,
         seed: int = 42,
         eval_interval: int = 5_000,
-        eval_behavior_type: str = "mix",
+        eval_behavior_type: str = "average",
         num_eval_episodes: int = 10,
         save_freq: int = 50_000,
         log_dir: str = "runs",

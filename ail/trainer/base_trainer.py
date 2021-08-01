@@ -35,6 +35,10 @@ class BaseTrainer(ABC):
     :param seed: random seed.
     :param verbose: The verbosity level: 0 no output, 1 info, 2 debug.
     :param use_wandb: Wether to use wandb for metrics visualization.
+    :param eval_behavior_type:
+        stochastic: sample from the distribution (same as behavioral policy used during training),
+        mode: use the mode of the Gaussian instead of sampling,
+        average: sample half and use mode half and take the average of them.
     """
 
     def __init__(
@@ -138,14 +142,14 @@ class BaseTrainer(ABC):
         self.num_eval_episodes = num_eval_episodes
         
         eval_behavior_type = eval_behavior_type.lower()
-        if eval_behavior_type == "deterministic":
+        if eval_behavior_type == "mode":
             self.stochastic_eval_episodes = 0
-        elif eval_behavior_type == "mix":
+        elif eval_behavior_type == "average":
             self.stochastic_eval_episodes = num_eval_episodes // 2
         else:
             raise ValueError(
                 f"Unrecognized evaluation behavior type: {eval_behavior_type}. "
-                f"Valid options are [deterministic, mix]."
+                f"Valid options are [stochastic, mode, average]."
             )    
         self.log_interval = log_interval
 

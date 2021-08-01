@@ -77,7 +77,7 @@ def CLI():
     # Logging and evaluation
     p.add_argument("--log_every_n_updates", "-lg", type=int, default=20)
     p.add_argument("--eval_interval", type=int, default=5 * 1e3)
-    p.add_argument("--eval_mode", type=str, default="mix")
+    p.add_argument("--eval_mode", type=str, default="average")
     p.add_argument("--num_eval_episodes", type=int, default=10)
     p.add_argument("--save_freq", type=int, default=50_000, 
                    help="Save model every `save_freq` steps.")
@@ -214,6 +214,8 @@ def run(args, cfg, path):
             lr_disc=cfg.DISC.lr_disc,
             subtract_logp = cfg.AIRL.subtract_logp,
             rew_input_choice = cfg.DISC.rew_input_choice,
+            rew_clip = cfg.DISC.rew_clip,
+            max_rew_magnitude = cfg.DISC.max_rew_magnitude,
         )
     )
     
@@ -251,7 +253,7 @@ def run(args, cfg, path):
         entries_to_remove = (
             "num_eval_episodes",
             "eval_interval",
-            "eval_behavior_type"
+            "eval_behavior_type",
             "log_dir",
             "log_interval",
             "save_freq",
@@ -329,8 +331,10 @@ if __name__ == "__main__":
         th.autograd.set_detect_anomaly(True)
 
     if args.cuda:
-        # os.environ["OMP_NUM_THREADS"] = "1"
+        os.environ["OMP_NUM_THREADS"] = "1"
         # torch backends
         th.backends.cudnn.benchmark = cfg.CUDA.cudnn  # ? Does this useful for non-convolutions?
-
+    else:
+        os.environ["OMP_NUM_THREADS"] = "2"
+    
     run(args, cfg, path)
