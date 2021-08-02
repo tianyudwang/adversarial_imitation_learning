@@ -71,7 +71,7 @@ def CLI():
     p.add_argument("--replay_batch_size", "-rbs", type=int, default=1_024)
 
     # Logging and evaluation
-    p.add_argument("--log_every_n_updates", "-lg", type=int, default=20)
+    p.add_argument("--log_every_n_updates", "-lg", type=int, default=10)
     p.add_argument("--eval_interval", type=int, default=5 * 1e3)
     p.add_argument("--eval_mode", type=str, default="average")
     p.add_argument("--num_eval_episodes", type=int, default=10)
@@ -212,6 +212,7 @@ def run(args, cfg, path):
                 dropout_hidden=cfg.DISC.dropout_hidden,
                 dropout_hidden_rate=cfg.DISC.dropout_hidden_rate,
             ),
+            disc_ent_coef=cfg.DISC.ent_coef,
             epoch_disc=cfg.DISC.epoch_disc,
             lr_disc=cfg.DISC.lr_disc,
             subtract_logp = cfg.AIRL.subtract_logp,

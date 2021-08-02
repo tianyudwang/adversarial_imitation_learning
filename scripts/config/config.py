@@ -108,7 +108,7 @@ _C.DISC.dropout_hidden_rate = 0.1  # Hidden layer dropout rate.
 # Discriminator Architecture
 _C.DISC.hidden_units = [128, 128]  # Discriminator hidden layers & sizes.
 _C.DISC.hidden_activation = "relu_inplace" # Hidden activation.
-
+_C.DISC.ent_coef = 0.0             # Entropy coef.
 _C.DISC.epoch_disc = 1  # Update discriminator n times per update.
 _C.DISC.lr_disc = 3e-4  # Discriminator learning rate.
 # Reward formulation

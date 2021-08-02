@@ -83,6 +83,8 @@ DISC:
   hidden_units: [100, 100]    # default: [128, 128] 
   hidden_activation: relu_inplace
 
+  ent_coef: 0.03 # default: 0.0
+
   epoch_disc: 1  
   lr_disc: 1.0e-4
   # choice = ["logsigmoid", "softplus", "logit"] # default: "logsigmoid"

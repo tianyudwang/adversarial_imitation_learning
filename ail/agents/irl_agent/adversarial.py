@@ -62,6 +62,7 @@ class Adversarial(BaseIRLAgent):
         disc_cls: DiscrimNet,
         disc_kwargs: Dict[str, Any],
         lr_disc: float,
+        disc_ent_coef: float,
         optim_kwargs: Optional[Dict[str, Any]],
         subtract_logp: bool,
         rew_type: str,
@@ -86,6 +87,7 @@ class Adversarial(BaseIRLAgent):
             gen_kwargs,
             optim_kwargs,
         )
+        # DiscrimNet
         self.disc = disc_cls(self.obs_dim, self.act_dim, **disc_kwargs).to(self.device)
         self.lr_disc = lr_disc
         self.optim_disc = self.optim_cls(self.disc.parameters(), lr=self.lr_disc)
@@ -97,7 +99,13 @@ class Adversarial(BaseIRLAgent):
                 th.ones(self.replay_batch_size, dtype=th.float32),
             ]
         ).reshape(-1, 1)
+
+        # loss function for the discriminator
         self.disc_criterion = nn.BCEWithLogitsLoss(reduction="mean")
+
+        # Coeffient for entropy bonus
+        assert disc_ent_coef >= 0, "disc_ent_coef must be non-negative."
+        self.disc_ent_coef = disc_ent_coef
 
         self.learning_steps_disc = 0
         self.epoch_disc = epoch_disc
@@ -286,17 +294,24 @@ class Adversarial(BaseIRLAgent):
             disc_logits = th.vstack([disc_logits_gen, disc_logits_exp])
             loss_disc = self.disc_criterion(disc_logits, self.disc_labels)
 
+            if self.disc_ent_coef > 0:
+                label_dist = Bernoulli(logits=disc_logits)
+                entropy = th.mean(label_dist.entropy())
+                loss_disc -= self.disc_ent_coef * entropy
+
         self.one_gradient_step(loss_disc, self.optim_disc, self.disc)
 
         disc_logs = {}
         if log_this_batch:
             # Discriminator's statistics.
-            disc_logs = compute_disc_stats(disc_logits, self.disc_labels, loss_disc)
+            disc_logs = self.compute_disc_stats(
+                disc_logits, self.disc_labels, loss_disc
+            )
 
         return disc_logs
 
     @staticmethod
-    def fix_normalize_obs(input_obs, obs_exp: th.Tensor):
+    def fix_normalize_obs(input_obs: th.Tensor, obs_exp: th.Tensor) -> th.Tensor:
         """
         Normalize expert's observations.
         :param obs_exp: expert's observations which has shape (batch_size, obs_dim)
@@ -305,77 +320,76 @@ class Adversarial(BaseIRLAgent):
         exp_obs_mean, exp_obs_std = obs_exp.mean(axis=0), obs_exp.std(axis=0)
         return normalize(input_obs, exp_obs_mean, exp_obs_std)
 
-    def make_absorbing_states(self, obs, dones):
+    def make_absorbing_states(self, obs: th.Tensor, dones: th.Tensor) -> th.Tensor:
         combined_states = th.hstack([obs, dones])
         is_done = th.all(combined_states, dim=-1, keepdims=True)
         absorbing_obs = th.where(is_done, self.absorbing_states, combined_states)
         return absorbing_obs
 
+    @staticmethod
+    def compute_disc_stats(
+        disc_logits: th.Tensor,
+        labels: th.Tensor,
+        disc_loss: th.Tensor,
+    ) -> Dict[str, float]:
+        """
+        Train statistics for GAIL/AIRL discriminator, or other binary classifiers.
+        :param disc_logits: discriminator logits where expert is 1 and generated is 0
+        :param labels: integer labels describing whether logit was for an
+                expert (1) or generator (0) sample.
+        :param disc_loss: discriminator loss.
+        :returns stats: dictionary mapping statistic names for float values.
+        """
+        with th.no_grad():
+            bin_is_exp_pred = disc_logits > 0
+            bin_is_exp_true = labels > 0
+            bin_is_gen_true = th.logical_not(bin_is_exp_true)
 
-def compute_disc_stats(
-    disc_logits: th.Tensor,
-    labels: th.Tensor,
-    disc_loss: th.Tensor,
-) -> Dict[str, float]:
-    """Train statistics for GAIL/AIRL discriminator, or other binary classifiers.
-    Args:
-        disc_logits_gen_is_high: discriminator logits produced by
-            `DiscrimNet.logits_gen_is_high`.
-        labels_gen_is_one: integer labels describing whether logit was for an
-            expert (0) or generator (1) sample.
-        disc_loss: final discriminator loss.
-    Returns:
-        stats: dictionary mapping statistic names for float values."""
-    with th.no_grad():
-        bin_is_exp_pred = disc_logits > 0
-        bin_is_exp_true = labels > 0
-        bin_is_gen_true = th.logical_not(bin_is_exp_true)
+            int_is_exp_pred = bin_is_exp_pred.long()
+            int_is_exp_true = bin_is_exp_true.long()
 
-        int_is_exp_pred = bin_is_exp_pred.long()
-        int_is_exp_true = bin_is_exp_true.long()
+            n_labels = float(len(labels))
+            n_exp = float(th.sum(int_is_exp_true))
+            n_gen = n_labels - n_exp
 
-        n_labels = float(len(labels))
-        n_exp = float(th.sum(int_is_exp_true))
-        n_gen = n_labels - n_exp
+            percent_gen = n_gen / float(n_labels) if n_labels > 0 else float("NaN")
+            n_gen_pred = int(n_labels - th.sum(int_is_exp_pred))
 
-        pct_gen = n_gen / float(n_labels) if n_labels > 0 else float("NaN")
-        n_gen_pred = int(n_labels - th.sum(int_is_exp_pred))
+            if n_labels > 0:
+                percent_gen_pred = n_gen_pred / float(n_labels)
+            else:
+                percent_gen_pred = float("NaN")
 
-        if n_labels > 0:
-            pct_gen_pred = n_gen_pred / float(n_labels)
-        else:
-            pct_gen_pred = float("NaN")
+            correct_vec = th.eq(bin_is_exp_pred, bin_is_exp_true)
+            disc_acc = th.mean(correct_vec.float())
 
-        correct_vec = th.eq(bin_is_exp_pred, bin_is_exp_true)
-        acc = th.mean(correct_vec.float())
+            _n_pred_gen = th.sum(th.logical_and(bin_is_gen_true, correct_vec))
+            if n_gen < 1:
+                gen_acc = float("NaN")
+            else:
+                # float() is defensive, since we cannot divide Torch tensors by
+                # Python ints
+                gen_acc = _n_pred_gen / float(n_gen)
 
-        _n_pred_gen = th.sum(th.logical_and(bin_is_gen_true, correct_vec))
-        if n_gen < 1:
-            gen_acc = float("NaN")
-        else:
-            # float() is defensive, since we cannot divide Torch tensors by
-            # Python ints
-            gen_acc = _n_pred_gen / float(n_gen)
+            _n_pred_exp = th.sum(th.logical_and(bin_is_exp_true, correct_vec))
+            _n_exp_or_1 = max(1, n_exp)
+            exp_acc = _n_pred_exp / float(_n_exp_or_1)
 
-        _n_pred_exp = th.sum(th.logical_and(bin_is_exp_true, correct_vec))
-        _n_exp_or_1 = max(1, n_exp)
-        exp_acc = _n_pred_exp / float(_n_exp_or_1)
+            label_dist = Bernoulli(logits=disc_logits)
+            entropy = th.mean(label_dist.entropy())
 
-        label_dist = Bernoulli(logits=disc_logits)
-        entropy = th.mean(label_dist.entropy())
-
-    pairs = [
-        ("disc_loss", float(th.mean(disc_loss))),
-        # accuracy, as well as accuracy on *just* expert examples and *just*
-        # generated examples
-        ("disc_acc", float(acc)),
-        ("disc_acc_gen", float(gen_acc)),
-        ("disc_acc_exp", float(exp_acc)),
-        # entropy of the predicted label distribution, averaged equally across
-        # both classes (if this drops then disc is very good or has given up)
-        ("disc_entropy", float(entropy)),
-        # true number of generators and predicted number of generators
-        ("proportion_gen_true", float(pct_gen)),
-        ("proportion_gen_pred", float(pct_gen_pred)),
-    ]
-    return OrderedDict(pairs)
+        pairs = [
+            ("disc_loss", float(th.mean(disc_loss))),
+            # Accuracy, as well as accuracy on *just* expert examples and *just*
+            # generated examples
+            ("disc_acc", float(disc_acc)),
+            ("disc_acc_gen", float(gen_acc)),
+            ("disc_acc_exp", float(exp_acc)),
+            # Entropy of the predicted label distribution, averaged equally across
+            # both classes (if this drops then disc is very good or has given up)
+            ("disc_entropy", float(entropy)),
+            # True number of generators and predicted number of generators
+            ("proportion_gen_true", float(percent_gen)),
+            ("proportion_gen_pred", float(percent_gen_pred)),
+        ]
+        return OrderedDict(pairs)

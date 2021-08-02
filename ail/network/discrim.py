@@ -44,18 +44,30 @@ class DiscrimNet(nn.Module, ABC):
     where f is a discriminator logit (a learnable function represented as MLP)
 
     Choice of reward function:
-    1. r(s, a) = − ln(1 − D) = softplus(h) (used in the original GAIL paper),
-    2. r(s, a) = ln D − ln(1 − D) = h (introduced in AIRL).
-    3. r(s, a) = ln D = −softplus(−h),            # ! Not Implemented.
-    4. r(s, a) = −h exp(h) (introduced in FAIRL)  # ! Not Implemented.
+    1. r(s, a) = − ln(1 − D) = softplus(h) \in [0, inf)
+        (used in the original GAIL paper),
+
+    2. r(s, a) = ln D − ln(1 − D) = h \in (-inf, inf)
+        (introduced in AIRL).
+
+    # ! 3 Not Implemented.
+    3. r(s, a) = ln D = −softplus(−h) \in (-inf, 0]
+        (a natural choice we have not encountered in literature)
+
+    # ! 4 Not Implemented.
+    4. r(s, a) = −h exp(h) (introduced in FAIRL)
     View the diference: https://www.desmos.com/calculator/egzxzpi4b7
 
     * The original GAIL paper uses the inverse convention in which
-    * D denotes the probability as being classified as non-expert.
+        D denotes the probability as being classified as non-expert.
+    * The FAIRL reward performed much worse than all others in the initial wide experiment
+        therefore was not included in our main experiment.
 
     ---------------------------------------------------------------------------
     BIAS IN REWARD FUNCTIONS:
     (1) Strictly positive reward worked well for environments that require a survival bonus.
+        (It encourages longer episodes)
+
     (2) Able to assign both positive and negative rewards for each time step.
         -Positive: this leading to sub-optimal policies (and training instability)
         in environments with a survival bonus.
@@ -63,9 +75,11 @@ class DiscrimNet(nn.Module, ABC):
             It is common for learned agents to finish an episode
             earlier. (to avoid additional negative penalty)
             instead of trying to imitate the expert.
+
     (3) Strictly negative reward often used for tasks with a per step penalty.
         However, this variant assigns only negative rewards
         and cannot learn a survival bonus.
+        (It encourages shorter episodes)
 
     **Also notes that the choice of a specific reward function might already
     provide strong prior knowledge that helps the RL algorithm
