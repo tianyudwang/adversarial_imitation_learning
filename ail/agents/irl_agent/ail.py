@@ -28,10 +28,11 @@ class AIRL(Adversarial):
         lr_disc: float,
         disc_ent_coef: float = 0.0,
         optim_kwargs: Optional[Dict[str, Any]] = None,
-        subtract_logp: bool = True,
+        subtract_logp: bool = False,
         rew_input_choice: str = "logit",
         rew_clip: bool = False,
         max_rew_magnitude: float = 10.0,
+        min_rew_magnitude: Optional[float] = None,
         obs_normalization: Optional[str] = None,
         **kwargs,
     ):
@@ -85,6 +86,7 @@ class AIRL(Adversarial):
             rew_input_choice,
             rew_clip,
             max_rew_magnitude,
+            min_rew_magnitude,
             obs_normalization,
             **kwargs,
         )
@@ -117,7 +119,8 @@ class GAIL(Adversarial):
         optim_kwargs: Optional[Dict[str, Any]] = None,
         rew_input_choice: str = "logsigmoid",
         rew_clip: bool = False,
-        max_rew_magnitude: float = 1.0,
+        max_rew_magnitude: float = 10.0,
+        min_rew_magnitude: Optional[float] = None,
         obs_normalization: Optional[str] = None,
         **kwargs,
     ):
@@ -151,5 +154,6 @@ class GAIL(Adversarial):
             rew_input_choice,
             rew_clip,
             max_rew_magnitude,
+            min_rew_magnitude,
             obs_normalization,
         )

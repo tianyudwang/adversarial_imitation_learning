@@ -219,6 +219,7 @@ def run(args, cfg, path):
             rew_input_choice = cfg.DISC.rew_input_choice,
             rew_clip = cfg.DISC.rew_clip,
             max_rew_magnitude = cfg.DISC.max_rew_magnitude,
+            min_rew_magnitude = cfg.DISC.min_rew_magnitude,
             obs_normalization = cfg.DISC.obs_normalization,
         )
     )

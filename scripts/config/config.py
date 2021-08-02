@@ -109,13 +109,14 @@ _C.DISC.dropout_hidden_rate = 0.1  # Hidden layer dropout rate.
 _C.DISC.hidden_units = [128, 128]  # Discriminator hidden layers & sizes.
 _C.DISC.hidden_activation = "relu_inplace" # Hidden activation.
 _C.DISC.ent_coef = 0.0             # Entropy coef.
-_C.DISC.epoch_disc = 1  # Update discriminator n times per update.
-_C.DISC.lr_disc = 3e-4  # Discriminator learning rate.
+_C.DISC.epoch_disc = 1             # Update discriminator n times per update.
+_C.DISC.lr_disc = 1e-4             # Discriminator learning rate.
 # Reward formulation
 _C.DISC.rew_input_choice = "logit" # Choices = ["logsigmoid", "softplus", "logti"].
 _C.DISC.rew_clip = False           # Clipping rewards.
-_C.DISC.max_rew_magnitude = 10.0   # Reward clipping magnitude.
-_C.DISC.obs_normalization = None  # Normalization of observations.
+_C.DISC.max_rew_magnitude = 10.0   # Max reward clipping magnitude.
+_C.DISC.min_rew_magnitude = -10.0  # Min reward clipping magnitude.
+_C.DISC.obs_normalization = None   # Normalization of observations.
 
 
 # AIRL only args

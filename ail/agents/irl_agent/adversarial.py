@@ -35,6 +35,7 @@ class Adversarial(BaseIRLAgent):
     :param disc_cls: Class for DiscrimNet,
     :param disc_kwargs: Expected kwargs to be passed to the DiscrimNet.
     :param lr_disc: learning rate for the discriminator
+    :param disc_ent_coef: Coefficient for entropy bonus
     :param optim_kwargs: arguments to be passed to the optimizer.
         eg. : {
             "optim_cls": adam,
@@ -69,10 +70,10 @@ class Adversarial(BaseIRLAgent):
         rew_input_choice: str,
         rew_clip: bool,
         max_rew_magnitude: float,
+        min_rew_magnitude: float,
         obs_normalization: Optional[str],
         **kwargs,
     ):
-        assert max_rew_magnitude > 0, "max_rew_magnitude must be greater than 0"
         super().__init__(
             state_space,
             action_space,
@@ -115,7 +116,16 @@ class Adversarial(BaseIRLAgent):
         self.rew_type = rew_type
         self.rew_input_choice = rew_input_choice
         self.rew_clip = rew_clip
-        self.max_rew_magnitude = max_rew_magnitude
+        
+        if self.rew_clip:
+            assert isinstance(max_rew_magnitude, (float, int))    
+            self.max_rew_magnitude = max_rew_magnitude
+            if min_rew_magnitude is None:
+                self.min_rew_magnitude = -max_rew_magnitude
+            else:
+                assert isinstance(min_rew_magnitude, (float, int))
+                assert min_rew_magnitude < max_rew_magnitude      
+                self.min_rew_magnitude = min_rew_magnitude
 
         if obs_normalization is not None:
             assert isinstance(
@@ -233,13 +243,11 @@ class Adversarial(BaseIRLAgent):
 
         # Reward Clipping
         if self.rew_clip:
-            ic("clipped")
-            data["rews"].clamp_(-self.max_rew_magnitude, self.max_rew_magnitude)
+            data["rews"].clamp_(self.min_rew_magnitude, self.max_rew_magnitude)
 
         # Update generator using estimated rewards.
         gen_logs = self.update_generator(data, log_this_batch)
 
-        # train_logs = {}
         return gen_logs, disc_logs
 
     def update_generator(
@@ -291,13 +299,13 @@ class Adversarial(BaseIRLAgent):
             """
             # Check dimensions of logits.
             assert disc_logits_gen.shape[0] == disc_logits_exp.shape[0]
+            # Combine batched logits.
             disc_logits = th.vstack([disc_logits_gen, disc_logits_exp])
             loss_disc = self.disc_criterion(disc_logits, self.disc_labels)
 
             if self.disc_ent_coef > 0:
-                label_dist = Bernoulli(logits=disc_logits)
-                entropy = th.mean(label_dist.entropy())
-                loss_disc -= self.disc_ent_coef * entropy
+                entropy = th.mean(Bernoulli(logits=disc_logits).entropy())
+                loss_disc = loss_disc - self.disc_ent_coef * entropy
 
         self.one_gradient_step(loss_disc, self.optim_disc, self.disc)
 
