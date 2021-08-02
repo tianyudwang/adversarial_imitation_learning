@@ -262,14 +262,17 @@ class BaseTrainer(ABC):
         time_logs["total_timestep"] = step
         time_logs["time_elapsed "] = self.duration(self.start_time)
 
+        disc_logging = False
         if len(train_logs) == 2 and isinstance(train_logs, tuple):
             train_logs, disc_logs = train_logs
+            disc_logging = True
 
         train_logs = self.convert_logs(train_logs)
 
         print("-" * 41)
         self.output_block(train_logs, tag="Train", color="back_bold_green")
-        self.output_block(disc_logs, tag="Disc", color="back_bold_red")
+        if disc_logging:
+            self.output_block(disc_logs, tag="Disc", color="back_bold_red")
         self.output_block(time_logs, tag="Time", color="back_bold_blue")
         print("\n")
 
