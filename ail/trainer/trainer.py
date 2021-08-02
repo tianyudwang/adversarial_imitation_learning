@@ -142,7 +142,6 @@ class Trainer(BaseTrainer):
             if self.algo.is_update(step):
                 if self.is_train_logging(step):
                     train_logs = self.algo.update(log_this_batch=True)
-                    train_logs = self.convert_logs(train_logs)
 
                     # Print changes from training updates.
                     self.train_logging(train_logs, step)

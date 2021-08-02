@@ -179,15 +179,16 @@ def run(args, cfg, path):
     # Demo data.
     if args.demo_path is None:
         # TODO: REMOVE THIS
-        try:
-            args.demo_path = (
-                path / "transitions" / args.env_id / "ppo_size11000.npz"
-            )
-        except FileNotFoundError:
-            args.demo_path = (
-                path / "transitions" / args.env_id / "sac_size11000.npz"
-            )
-        
+        demo_dir = path / "transitions"/ args.env_id
+        dir_lst = os.listdir(demo_dir)
+        repeat = []
+        for fname in dir_lst:
+            if fname.endswith("npz"):
+                repeat.append(fname)
+        if len(repeat) > 1:
+            raise ValueError(f"Too many demo files in {demo_dir}")
+        args.demo_path = demo_dir / fname
+                
     transitions = dict(np.load(args.demo_path))
 
     algo_kwargs.update(

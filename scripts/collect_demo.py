@@ -67,7 +67,7 @@ def collect_demo(
             raise ValueError("Please provide either sb3_model or cumstom algo")
 
         next_state, reward, done, _ = env.step(action)
-        mask = False if t == env._max_episode_steps else done
+        mask = done
 
         data = {
             "obs": asarray_shape2d(state),

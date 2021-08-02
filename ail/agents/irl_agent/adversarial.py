@@ -1,9 +1,10 @@
 from typing import Union, Optional, Dict, Any
-from collections import defaultdict
+from collections import OrderedDict
 
 import torch as th
-import torch.nn.functional as F
+from torch import nn
 from torch.cuda.amp import autocast
+from torch.distributions import Bernoulli
 
 from ail.agents.irl_agent.irl_core import BaseIRLAgent
 from ail.buffer import ReplayBuffer, BufferTag
@@ -89,6 +90,15 @@ class Adversarial(BaseIRLAgent):
         self.lr_disc = lr_disc
         self.optim_disc = self.optim_cls(self.disc.parameters(), lr=self.lr_disc)
 
+        # Lables for the discriminator(Assuming same batch size for gen and exp)
+        self.disc_labels = th.cat(
+            [
+                th.zeros(self.replay_batch_size, dtype=th.float32),
+                th.ones(self.replay_batch_size, dtype=th.float32),
+            ]
+        ).reshape(-1, 1)
+        self.disc_criterion = nn.BCEWithLogitsLoss(reduction="mean")
+
         self.learning_steps_disc = 0
         self.epoch_disc = epoch_disc
 
@@ -117,6 +127,9 @@ class Adversarial(BaseIRLAgent):
         else:
             self.normalize_obs = False
 
+        self.absorbing_states = th.zeros(self.obs_dim + 1).reshape(1, -1)
+        self.absorbing_states[:, -1] = 1.0
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
 
@@ -128,7 +141,6 @@ class Adversarial(BaseIRLAgent):
          2. Update discriminator.
          3. Update generator.
         """
-        disc_logs = defaultdict(list)
         for _ in range(self.epoch_disc):
             self.learning_steps_disc += 1
             # * Sample transitions from ``current`` policy.
@@ -144,18 +156,27 @@ class Adversarial(BaseIRLAgent):
             # Samples transitions from expert's demonstrations.
             data_exp = self.buffer_exp.sample(self.replay_batch_size)
 
+            # self.make_absorbing_states(data_gen["obs"], data_gen["dones"])
+
             if self.normalize_obs:
-                
-                data_gen["obs"] = self.fix_normalize_obs(data_gen["obs"], data_exp["obs"])
-                data_exp["obs"] = self.fix_normalize_obs(data_exp["obs"], data_exp["obs"])
-                data_gen["next_obs"] = self.fix_normalize_obs(data_gen["next_obs"], data_exp["next_obs"])
-                data_exp["next_obs"] = self.fix_normalize_obs(data_exp["next_obs"], data_exp["next_obs"])
-                ic(data_gen["obs"].mean(0), data_gen["next_obs"].mean(0))
-                ic(data_gen["obs"].std(0), data_gen["next_obs"].std(0))
-                ic(data_exp["obs"].mean(0), data_exp["next_obs"].mean(0))
-                ic(data_exp["obs"].std(0), data_exp["next_obs"].std(0))
-                
-                
+
+                data_gen["obs"] = self.fix_normalize_obs(
+                    data_gen["obs"], data_exp["obs"]
+                )
+                data_exp["obs"] = self.fix_normalize_obs(
+                    data_exp["obs"], data_exp["obs"]
+                )
+                data_gen["next_obs"] = self.fix_normalize_obs(
+                    data_gen["next_obs"], data_exp["next_obs"]
+                )
+                data_exp["next_obs"] = self.fix_normalize_obs(
+                    data_exp["next_obs"], data_exp["next_obs"]
+                )
+                # ic(data_gen["obs"].mean(0), data_gen["next_obs"].mean(0))
+                # ic(data_gen["obs"].std(0), data_gen["next_obs"].std(0))
+                # ic(data_exp["obs"].mean(0), data_exp["next_obs"].mean(0))
+                # ic(data_exp["obs"].std(0), data_exp["next_obs"].std(0))
+
             # Calculate log probabilities of generator's actions.
             # And evaluate log probabilities of expert actions.
             # Based on current generator's action distribution.
@@ -166,17 +187,16 @@ class Adversarial(BaseIRLAgent):
                         data_exp["obs"], data_exp["acts"]
                     )
             # Update discriminator.
-            disc_info = self.update_discriminator(data_gen, data_exp, log_this_batch)
+            disc_logs = self.update_discriminator(data_gen, data_exp, log_this_batch)
             if log_this_batch:
-                for k in disc_info.keys():
-                    disc_logs[k].append(disc_info[k])
                 disc_logs.update(
                     {
                         "lr_disc": self.lr_disc,
                         "learn_steps_disc": self.learning_steps_disc,
                     }
                 )
-            del data_gen, data_exp, disc_info
+                disc_logs = dict(disc_logs)
+            del data_gen, data_exp
 
         # Calculate rewards:
         if self.gen.buffer.tag == BufferTag.ROLLOUT:
@@ -205,13 +225,14 @@ class Adversarial(BaseIRLAgent):
 
         # Reward Clipping
         if self.rew_clip:
+            ic("clipped")
             data["rews"].clamp_(-self.max_rew_magnitude, self.max_rew_magnitude)
 
         # Update generator using estimated rewards.
         gen_logs = self.update_generator(data, log_this_batch)
 
-        train_logs = {**gen_logs, **disc_logs}
-        return train_logs
+        # train_logs = {}
+        return gen_logs, disc_logs
 
     def update_generator(
         self, data: TensorDict, log_this_batch: bool = False
@@ -244,37 +265,38 @@ class Adversarial(BaseIRLAgent):
         self.optim_disc.zero_grad(self.optim_set_to_none)
         with autocast(enabled=self.fp16):
             # Obtain logits of the discriminator.
-            logits_gen = self.disc(subtract_logp=self.subtract_logp, **data_gen)
-            logits_exp = self.disc(subtract_logp=self.subtract_logp, **data_exp)
+            disc_logits_gen = self.disc(subtract_logp=self.subtract_logp, **data_gen)
+            disc_logits_exp = self.disc(subtract_logp=self.subtract_logp, **data_exp)
 
             """
             E_{exp} [log(D)] + E_{\pi} [log(1 - D)]
             E_{exp} [log(sigmoid(f))] + E_{\pi} [log(1 - sigmoid(f))]
             *Note: S(x) = 1 - S(-x) -> S(-x) = 1 - S(x)
-            """
-            loss_pi = F.logsigmoid(-logits_gen).mean()
+            
+            # ! Deprecated:
+            Implmentation below is correct, but using BCEWithLogitsLoss
+            is more numerically stable than using a plain Sigmoid followed by a BCELoss
+            
+            loss_gen = F.logsigmoid(-logits_gen).mean()
             loss_exp = F.logsigmoid(logits_exp).mean()
-            loss_disc = -(loss_pi + loss_exp)
+            loss_disc = -(loss_gen + loss_exp)
+            """
+            # Check dimensions of logits.
+            assert disc_logits_gen.shape[0] == disc_logits_exp.shape[0]
+            disc_logits = th.vstack([disc_logits_gen, disc_logits_exp])
+            loss_disc = self.disc_criterion(disc_logits, self.disc_labels)
 
         self.one_gradient_step(loss_disc, self.optim_disc, self.disc)
 
         disc_logs = {}
         if log_this_batch:
-            # Discriminator's accuracies.
-            with th.no_grad():
-                acc_gen = (logits_gen.detach() < 0).float().mean()
-                acc_exp = (logits_exp.detach() > 0).float().mean()
+            # Discriminator's statistics.
+            disc_logs = compute_disc_stats(disc_logits, self.disc_labels, loss_disc)
 
-            disc_logs.update(
-                {
-                    "disc_loss": loss_disc.detach(),
-                    "acc_gen": acc_gen,
-                    "acc_exp": acc_exp,
-                }
-            )
         return disc_logs
-    
-    def fix_normalize_obs(self, input_obs, obs_exp: th.Tensor):
+
+    @staticmethod
+    def fix_normalize_obs(input_obs, obs_exp: th.Tensor):
         """
         Normalize expert's observations.
         :param obs_exp: expert's observations which has shape (batch_size, obs_dim)
@@ -282,6 +304,78 @@ class Adversarial(BaseIRLAgent):
         """
         exp_obs_mean, exp_obs_std = obs_exp.mean(axis=0), obs_exp.std(axis=0)
         return normalize(input_obs, exp_obs_mean, exp_obs_std)
-        
-        
-        
+
+    def make_absorbing_states(self, obs, dones):
+        combined_states = th.hstack([obs, dones])
+        is_done = th.all(combined_states, dim=-1, keepdims=True)
+        absorbing_obs = th.where(is_done, self.absorbing_states, combined_states)
+        return absorbing_obs
+
+
+def compute_disc_stats(
+    disc_logits: th.Tensor,
+    labels: th.Tensor,
+    disc_loss: th.Tensor,
+) -> Dict[str, float]:
+    """Train statistics for GAIL/AIRL discriminator, or other binary classifiers.
+    Args:
+        disc_logits_gen_is_high: discriminator logits produced by
+            `DiscrimNet.logits_gen_is_high`.
+        labels_gen_is_one: integer labels describing whether logit was for an
+            expert (0) or generator (1) sample.
+        disc_loss: final discriminator loss.
+    Returns:
+        stats: dictionary mapping statistic names for float values."""
+    with th.no_grad():
+        bin_is_exp_pred = disc_logits > 0
+        bin_is_exp_true = labels > 0
+        bin_is_gen_true = th.logical_not(bin_is_exp_true)
+
+        int_is_exp_pred = bin_is_exp_pred.long()
+        int_is_exp_true = bin_is_exp_true.long()
+
+        n_labels = float(len(labels))
+        n_exp = float(th.sum(int_is_exp_true))
+        n_gen = n_labels - n_exp
+
+        pct_gen = n_gen / float(n_labels) if n_labels > 0 else float("NaN")
+        n_gen_pred = int(n_labels - th.sum(int_is_exp_pred))
+
+        if n_labels > 0:
+            pct_gen_pred = n_gen_pred / float(n_labels)
+        else:
+            pct_gen_pred = float("NaN")
+
+        correct_vec = th.eq(bin_is_exp_pred, bin_is_exp_true)
+        acc = th.mean(correct_vec.float())
+
+        _n_pred_gen = th.sum(th.logical_and(bin_is_gen_true, correct_vec))
+        if n_gen < 1:
+            gen_acc = float("NaN")
+        else:
+            # float() is defensive, since we cannot divide Torch tensors by
+            # Python ints
+            gen_acc = _n_pred_gen / float(n_gen)
+
+        _n_pred_exp = th.sum(th.logical_and(bin_is_exp_true, correct_vec))
+        _n_exp_or_1 = max(1, n_exp)
+        exp_acc = _n_pred_exp / float(_n_exp_or_1)
+
+        label_dist = Bernoulli(logits=disc_logits)
+        entropy = th.mean(label_dist.entropy())
+
+    pairs = [
+        ("disc_loss", float(th.mean(disc_loss))),
+        # accuracy, as well as accuracy on *just* expert examples and *just*
+        # generated examples
+        ("disc_acc", float(acc)),
+        ("disc_acc_gen", float(gen_acc)),
+        ("disc_acc_exp", float(exp_acc)),
+        # entropy of the predicted label distribution, averaged equally across
+        # both classes (if this drops then disc is very good or has given up)
+        ("disc_entropy", float(entropy)),
+        # true number of generators and predicted number of generators
+        ("proportion_gen_true", float(pct_gen)),
+        ("proportion_gen_pred", float(pct_gen_pred)),
+    ]
+    return OrderedDict(pairs)

@@ -6,6 +6,7 @@ from torch import nn
 
 from ail.common.pytorch_util import build_mlp
 
+
 class BaseValue(nn.Module, ABC):
     """
     Basic class of a general Value or Q function

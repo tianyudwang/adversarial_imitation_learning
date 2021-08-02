@@ -48,31 +48,32 @@ class DiscrimNet(nn.Module, ABC):
     2. r(s, a) = ln D − ln(1 − D) = h (introduced in AIRL).
     3. r(s, a) = ln D = −softplus(−h),            # ! Not Implemented.
     4. r(s, a) = −h exp(h) (introduced in FAIRL)  # ! Not Implemented.
-    
+    View the diference: https://www.desmos.com/calculator/egzxzpi4b7
+
     * The original GAIL paper uses the inverse convention in which
     * D denotes the probability as being classified as non-expert.
-    
+
     ---------------------------------------------------------------------------
     BIAS IN REWARD FUNCTIONS:
     (1) Strictly positive reward worked well for environments that require a survival bonus.
-    (2) Able to assign both positive and negative rewards for each time step. 
+    (2) Able to assign both positive and negative rewards for each time step.
         -Positive: this leading to sub-optimal policies (and training instability)
         in environments with a survival bonus.
         -Negative: this assigns rewards with a negative bias(in the beginning of training).
-            It is common for learned agents to finish an episode 
+            It is common for learned agents to finish an episode
             earlier. (to avoid additional negative penalty)
             instead of trying to imitate the expert.
     (3) Strictly negative reward often used for tasks with a per step penalty.
         However, this variant assigns only negative rewards
         and cannot learn a survival bonus.
-    
+
     **Also notes that the choice of a specific reward function might already
     provide strong prior knowledge that helps the RL algorithm
     to move towards recovering the expertpolicy,
     irrespective of the quality of the learned reward.
-    
+
     More discussion: https://arxiv.org/pdf/1809.02925.pdf section 4.1, 4.1.1, 5.2
-    
+
     ---------------------------------------------------------------------------
     The objective of the discriminator is to
     minimize cross-entropy loss

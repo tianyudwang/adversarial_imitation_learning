@@ -131,8 +131,11 @@ class BaseTrainer(ABC):
             "approx_kl": "info/actor/approx_kl",
             "clip_fraction": "info/actor/clip_fraction",
             "disc_loss": "loss/disc",
-            "acc_gen": "info/disc/acc_gen",
-            "acc_exp": "info/disc/acc_exp",
+            "disc_acc": "info/disc/acc_disc",
+            "disc_acc_gen": "info/disc/acc_gen",
+            "disc_acc_exp": "info/disc/acc_exp",
+            "disc_entropy": "info/disc/entropy",
+            "proportion_gen_pred": "info/disc/prop_gen",
         }
 
         # Log and Saving.
@@ -255,15 +258,20 @@ class BaseTrainer(ABC):
 
     def train_logging(self, train_logs: Dict[str, Any], step: int) -> None:
         """Log training info (no saving yet)"""
-        if self.is_train_logging(step):
-            time_logs = OrderedDict()
-            time_logs["total_timestep"] = step
-            time_logs["time_elapsed "] = self.duration(self.start_time)
+        time_logs = OrderedDict()
+        time_logs["total_timestep"] = step
+        time_logs["time_elapsed "] = self.duration(self.start_time)
 
-            print("-" * 41)
-            self.output_block(train_logs, tag="Train", color="back_bold_green")
-            self.output_block(time_logs, tag="Time", color="back_bold_blue")
-            print("\n")
+        if len(train_logs) == 2 and isinstance(train_logs, tuple):
+            train_logs, disc_logs = train_logs
+
+        train_logs = self.convert_logs(train_logs)
+
+        print("-" * 41)
+        self.output_block(train_logs, tag="Train", color="back_bold_green")
+        self.output_block(disc_logs, tag="Disc", color="back_bold_red")
+        self.output_block(time_logs, tag="Time", color="back_bold_blue")
+        print("\n")
 
     def eval_logging(
         self,
@@ -355,6 +363,9 @@ class BaseTrainer(ABC):
     def info_to_tb(self, train_logs: Dict[str, Any], step: int) -> None:
         """Logging to tensorboard or wandb (if sync)"""
         assert train_logs is not None, "train log can not be `None`"
+        if len(train_logs) == 2 and isinstance(train_logs, tuple):
+            train_logs = {**train_logs[0], **train_logs[1]}
+
         if len(train_logs) > 0:
             for k, v in train_logs.items():
                 if k in self.tb_tags:

@@ -462,7 +462,6 @@ class BaseBuffer:
         """Returns whether the buffer is full."""
         return self._buffer.full()
 
-
     def store(
         self,
         transitions: Dict[str, np.ndarray],
@@ -526,7 +525,7 @@ class BaseBuffer:
             warnings.warn(f"Unfulfill keys: {difference}.")
         if ignore:
             warnings.warn(f"Ignore keys: {ignore}.")
-        
+
         # Remove unnecessary fields
         trans_dict = {k: transitions[k] for k in intersect}
         self._buffer.store(trans_dict, truncate_ok=truncate_ok)
