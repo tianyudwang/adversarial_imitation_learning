@@ -1,4 +1,4 @@
-from typing import Union, Optional, Dict, Any
+from typing import Union, Optional, Tuple, Dict, Any
 from collections import OrderedDict
 
 import torch as th
@@ -116,15 +116,15 @@ class Adversarial(BaseIRLAgent):
         self.rew_type = rew_type
         self.rew_input_choice = rew_input_choice
         self.rew_clip = rew_clip
-        
+
         if self.rew_clip:
-            assert isinstance(max_rew_magnitude, (float, int))    
+            assert isinstance(max_rew_magnitude, (float, int))
             self.max_rew_magnitude = max_rew_magnitude
             if min_rew_magnitude is None:
                 self.min_rew_magnitude = -max_rew_magnitude
             else:
                 assert isinstance(min_rew_magnitude, (float, int))
-                assert min_rew_magnitude < max_rew_magnitude      
+                assert min_rew_magnitude < max_rew_magnitude
                 self.min_rew_magnitude = min_rew_magnitude
 
         if obs_normalization is not None:
@@ -151,7 +151,9 @@ class Adversarial(BaseIRLAgent):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
 
-    def update(self, log_this_batch: bool = False) -> Dict[str, Any]:
+    def update(
+        self, log_this_batch: bool = False
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Main loop
          1. Interact with the environment using the current generator/ policy.

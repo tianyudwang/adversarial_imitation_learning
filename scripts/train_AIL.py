@@ -230,7 +230,7 @@ def run(args, cfg, path):
 
     
     config = dict(
-        num_steps=args.num_steps,
+        total_timesteps=args.num_steps,
         env=args.env_id,
         algo=args.algo,
         algo_kwargs=algo_kwargs,

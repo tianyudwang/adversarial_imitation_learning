@@ -41,7 +41,7 @@ class Trainer(BaseTrainer):
 
     def __init__(
         self,
-        num_steps: int,
+        total_timesteps: int,
         env: Union[GymEnv, str],
         algo: Union[OnPolicyAgent, OffPolicyAgent],
         algo_kwargs: Dict[str, Any],
@@ -60,7 +60,7 @@ class Trainer(BaseTrainer):
         **kwargs,
     ):
         super().__init__(
-            num_steps,
+            total_timesteps,
             env,
             env_kwargs,
             max_ep_len,
@@ -119,7 +119,7 @@ class Trainer(BaseTrainer):
         self.writer = SummaryWriter(log_dir=self.summary_dir)
 
         DEVICE = "".join(re.findall("[a-zA-Z]+", str(self.device)))
-        self.n_steps_pbar.set_description(f"{self.algo} ({DEVICE})")
+        self.total_timesteps_pbar.set_description(f"{self.algo} ({DEVICE})")
 
     def run_training_loop(self):
         """
@@ -128,26 +128,28 @@ class Trainer(BaseTrainer):
         # Time to start training.
         self.start_time = time()
         # Episode's timestep.
-        t = 0
+        episode_timesteps = 0
         # Initialize the environment.
         obs = self.env.reset()
 
         # log = []
-        for step in self.n_steps_pbar:
+        for global_step in self.total_timesteps_pbar:
             # Pass to the algorithm to update state and episode timestep.
-            # * return of algo.step() is next_obs
-            obs, t = self.algo.step(self.env, obs, t, step)
+            # * return of algo.step() is next_obs, episode_timesteps
+            obs, episode_timesteps = self.algo.step(
+                self.env, obs, episode_timesteps, global_step
+            )
 
             # Update the algorithm whenever ready.
-            if self.algo.is_update(step):
-                if self.is_train_logging(step):
+            if self.algo.is_update(global_step):
+                if self.is_train_logging(global_step):
                     train_logs = self.algo.update(log_this_batch=True)
 
                     # Print changes from training updates.
-                    self.train_logging(train_logs, step)
+                    self.train_logging(train_logs, global_step)
 
                     # Logging changes to tensorboard.
-                    self.info_to_tb(train_logs, step)
+                    self.info_to_tb(train_logs, global_step)
                     # TODO: Set a better log strategy to reduce overhead. Current downsampling.
                     # TODO: implement two more logging strategies: Summarization / histogram.
                     # log.append(train_logs)
@@ -164,11 +166,11 @@ class Trainer(BaseTrainer):
                     self.algo.update(log_this_batch=False)
 
             # Evaluate regularly.
-            if step % self.eval_interval == 0:
-                self.evaluate(step)
+            if global_step % self.eval_interval == 0:
+                self.evaluate(global_step)
 
             # Saving the model.
-            if self.is_saving_model(step):
-                self.save_models(os.path.join(self.model_dir, f"step{step}"))
+            if self.is_saving_model(global_step):
+                self.save_models(os.path.join(self.model_dir, f"step{global_step}"))
 
         self.finish_logging()

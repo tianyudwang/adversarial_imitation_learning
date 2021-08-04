@@ -34,6 +34,10 @@ class RescaleBoxAction(ActionWrapper):
         action = np.clip(action, low, high)
         return action
 
+    @property
+    def _max_episode_steps(self):
+        return self.env._max_episode_steps  # pylint: disable=protected-access
+
 
 # Borrow from (https://github.com/openai/gym/tree/ee5ee3a4a5b9d09219ff4c932a45c4a661778cd7/gym/wrappers)
 class ClipBoxAction(ActionWrapper):
@@ -45,12 +49,14 @@ class ClipBoxAction(ActionWrapper):
 
     def __init__(self, env):
         assert isinstance(env.action_space, Box)
-        max_episode_steps = env.spec.max_episode_steps
         super().__init__(env)
-        self._max_episode_steps = max_episode_steps
 
     def action(self, action):
         return np.clip(action, self.action_space.low, self.action_space.high)
+
+    @property
+    def _max_episode_steps(self):
+        return self.env._max_episode_steps  # pylint: disable=protected-access
 
 
 class NormalizeBoxAction(ActionWrapper):
@@ -60,10 +66,6 @@ class NormalizeBoxAction(ActionWrapper):
         if not isinstance(env.action_space, Box):
             raise ValueError(f"env {env} does not use spaces.Box.")
         super().__init__(env)
-        try:
-            self._max_episode_steps = env.max_episode_steps
-        except AttributeError:
-            self._max_episode_steps = env.spec.max_episode_steps
 
     def action(self, action):
         # rescale the action (MinMaxScaler)
@@ -76,3 +78,7 @@ class NormalizeBoxAction(ActionWrapper):
         low, high = self.env.action_space.low, self.env.action_space.high
         action = (scaled_action - low) * 2.0 / (high - low) - 1.0
         return action
+
+    @property
+    def _max_episode_steps(self):
+        return self.env._max_episode_steps  # pylint: disable=protected-access

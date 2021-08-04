@@ -7,7 +7,7 @@ from torch.cuda.amp import autocast
 
 from ail.agents.rl_agent.rl_core import OnPolicyAgent
 from ail.common.math import normalize
-from ail.common.type_alias import AlgoTags, GymEnv, GymSpace, TensorDict
+from ail.common.type_alias import AlgoTags, DoneMask, GymEnv, GymSpace, TensorDict
 from ail.common.pytorch_util import asarray_shape2d, obs_as_tensor, disable_gradient
 
 
@@ -117,27 +117,37 @@ class PPO(OnPolicyAgent):
         return step % self.batch_size == 0
 
     def step(
-        self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
+        self,
+        env: GymEnv,
+        state: th.Tensor,
+        episode_timesteps: th.Tensor,
+        total_timesteps: Optional[int] = None,
     ) -> Tuple[np.ndarray, int]:
         """
         Intereact with environment and store the transition.
         return: next_state, episode length
         """
-        t += 1
+        episode_timesteps += 1
         action, log_pi = self.explore(obs_as_tensor(state, self.device), scale=False)
         scale_action = (
             self.scale_action(action) if not self.normalized_action_space else action
         )
         next_state, reward, done, info = env.step(scale_action)
 
-        # * (Yifan) Intuitively, mask make sense that agent keeps alive which is not done by env
-        mask = False if t == env._max_episode_steps else done
+        # * (Yifan) Intuitively, done mask make sense
+        # * that agent keeps alive and keep running if it is not done by env's time limit.
+        # See: https://github.com/sfujim/TD3/blob/master/main.py#L127
+        done_mask: float
+        if episode_timesteps == env._max_episode_steps or not done:
+            done_mask = DoneMask.NOT_DONE.value
+        else:
+            done_mask = DoneMask.DONE.value
 
         data = {
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
             "rews": asarray_shape2d(reward),
-            "dones": asarray_shape2d(mask),
+            "dones": asarray_shape2d(done_mask),
             "log_pis": asarray_shape2d(log_pi),
             "next_obs": asarray_shape2d(next_state),
         }
@@ -147,10 +157,10 @@ class PPO(OnPolicyAgent):
         self.buffer.store(data, truncate_ok=False)
 
         if done:
-            t = 0
+            episode_timesteps = 0
             next_state = env.reset()
 
-        return next_state, t
+        return next_state, episode_timesteps
 
     def update(self, log_this_batch: bool = False) -> Dict[str, Any]:
         """

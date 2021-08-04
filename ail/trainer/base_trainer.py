@@ -3,7 +3,7 @@ from time import time
 from datetime import timedelta
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from typing import Dict, Any, Union, Optional
+from typing import Tuple, Dict, Any, Union, Optional
 
 import numpy as np
 import torch as th
@@ -43,7 +43,7 @@ class BaseTrainer(ABC):
 
     def __init__(
         self,
-        num_steps: int,
+        total_timesteps: int,
         env: Union[GymEnv, str],
         env_kwargs: Dict[str, Any],
         max_ep_len: Optional[int],
@@ -157,12 +157,14 @@ class BaseTrainer(ABC):
         self.log_interval = log_interval
 
         # Progress param
-        self.n_steps_pbar = tqdm(range(1, num_steps + 1), dynamic_ncols=True)
+        self.total_timesteps_pbar = tqdm(
+            range(1, total_timesteps + 1), dynamic_ncols=True
+        )
         self.best_ret = -float("inf")
         self.rs = RunningStats()
 
         # Other parameters.
-        self.num_steps = num_steps
+        self.total_timesteps = total_timesteps
         self.verbose = verbose
         self.algo = None
         self.batch_size = None
@@ -253,10 +255,12 @@ class BaseTrainer(ABC):
         )
 
     def is_saving_model(self, step: int) -> bool:
-        cond = (step > 0, step % self.save_freq == 0, step / self.num_steps > 0.3)
-        return all(cond) or step == self.num_steps - 1
+        cond = (step > 0, step % self.save_freq == 0, step / self.total_timesteps > 0.3)
+        return all(cond) or step == self.total_timesteps - 1
 
-    def train_logging(self, train_logs: Dict[str, Any], step: int) -> None:
+    def train_logging(
+        self, train_logs: Union[Tuple[dict], Dict[str, Any]], step: int
+    ) -> None:
         """Log training info (no saving yet)"""
         time_logs = OrderedDict()
         time_logs["total_timestep"] = step

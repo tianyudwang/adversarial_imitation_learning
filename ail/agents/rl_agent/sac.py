@@ -18,7 +18,7 @@ from ail.common.pytorch_util import (
     obs_as_tensor,
     to_torch,
 )
-from ail.common.type_alias import AlgoTags, GymEnv, GymSpace, TensorDict
+from ail.common.type_alias import AlgoTags, DoneMask, GymEnv, GymSpace, TensorDict
 from ail.network.policies import StateDependentPolicy
 from ail.network.value import mlp_value
 
@@ -181,7 +181,11 @@ class SAC(OffPolicyAgent):
         return step >= max(self.start_steps, self.batch_size)
 
     def step(
-        self, env: GymEnv, state: th.Tensor, t: th.Tensor, step: Optional[int] = None
+        self,
+        env: GymEnv,
+        state: th.Tensor,
+        episode_timesteps: th.Tensor,
+        total_timesteps: Optional[int] = None,
     ) -> Tuple[np.ndarray, int]:
 
         """
@@ -191,9 +195,9 @@ class SAC(OffPolicyAgent):
         Agent takes actions which are sampled from a uniform random distribution over valid actions.
         After that, it returns to normal SAC exploration.
         """
-        t += 1
+        episode_timesteps += 1
 
-        if step <= self.start_steps:
+        if total_timesteps <= self.start_steps:
             # Random uniform sampling.
             scaled_action = env.action_space.sample()
             # * Need to apply tanh transoform to the action to make it in range [-1, 1]
@@ -225,14 +229,20 @@ class SAC(OffPolicyAgent):
             assert not math.isnan(log_pi)
 
         next_state, reward, done, info = env.step(scaled_action)
-        # * (Yifan) Intuitively, mask make sense that agent keeps alive which is not done by env
-        mask = False if t == env._max_episode_steps else done
+        # * (Yifan) Intuitively, done mask make sense
+        # * Agent keeps alive and keep running if it is not done by env's time limit.
+        # See: https://github.com/sfujim/TD3/blob/master/main.py#L127
+        done_mask: float
+        if episode_timesteps == env._max_episode_steps or not done:
+            done_mask = DoneMask.NOT_DONE.value
+        else:
+            done_mask = DoneMask.DONE.value
 
         data = {
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
             "rews": asarray_shape2d(reward),
-            "dones": asarray_shape2d(mask),
+            "dones": asarray_shape2d(done_mask),
             "next_obs": asarray_shape2d(next_state),
         }
 
@@ -248,9 +258,9 @@ class SAC(OffPolicyAgent):
         self.buffer.store(data, truncate_ok=True)
 
         if done:
-            t = 0
+            episode_timesteps = 0
             next_state = env.reset()
-        return next_state, t
+        return next_state, episode_timesteps
 
     def update(self, log_this_batch: bool = False) -> Dict[str, Any]:
         """
