@@ -197,8 +197,9 @@ class SAC(OffPolicyAgent):
         """
         episode_timesteps += 1
 
+        # Random exploration step
         if total_timesteps <= self.start_steps:
-            # Random uniform sampling.
+            # Random uniform sampling from env's action space.
             scaled_action = env.action_space.sample()
             # * Need to apply tanh transoform to the action to make it in range [-1, 1]
             action = (
@@ -207,6 +208,9 @@ class SAC(OffPolicyAgent):
                 else scaled_action
             )
 
+            # If we want to record log_pi during random exploration
+            # We need to applied tanh transform
+            # and calculate the squashed log prob correction as well.
             log_pi = (
                 self.actor.evaluate_log_pi(
                     to_torch(state, self.device), to_torch(action, self.device)
@@ -215,6 +219,7 @@ class SAC(OffPolicyAgent):
                 else None
             )
 
+        # Returns to normal SAC exploration.
         else:
             action, log_pi = self.explore(
                 obs_as_tensor(state, self.device), scale=False
@@ -225,10 +230,13 @@ class SAC(OffPolicyAgent):
                 else action
             )
 
+        # Ensures log_pi is not NaN.
         if log_pi is not None:
             assert not math.isnan(log_pi)
 
+        # Interact with environment.
         next_state, reward, done, info = env.step(scaled_action)
+
         # * (Yifan) Intuitively, done mask make sense
         # * Agent keeps alive and keep running if it is not done by env's time limit.
         # See: https://github.com/sfujim/TD3/blob/master/main.py#L127
@@ -257,6 +265,7 @@ class SAC(OffPolicyAgent):
         # * ALLOW size larger than buffer capcity.
         self.buffer.store(data, truncate_ok=True)
 
+        # Reset env if encounter done signal (not done mask!)
         if done:
             episode_timesteps = 0
             next_state = env.reset()

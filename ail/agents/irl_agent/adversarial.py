@@ -94,12 +94,10 @@ class Adversarial(BaseIRLAgent):
         self.optim_disc = self.optim_cls(self.disc.parameters(), lr=self.lr_disc)
 
         # Lables for the discriminator(Assuming same batch size for gen and exp)
-        self.disc_labels = th.cat(
-            [
-                th.zeros(self.replay_batch_size, dtype=th.float32),
-                th.ones(self.replay_batch_size, dtype=th.float32),
-            ]
-        ).reshape(-1, 1)
+        self.disc_labels = self.make_labels(
+            n_gen=self.replay_batch_size, n_exp=self.replay_batch_size
+        )
+        self.n_labels = float(len(self.disc_labels))
 
         # loss function for the discriminator
         self.disc_criterion = nn.BCEWithLogitsLoss(reduction="mean")
@@ -320,26 +318,9 @@ class Adversarial(BaseIRLAgent):
 
         return disc_logs
 
-    @staticmethod
-    def fix_normalize_obs(input_obs: th.Tensor, obs_exp: th.Tensor) -> th.Tensor:
-        """
-        Normalize expert's observations.
-        :param obs_exp: expert's observations which has shape (batch_size, obs_dim)
-        :return: normalized input_obs with approximately zero mean and std one
-        """
-        exp_obs_mean, exp_obs_std = obs_exp.mean(axis=0), obs_exp.std(axis=0)
-        return normalize(input_obs, exp_obs_mean, exp_obs_std)
-
-    def make_absorbing_states(self, obs: th.Tensor, dones: th.Tensor) -> th.Tensor:
-        combined_states = th.hstack([obs, dones])
-        is_done = th.all(combined_states, dim=-1, keepdims=True)
-        absorbing_obs = th.where(is_done, self.absorbing_states, combined_states)
-        return absorbing_obs
-
-    @staticmethod
     def compute_disc_stats(
+        self,
         disc_logits: th.Tensor,
-        labels: th.Tensor,
         disc_loss: th.Tensor,
     ) -> Dict[str, float]:
         """
@@ -352,23 +333,19 @@ class Adversarial(BaseIRLAgent):
         """
         with th.no_grad():
             bin_is_exp_pred = disc_logits > 0
-            bin_is_exp_true = labels > 0
+            bin_is_exp_true = self.disc_labels > 0
             bin_is_gen_true = th.logical_not(bin_is_exp_true)
 
             int_is_exp_pred = bin_is_exp_pred.long()
             int_is_exp_true = bin_is_exp_true.long()
 
-            n_labels = float(len(labels))
             n_exp = float(th.sum(int_is_exp_true))
-            n_gen = n_labels - n_exp
+            n_gen = self.n_labels - n_exp
 
-            percent_gen = n_gen / float(n_labels) if n_labels > 0 else float("NaN")
-            n_gen_pred = int(n_labels - th.sum(int_is_exp_pred))
+            percent_gen = n_gen / self.n_labels 
+            n_gen_pred = int(self.n_labels - th.sum(int_is_exp_pred))
 
-            if n_labels > 0:
-                percent_gen_pred = n_gen_pred / float(n_labels)
-            else:
-                percent_gen_pred = float("NaN")
+            percent_gen_pred = n_gen_pred / self.n_labels
 
             correct_vec = th.eq(bin_is_exp_pred, bin_is_exp_true)
             disc_acc = th.mean(correct_vec.float())
@@ -403,3 +380,25 @@ class Adversarial(BaseIRLAgent):
             ("proportion_gen_pred", float(percent_gen_pred)),
         ]
         return OrderedDict(pairs)
+    
+    @staticmethod
+    def fix_normalize_obs(input_obs: th.Tensor, obs_exp: th.Tensor) -> th.Tensor:
+        """
+        Normalize expert's observations.
+        :param obs_exp: expert's observations which has shape (batch_size, obs_dim)
+        :return: normalized input_obs with approximately zero mean and std one
+        """
+        exp_obs_mean, exp_obs_std = obs_exp.mean(axis=0), obs_exp.std(axis=0)
+        return normalize(input_obs, exp_obs_mean, exp_obs_std)
+
+    def make_absorbing_states(self, obs: th.Tensor, dones: th.Tensor) -> th.Tensor:
+        combined_states = th.hstack([obs, dones])
+        is_done = th.all(combined_states, dim=-1, keepdims=True)
+        absorbing_obs = th.where(is_done, self.absorbing_states, combined_states)
+        return absorbing_obs
+
+    @staticmethod
+    def make_labels(n_gen: int, n_exp: int) -> th.Tensor:
+        return th.cat(
+            [th.zeros(n_gen, dtype=th.float32), th.ones(n_exp, dtype=th.float32)]
+        ).reshape(-1, 1)

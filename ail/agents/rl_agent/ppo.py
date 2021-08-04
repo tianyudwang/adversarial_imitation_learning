@@ -128,10 +128,17 @@ class PPO(OnPolicyAgent):
         return: next_state, episode length
         """
         episode_timesteps += 1
+
+        # Sample actions from action distribution.
+        # which is then wrapped by tanh transform to keep it in range [-1, 1].
         action, log_pi = self.explore(obs_as_tensor(state, self.device), scale=False)
+
+        # Resacle actions to match original action space.
         scale_action = (
             self.scale_action(action) if not self.normalized_action_space else action
         )
+
+        # Interact with environment.
         next_state, reward, done, info = env.step(scale_action)
 
         # * (Yifan) Intuitively, done mask make sense
@@ -153,13 +160,13 @@ class PPO(OnPolicyAgent):
         }
 
         # Store transition.
-        # * NOT allow size larger than buffer capcity.
+        # * NOT ALLOW size larger than buffer capcity.
         self.buffer.store(data, truncate_ok=False)
 
+        # Reset env if encounter done signal (not done mask!)
         if done:
             episode_timesteps = 0
             next_state = env.reset()
-
         return next_state, episode_timesteps
 
     def update(self, log_this_batch: bool = False) -> Dict[str, Any]:
