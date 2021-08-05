@@ -14,7 +14,7 @@ from ail.common.utils import zip_strict
 LOG2PI = log(2 * pi)
 
 
-def pure_discount_cumsum(x, discount) -> List[float]:
+def pure_discount_cumsum(x: Union[list, np.ndarray], discount: float) -> List[float]:
     """
     Discount cumsum implemented in pure python.
     (For an input of size N,
@@ -28,7 +28,7 @@ def pure_discount_cumsum(x, discount) -> List[float]:
     return acc[::-1]
 
 
-def discount_cumsum(x, discount) -> np.ndarray:
+def discount_cumsum(x: np.ndarray, discount: float) -> np.ndarray:
     """
     magic from rllab for computing discounted cumulative sums of vectors.
     Note this is a faster when vector is large. (e.g: len(x) >= 1e3)

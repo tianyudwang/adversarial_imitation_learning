@@ -161,7 +161,7 @@ class BaseTrainer(ABC):
             range(1, total_timesteps + 1), dynamic_ncols=True
         )
         self.best_ret = -float("inf")
-        self.rs = RunningStats()
+        self.rs = RunningStats(shape=())
 
         # Other parameters.
         self.total_timesteps = total_timesteps
@@ -224,12 +224,12 @@ class BaseTrainer(ABC):
         # Turn back to train mode.
         self.algo.train()
 
-        if self.rs.mean() > self.best_ret:
-            self.best_ret = self.rs.mean()
+        if self.rs.mean > self.best_ret:
+            self.best_ret = self.rs.mean
         Console.info(
             f"Num steps: {step}\t"
             f"| Best Ret: {self.best_ret:.2f}\t"
-            f"| Return: {self.rs.mean():.2f} +/- {self.rs.standard_deviation():.2f}"
+            f"| Return: {self.rs.mean:.2f} +/- {self.rs.std:.2f}"
         )
 
     # -----------------------

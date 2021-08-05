@@ -1,5 +1,7 @@
-import random
 import dataclasses
+import random
+import uuid
+from datetime import datetime
 from time import sleep
 from itertools import zip_longest
 from collections import OrderedDict
@@ -10,6 +12,14 @@ import torch as th
 from torch.distributions import Bernoulli
 
 
+def make_unique_timestamp() -> str:
+    """Timestamp, with random uuid added to avoid collisions."""
+    ISO_TIMESTAMP = "%Y%m%d_%H%M_%S"
+    timestamp = datetime.now().strftime(ISO_TIMESTAMP)
+    random_uuid = uuid.uuid4().hex[:3]
+    return f"{timestamp}_{random_uuid}"
+
+
 def set_random_seed(seed: int) -> None:
     """Set random seed to both numpy and torch."""
     random.seed(seed)
@@ -18,7 +28,7 @@ def set_random_seed(seed: int) -> None:
     th.cuda.manual_seed(seed)
 
 
-def countdown(t_sec) -> None:
+def countdown(t_sec: int) -> None:
     """Countdown t seconds."""
     while t_sec:
         mins, secs = divmod(t_sec, 60)
@@ -35,7 +45,7 @@ def get_stats(x: np.ndarray) -> Tuple[np.ndarray, ...]:
     return x.mean(), x.std(), x.min(), x.max()  # noqa
 
 
-def combined_shape(length: int, shape: Optional[Tuple[int]] = None):
+def combined_shape(length: int, shape: Optional[Tuple[int, ...]] = None):
     if shape is None:
         return (length,)  # noqa
     return (length, shape) if np.isscalar(shape) else (length, *shape)
@@ -171,3 +181,7 @@ def compute_disc_stats(
         ("explained_var_gen", float(explained_var_gen)),
     ]
     return OrderedDict(pairs)
+
+if __name__ == "__main__":
+    from icecream import ic
+    ic(make_unique_timestamp())

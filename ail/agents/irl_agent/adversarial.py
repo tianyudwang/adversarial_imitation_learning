@@ -313,7 +313,9 @@ class Adversarial(BaseIRLAgent):
         disc_logs = {}
         if log_this_batch:
             # Discriminator's statistics.
-            disc_logs = self.compute_disc_stats(disc_logits.detach(), loss_disc.detach())
+            disc_logs = self.compute_disc_stats(
+                disc_logits.detach(), loss_disc.detach()
+            )
 
         return disc_logs
 

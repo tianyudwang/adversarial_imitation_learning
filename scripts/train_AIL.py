@@ -3,13 +3,13 @@ import pathlib
 import sys
 import argparse
 from copy import deepcopy
-from datetime import datetime
 
 import yaml
 import numpy as np
 import torch as th
 
 from ail.trainer import Trainer
+from ail.common.utils import make_unique_timestamp
 from config.config import get_cfg_defaults
 
 
@@ -224,8 +224,8 @@ def run(args, cfg, path):
         )
     )
     
-    time = datetime.now().strftime("%Y%m%d-%H%M")
-    exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{time}")
+    timestamp = make_unique_timestamp()
+    exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{timestamp}")
     log_dir = path.joinpath("runs", exp_name)
 
     

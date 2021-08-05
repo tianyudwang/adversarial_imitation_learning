@@ -2,12 +2,12 @@ import os
 import pathlib
 import sys
 import argparse
-from datetime import datetime
 
 import yaml
 import torch as th
 
 from ail.trainer import Trainer
+from ail.common.utils import make_unique_timestamp
 from config.config import get_cfg_defaults
 
 
@@ -151,8 +151,8 @@ def run(args, cfg, path):
         raise ValueError(f"RL ALgo {args.algo} not Implemented.")
 
         
-    time = datetime.now().strftime("%Y%m%d-%H%M")
-    exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{time}")
+    timestamp = make_unique_timestamp()
+    exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{timestamp}")
     log_dir = path.joinpath("runs", exp_name)
     
     if not os.path.exists(log_dir):

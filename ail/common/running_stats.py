@@ -1,99 +1,64 @@
 from typing import Tuple
-from math import sqrt
 
 import numpy as np
 
 
+# Taken from: https://github.com/joschu/modular_rl/blob/6970cde3da265cf2a98537250fea5e0c0d9a7639/modular_rl/running_stat.py#L4
 class RunningStats:
     """
-    Welford’s method
+    Welford’s method: keeps track of first and second moments (mean and variance)
+    of a streaming time series.
     Based on (https://www.johndcook.com/standard_deviation.html).
     This algorithm is much less prone to loss of precision due to catastrophic cancellation,
     but might not be as efficient because of the division operation inside the loop.
+
+    The algorithm is as follows:
+        Initialize M1 = x1 and S1 = 0.
+        For subsequent x‘s, use the recurrence formulas
+        Mk = Mk-1+ (xk – Mk-1)/k
+        Sk = Sk-1 + (xk – Mk-1)*(xk – Mk).
+        For 2 ≤ k ≤ n, the kth estimate of the variance is s2 = Sk/(k – 1).
     """
 
-    __slots__ = ["n", "old_m", "new_m", "old_s", "new_s"]
+    __slots__ = ["_n", "_M", "_S"]
 
-    def __init__(self):
-        self.n: int = 0
-        self.old_m: float = 0
-        self.new_m: float = 0
-        self.old_s: float = 0
-        self.new_s: float = 0
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}:(n={self.n}, mean={self.mean()}, std={self.standard_deviation()})"
-
-    def clear(self):
-        self.n = 0
+    def __init__(self, shape: Tuple[int, ...]):
+        self._n: int = 0
+        self._M = np.zeros(shape)
+        self._S = np.zeros(shape)
 
     def push(self, x):
-        self.n += 1
-
-        if self.n == 1:
-            self.old_m = self.new_m = x
-            self.old_s = 0
+        x = np.asarray(x)
+        assert x.shape == self._M.shape
+        self._n += 1
+        if self._n == 1:
+            self._M[...] = x
         else:
-            self.new_m = self.old_m + (x - self.old_m) / self.n
-            self.new_s = self.old_s + (x - self.old_m) * (x - self.new_m)
+            oldM = self._M.copy()
+            self._M[...] = oldM + (x - oldM) / self._n
+            self._S[...] = self._S + (x - oldM) * (x - self._M)
 
-            self.old_m = self.new_m
-            self.old_s = self.new_s
+    def clear(self):
+        self._n = 0
+        self._M = np.zeros_like(self._M)
+        self._S = np.zeros_like(self._M)     
+    
+    @property
+    def n(self) -> int:
+        return self._n
 
-    def mean(self):
-        return self.new_m if self.n else 0.0
+    @property
+    def mean(self) -> np.ndarray:
+        return self._M
 
-    def variance(self):
-        return self.new_s / (self.n - 1) if self.n > 1 else 0.0
+    @property
+    def var(self) -> np.ndarray:
+        return self._S / (self._n - 1) if self._n > 1 else np.square(self._M)
 
-    def standard_deviation(self):
-        return sqrt(self.variance())
+    @property
+    def std(self) -> np.ndarray:
+        return np.sqrt(self.var)
 
-
-class RunningMeanStd:
-    """
-    Parallel algorithm
-    https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
-
-    Chan's method for estimating the mean is numerically unstable
-    when n_A \approx n_B and both are large,
-    because the numerical error in \delta ={\bar {x}}_{B}-{\bar {x}}_{A}}
-    is not scaled down in the way that it is in the n_B = 1 case.
-    :param epsilon: helps with arithmetic issues
-    :param shape: the shape of the data stream's output
-    """
-
-    __slots__ = ["mean", "var", "count"]
-
-    def __init__(self, epsilon: float = 1e-4, shape: Tuple[int, ...] = ()):
-        self.mean = np.zeros(shape, np.float64)
-        self.var = np.ones(shape, np.float64)
-        self.count = epsilon
-
-    def update(self, arr: np.ndarray) -> None:
-        batch_mean = np.mean(arr, axis=0)
-        batch_var = np.var(arr, axis=0)
-        batch_count = arr.shape[0]
-        self.update_from_moments(batch_mean, batch_var, batch_count)
-
-    def update_from_moments(
-        self, batch_mean: np.ndarray, batch_var: np.ndarray, batch_count: int
-    ) -> None:
-        delta = batch_mean - self.mean
-        total_count = self.count + batch_count
-
-        new_mean = self.mean + delta * batch_count / total_count
-        m_a = self.var * self.count
-        m_b = batch_var * batch_count
-        m_2 = (
-            m_a
-            + m_b
-            + np.square(delta) * self.count * batch_count / (self.count + batch_count)
-        )
-        new_var = m_2 / (self.count + batch_count)
-
-        new_count = batch_count + self.count
-
-        self.mean = new_mean
-        self.var = new_var
-        self.count = new_count
+    @property
+    def shape(self) -> np.ndarray:
+        return self._M.shape
