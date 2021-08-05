@@ -3,7 +3,7 @@ import dataclasses
 from time import sleep
 from itertools import zip_longest
 from collections import OrderedDict
-from typing import Tuple, Dict, Any, Iterable
+from typing import Tuple, Dict, Any, Iterable, Union, Optional
 
 import numpy as np
 import torch as th
@@ -35,7 +35,7 @@ def get_stats(x: np.ndarray) -> Tuple[np.ndarray, ...]:
     return x.mean(), x.std(), x.min(), x.max()  # noqa
 
 
-def combined_shape(length: int, shape=None):
+def combined_shape(length: int, shape: Optional[Tuple[int]] = None):
     if shape is None:
         return (length,)  # noqa
     return (length, shape) if np.isscalar(shape) else (length, *shape)
@@ -71,6 +71,28 @@ def zip_strict(*iterables: Iterable) -> Iterable:
         yield combo
 
 
+# From stable baselines
+def explained_variance(
+    y_pred: Union[np.ndarray, th.Tensor], y_true: Union[np.ndarray, th.Tensor]
+) -> Union[np.ndarray, th.Tensor]:
+    """
+    Computes fraction of variance that ypred explains about y.
+    Returns 1 - Var[y-ypred] / Var[y]
+    interpretation:
+        ev=0  =>  might as well have predicted zero
+        ev=1  =>  perfect prediction
+        ev<0  =>  worse than just predicting zero
+    :param y_pred: the prediction
+    :param y_true: the expected value
+    :return: explained variance of ypred and y
+    """
+    assert y_true.ndim == 1 and y_pred.ndim == 1
+    var_y = y_true.var()
+    return float("NaN") if var_y == 0 else 1 - (y_true - y_pred).var() / var_y
+
+
+# Borrow and modify from Imitation Learning
+# https://github.com/HumanCompatibleAI/imitation/blob/4008bfee6bb4ad0b1ae18ba5e45d99c1a397d7e5/src/imitation/rewards/common.py#L89-L154
 def compute_disc_stats(
     disc_logits: th.Tensor,
     labels: th.Tensor,
@@ -87,10 +109,17 @@ def compute_disc_stats(
     with th.no_grad():
         bin_is_exp_pred = disc_logits > 0
         bin_is_exp_true = labels > 0
+        bin_is_gen_pred = th.logical_not(bin_is_exp_pred)
         bin_is_gen_true = th.logical_not(bin_is_exp_true)
 
         int_is_exp_pred = bin_is_exp_pred.long()
         int_is_exp_true = bin_is_exp_true.long()
+        float_is_gen_pred = bin_is_gen_pred.float()
+        float_is_gen_true = bin_is_gen_true.float()
+
+        explained_var_gen = explained_variance(
+            float_is_gen_pred.view(-1), float_is_gen_true.view(-1)
+        )
 
         n_labels = float(len(labels))
         n_exp = float(th.sum(int_is_exp_true))
@@ -135,5 +164,10 @@ def compute_disc_stats(
         # True number of generators and predicted number of generators
         ("proportion_gen_true", float(percent_gen)),
         ("proportion_gen_pred", float(percent_gen_pred)),
+        # interpretation:
+        # ev=0  =>  might as well have predicted zero
+        # ev=1  =>  perfect prediction
+        # ev<0  =>  worse than just predicting zero
+        ("explained_var_gen", float(explained_var_gen)),
     ]
     return OrderedDict(pairs)

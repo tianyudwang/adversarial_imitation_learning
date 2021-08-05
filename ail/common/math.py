@@ -1,5 +1,6 @@
 from math import pi, log
 from itertools import accumulate
+from typing import Union, List
 
 import numpy as np
 import torch as th
@@ -13,7 +14,7 @@ from ail.common.utils import zip_strict
 LOG2PI = log(2 * pi)
 
 
-def pure_discount_cumsum(x, discount) -> list:
+def pure_discount_cumsum(x, discount) -> List[float]:
     """
     Discount cumsum implemented in pure python.
     (For an input of size N,
@@ -40,12 +41,21 @@ def discount_cumsum(x, discount) -> np.ndarray:
     return lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
 
 
-def normalize(x, mean, std, eps=1e-8):
+def normalize(
+    x: Union[np.ndarray, th.Tensor],
+    mean: Union[np.ndarray, th.Tensor],
+    std: Union[np.ndarray, th.Tensor],
+    eps: float = 1e-8,
+) -> Union[np.ndarray, th.Tensor]:
     """Normalize or standardize."""
     return (x - mean) / (std + eps)
 
 
-def unnormalize(x, mean, std):
+def unnormalize(
+    x: Union[np.ndarray, th.Tensor],
+    mean: Union[np.ndarray, th.Tensor],
+    std: Union[np.ndarray, th.Tensor],
+) -> Union[np.ndarray, th.Tensor]:
     """Unnormalize or Unstandardize."""
     return x * std + mean
 

@@ -88,9 +88,9 @@ DISC:
   epoch_disc: 1  
   lr_disc: 1.0e-4
   # choice = ["logsigmoid", "softplus", "logit"] # default: "logsigmoid"
-  # rew_input_choice: logsigmoid
+  rew_input_choice: logsigmoid
   # rew_input_choice: softplus
-  rew_input_choice: logit
+  # rew_input_choice: logit
   # rew_clip: true         # default: False
   # max_rew_magnitude: 1.0   # default: 10.0
   # min_rew_magnitude: -1.0  # default: -10.0

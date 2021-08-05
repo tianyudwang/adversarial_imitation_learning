@@ -10,6 +10,7 @@ from ail.agents.irl_agent.irl_core import BaseIRLAgent
 from ail.buffer import ReplayBuffer, BufferTag
 from ail.common.math import normalize
 from ail.common.type_alias import GymSpace, TensorDict
+from ail.common.utils import explained_variance
 from ail.network.discrim import DiscrimNet
 
 
@@ -312,9 +313,7 @@ class Adversarial(BaseIRLAgent):
         disc_logs = {}
         if log_this_batch:
             # Discriminator's statistics.
-            disc_logs = self.compute_disc_stats(
-                disc_logits, self.disc_labels, loss_disc
-            )
+            disc_logs = self.compute_disc_stats(disc_logits.detach(), loss_disc.detach())
 
         return disc_logs
 
@@ -334,15 +333,22 @@ class Adversarial(BaseIRLAgent):
         with th.no_grad():
             bin_is_exp_pred = disc_logits > 0
             bin_is_exp_true = self.disc_labels > 0
+            bin_is_gen_pred = th.logical_not(bin_is_exp_pred)
             bin_is_gen_true = th.logical_not(bin_is_exp_true)
 
             int_is_exp_pred = bin_is_exp_pred.long()
             int_is_exp_true = bin_is_exp_true.long()
+            float_is_gen_pred = bin_is_gen_pred.float()
+            float_is_gen_true = bin_is_gen_true.float()
+
+            explained_var_gen = explained_variance(
+                float_is_gen_pred.view(-1), float_is_gen_true.view(-1)
+            )
 
             n_exp = float(th.sum(int_is_exp_true))
             n_gen = self.n_labels - n_exp
 
-            percent_gen = n_gen / self.n_labels 
+            percent_gen = n_gen / self.n_labels
             n_gen_pred = int(self.n_labels - th.sum(int_is_exp_pred))
 
             percent_gen_pred = n_gen_pred / self.n_labels
@@ -364,7 +370,6 @@ class Adversarial(BaseIRLAgent):
 
             label_dist = Bernoulli(logits=disc_logits)
             entropy = th.mean(label_dist.entropy())
-
         pairs = [
             ("disc_loss", float(th.mean(disc_loss))),
             # Accuracy, as well as accuracy on *just* expert examples and *just*
@@ -378,9 +383,10 @@ class Adversarial(BaseIRLAgent):
             # True number of generators and predicted number of generators
             ("proportion_gen_true", float(percent_gen)),
             ("proportion_gen_pred", float(percent_gen_pred)),
+            ("explained_var_gen", float(explained_var_gen)),
         ]
         return OrderedDict(pairs)
-    
+
     @staticmethod
     def fix_normalize_obs(input_obs: th.Tensor, obs_exp: th.Tensor) -> th.Tensor:
         """

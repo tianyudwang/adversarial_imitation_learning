@@ -74,10 +74,10 @@ class AlgoTags(Enum):
     PPO = auto()
     SAC = auto()
     AIRL = auto()
-    # GAIL = auto()
+    GAIL = auto()
 
 
 class DoneMask(Enum):
-    #   ABSORBING = -1.0
+    ABSORBING = -1.0  # TODO: this should have anther value
     DONE = 1.0
     NOT_DONE = 0.0

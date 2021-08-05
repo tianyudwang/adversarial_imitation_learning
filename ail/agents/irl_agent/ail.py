@@ -4,7 +4,7 @@ import torch as th
 
 from ail.agents.irl_agent.adversarial import Adversarial
 from ail.buffer import ReplayBuffer
-from ail.common.type_alias import GymSpace
+from ail.common.type_alias import AlgoTags, GymSpace
 from ail.network.discrim import DiscrimNet, DiscrimTag, DiscrimType
 
 
@@ -90,6 +90,7 @@ class AIRL(Adversarial):
             obs_normalization,
             **kwargs,
         )
+        self.tag = AlgoTags.AIRL
 
     def __repr__(self):
         if self.name is None:
@@ -157,3 +158,4 @@ class GAIL(Adversarial):
             min_rew_magnitude,
             obs_normalization,
         )
+        self.tag = AlgoTags.GAIL
