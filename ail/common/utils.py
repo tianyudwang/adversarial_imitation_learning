@@ -182,6 +182,3 @@ def compute_disc_stats(
     ]
     return OrderedDict(pairs)
 
-if __name__ == "__main__":
-    from icecream import ic
-    ic(make_unique_timestamp())

@@ -125,7 +125,12 @@ class PPO(OnPolicyAgent):
     ) -> Tuple[np.ndarray, int]:
         """
         Intereact with environment and store the transition.
-        return: next_state, episode length
+        
+        :param env: gym environment
+        :param state: orginal state return by the environment
+        :param episode_timesteps: number of timesteps this episode
+        :param total_timesteps: total number of timesteps to run in outer loop
+        :return: next_state, episode length
         """
         episode_timesteps += 1
 
@@ -141,6 +146,10 @@ class PPO(OnPolicyAgent):
         # Interact with environment.
         next_state, reward, done, info = env.step(scale_action)
 
+        # Info might be useful for some special env
+        if info:
+            print(info)         
+        
         # * (Yifan) Intuitively, done mask make sense
         # * that agent keeps alive and keep running if it is not done by env's time limit.
         # See: https://github.com/sfujim/TD3/blob/master/main.py#L127
