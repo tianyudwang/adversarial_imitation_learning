@@ -9,12 +9,12 @@ import numpy as np
 import torch as th
 from tqdm import tqdm
 
+from ail.color_console import COLORS, Console
 from ail.common.env_utils import maybe_make_env
-from ail.common.running_stats import RunningStats
 from ail.common.pytorch_util import obs_as_tensor
+from ail.common.running_stats import RunningStats
 from ail.common.type_alias import GymEnv
 from ail.common.utils import set_random_seed, get_stats, countdown
-from ail.color_console import COLORS, Console
 
 
 class BaseTrainer(ABC):

@@ -194,7 +194,7 @@ class SAC(OffPolicyAgent):
         A trick to improve exploration at the start of training (for a fixed number of steps)
         Agent takes actions which are sampled from a uniform random distribution over valid actions.
         After that, it returns to normal SAC exploration.
-        
+
         :param env: gym environment
         :param state: orginal state return by the environment
         :param episode_timesteps: number of timesteps this episode

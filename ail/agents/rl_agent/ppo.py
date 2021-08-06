@@ -7,8 +7,8 @@ from torch.cuda.amp import autocast
 
 from ail.agents.rl_agent.rl_core import OnPolicyAgent
 from ail.common.math import normalize
-from ail.common.type_alias import AlgoTags, DoneMask, GymEnv, GymSpace, TensorDict
 from ail.common.pytorch_util import asarray_shape2d, obs_as_tensor, disable_gradient
+from ail.common.type_alias import AlgoTags, DoneMask, GymEnv, GymSpace, TensorDict
 
 
 class PPO(OnPolicyAgent):
@@ -125,7 +125,7 @@ class PPO(OnPolicyAgent):
     ) -> Tuple[np.ndarray, int]:
         """
         Intereact with environment and store the transition.
-        
+
         :param env: gym environment
         :param state: orginal state return by the environment
         :param episode_timesteps: number of timesteps this episode
@@ -147,9 +147,6 @@ class PPO(OnPolicyAgent):
         next_state, reward, done, info = env.step(scale_action)
 
         # Info might be useful for some special env
-        if info:
-            print(info)         
-        
         # * (Yifan) Intuitively, done mask make sense
         # * that agent keeps alive and keep running if it is not done by env's time limit.
         # See: https://github.com/sfujim/TD3/blob/master/main.py#L127
@@ -186,6 +183,7 @@ class PPO(OnPolicyAgent):
         """
         self.learning_steps += 1
         rollout_data = self.buffer.get()
+
         # Clear buffer after getting entire buffer.
         self.buffer.reset()
         train_logs = self.update_algo(rollout_data, log_this_batch)
@@ -245,7 +243,7 @@ class PPO(OnPolicyAgent):
         """
         self.optim_critic.zero_grad(set_to_none=self.optim_set_to_none)
         with autocast(enabled=self.fp16):
-            loss_critic = (self.critic(states) - targets).pow_(2).mean()
+            loss_critic = (self.critic(states) - targets).pow(2).mean()
         self.one_gradient_step(loss_critic, self.optim_critic, self.critic)
         return loss_critic.detach()
 

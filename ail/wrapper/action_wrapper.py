@@ -25,7 +25,7 @@ class RescaleBoxAction(ActionWrapper):
             low=a, high=b, shape=env.action_space.shape, dtype=env.action_space.dtype
         )
 
-    def action(self, action):
+    def action(self, action) -> np.ndarray:
         assert np.all(np.greater_equal(action, self.a)), (action, self.a)
         assert np.all(np.less_equal(action, self.b)), (action, self.b)
         low = self.env.action_space.low
@@ -35,7 +35,7 @@ class RescaleBoxAction(ActionWrapper):
         return action
 
     @property
-    def _max_episode_steps(self):
+    def _max_episode_steps(self) -> int:
         return self.env._max_episode_steps  # pylint: disable=protected-access
 
 
@@ -51,11 +51,11 @@ class ClipBoxAction(ActionWrapper):
         assert isinstance(env.action_space, Box)
         super().__init__(env)
 
-    def action(self, action):
+    def action(self, action) -> np.ndarray:
         return np.clip(action, self.action_space.low, self.action_space.high)
 
     @property
-    def _max_episode_steps(self):
+    def _max_episode_steps(self) -> int:
         return self.env._max_episode_steps  # pylint: disable=protected-access
 
 
@@ -67,18 +67,18 @@ class NormalizeBoxAction(ActionWrapper):
             raise ValueError(f"env {env} does not use spaces.Box.")
         super().__init__(env)
 
-    def action(self, action):
+    def action(self, action) -> np.ndarray:
         # rescale the action (MinMaxScaler)
         low, high = self.env.action_space.low, self.env.action_space.high
         scaled_action = low + (action + 1.0) * (high - low) / 2.0
         scaled_action = np.clip(scaled_action, low, high)
         return scaled_action
 
-    def reverse_action(self, scaled_action):
+    def reverse_action(self, scaled_action) -> np.ndarray:
         low, high = self.env.action_space.low, self.env.action_space.high
         action = (scaled_action - low) * 2.0 / (high - low) - 1.0
         return action
 
     @property
-    def _max_episode_steps(self):
+    def _max_episode_steps(self) -> int:
         return self.env._max_episode_steps  # pylint: disable=protected-access

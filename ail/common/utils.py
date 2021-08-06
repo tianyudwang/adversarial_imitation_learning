@@ -181,4 +181,3 @@ def compute_disc_stats(
         ("explained_var_gen", float(explained_var_gen)),
     ]
     return OrderedDict(pairs)
-

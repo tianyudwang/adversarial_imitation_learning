@@ -24,7 +24,7 @@ def test_running_stats_gym():
     obs = env.reset()
     obs = obs.astype(np.float32)
     ic(obs.shape, obs.dtype)
-    
+
     shp = obs.shape
     rs = RunningStats(shp)
     obs_filter = ZFilter(shp, scale=False)
@@ -46,7 +46,7 @@ def test_running_stats_gym():
 
     np.testing.assert_allclose(rs.mean, m)
     np.testing.assert_allclose(rs.var, v)
-    
+
     print(rs)
     print(obs_filter.rs.mean, obs_filter.rs.std)
 
