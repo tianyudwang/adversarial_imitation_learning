@@ -180,6 +180,8 @@ class VecNormalize(gym.Wrapper):
                     -self.clip_reward,
                     self.clip_reward,
                 )
+        else:
+            norm_rew = reward
         return norm_rew
 
     def unnormalize_obs(

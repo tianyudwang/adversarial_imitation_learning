@@ -17,8 +17,8 @@ CUDA:
 
 
 ENV:
-  # wrapper: [clip_act, vec_norm]
   wrapper: [clip_act]
+  # wrapper: [clip_act]
 
 
 OPTIM:
@@ -34,14 +34,14 @@ ALGO:
 
 PPO:
   # desc: PPO unique inputs
-  epoch_ppo: 15
+  epoch_ppo: 10
   gae_lambda: 0.97
   clip_eps: 0.2
   coef_ent: 0.01
 
   # policy_kwargs
   pi: [64, 64]
-  vf: [64,64]
+  vf: [64, 64]
   activation: 'relu'
   lr_actor: 7.0e-4
   lr_critic: 3.0e-4

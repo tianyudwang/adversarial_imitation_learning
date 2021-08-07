@@ -37,14 +37,20 @@ def maybe_make_env(
         env = gym.make(env)
     if env_wrapper:
         for wrap in env_wrapper:
+            str_wrap = None
             if isinstance(wrap, str):
                 try:
+                    str_wrap = wrap
                     wrap = EnvWrapper[wrap]
                 except KeyError:
                     raise KeyError(f"{wrap} is not a valid wrapper")
             env = wrap(env)
             if verbose > 0:
-                print(COLORS[color] + f"| Wrapping {tag} env with: {wrap.class_name}")
+                msg = COLORS[color] + f"| Wrapping {tag} env with: "
+                try:
+                    print(msg + f"{wrap.class_name}")
+                except AttributeError:
+                    print(msg + f"{str_wrap}")
     if verbose == 2:
         env_summary(env, tag, verbose=True)
 

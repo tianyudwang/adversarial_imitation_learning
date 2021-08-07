@@ -52,9 +52,7 @@ class RunningMeanStd:
 
         new_count = batch_count + self.count
 
-        self.mean = new_mean
-        self.var = new_var
-        self.count = new_count
+        self.mean, self.var, self.count = new_mean, new_var, new_count
 
     def std(self):
         return np.sqrt(self.var)
@@ -101,12 +99,16 @@ class RunningStats:
             x = x.detach().cpu().numpy()
         else:
             x = np.asarray(x)
+        from icecream import ic
+        ic(x.shape, self._M.shape)
         assert x.shape == self._M.shape
 
         self._n += 1
 
         if self._n == 1:
             self._M[...] = x
+            oldM = self._M.copy()
+            self._S[...] = self._S + (x - oldM) * (x - self._M)
         else:
             oldM = self._M.copy()
             self._M[...] = oldM + (x - oldM) / self._n
