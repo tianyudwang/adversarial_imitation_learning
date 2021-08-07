@@ -3,7 +3,8 @@ from ail.wrapper.action_wrapper import (
     NormalizeBoxAction,
     RescaleBoxAction,
 )
-from ail.wrapper.vec_norm_wrapper import VecNormalize
+
+from ail.wrapper.vev_norm_wrapper import VecNormalize
 
 EnvWrapper = {
     "clip_act": ClipBoxAction,

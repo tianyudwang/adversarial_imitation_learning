@@ -12,7 +12,6 @@ from tqdm import tqdm
 from ail.color_console import COLORS, Console
 from ail.common.env_utils import maybe_make_env
 from ail.common.pytorch_util import obs_as_tensor
-from ail.common.running_stats import RunningStats
 from ail.common.type_alias import GymEnv
 from ail.common.utils import set_random_seed, get_stats, countdown
 
@@ -161,7 +160,6 @@ class BaseTrainer(ABC):
             range(1, total_timesteps + 1), dynamic_ncols=True
         )
         self.best_ret = -float("inf")
-        self.rs = RunningStats(shape=())
 
         # Other parameters.
         self.total_timesteps = total_timesteps
@@ -183,7 +181,6 @@ class BaseTrainer(ABC):
     def evaluate(self, step: int) -> None:
         # set algo to evaluation mode
         self.algo.actor.eval()
-        self.rs.clear()
         train_returns, train_ep_lens = [], []
         valid_returns, valid_ep_lens = [], []
         # visualize result from half explore and half exploit
@@ -204,7 +201,6 @@ class BaseTrainer(ABC):
                 ep_ret += reward
                 ep_len += 1
 
-            self.rs.push(ep_ret)
             if deterministic:
                 valid_ep_lens.append(ep_len)
                 valid_returns.append(ep_ret)
@@ -224,12 +220,14 @@ class BaseTrainer(ABC):
         # Turn back to train mode.
         self.algo.train()
 
-        if self.rs.mean > self.best_ret:
-            self.best_ret = self.rs.mean
+        mix_returns = np.concatenate([train_returns, valid_returns])
+        mean, std = mix_returns.mean(), mix_returns.std()
+        if mean > self.best_ret:
+            self.best_ret = mean
         Console.info(
             f"Num steps: {step}\t"
             f"| Best Ret: {self.best_ret:.2f}\t"
-            f"| Return: {self.rs.mean:.2f} +/- {self.rs.std:.2f}"
+            f"| Return: {mean:.2f} +/- {std:.2f}"
         )
 
     # -----------------------

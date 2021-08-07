@@ -18,21 +18,24 @@ class RunningMeanStd:
         var_ab = M2 / (n - 1)
     """
 
-    __slots__ = ["mean", "var", "count"]
+    __slots__ = ["mean", "var", "count", "shape", "epsilon"]
 
-    def __init__(self, epsilon=1e-4, shape=()):
-        self.mean = np.zeros(shape, dtype=np.float64)
-        self.var = np.ones(shape, dtype=np.float64)
+    def __init__(self, epsilon: float = 1e-4, shape: Tuple[int, ...] = ()):
+
+        self.mean = np.zeros(shape, np.float64)
+        self.var = np.ones(shape, np.float64)
         self.count = epsilon
+        self.shape = shape
+        self.epsilon = epsilon
 
-    def update(self, x: np.ndarray) -> None:
-        batch_mean = np.mean(x, axis=0)
-        batch_var = np.var(x, axis=0)
-        batch_count = 1
+    def update(self, arr: np.ndarray) -> None:
+        batch_mean = np.mean(arr, axis=0)
+        batch_var = np.var(arr, axis=0)
+        batch_count = arr.shape[0]
         self.update_from_moments(batch_mean, batch_var, batch_count)
 
     def update_from_moments(
-        self, batch_mean: np.ndarray, batch_var: np.ndarray, batch_count: np.ndarray
+        self, batch_mean: np.ndarray, batch_var: np.ndarray, batch_count: int
     ) -> None:
         delta = batch_mean - self.mean
         tot_count = self.count + batch_count
@@ -40,10 +43,33 @@ class RunningMeanStd:
         new_mean = self.mean + delta * batch_count / tot_count
         m_a = self.var * self.count
         m_b = batch_var * batch_count
-        M2 = m_a + m_b + np.square(delta) * self.count * batch_count / tot_count
-        new_var = M2 / tot_count
-        new_count = tot_count
-        self.mean, self.var, self.count = new_mean, new_var, new_count
+        m_2 = (
+            m_a
+            + m_b
+            + np.square(delta) * self.count * batch_count / (self.count + batch_count)
+        )
+        new_var = m_2 / (self.count + batch_count)
+
+        new_count = batch_count + self.count
+
+        self.mean = new_mean
+        self.var = new_var
+        self.count = new_count
+
+    def std(self):
+        return np.sqrt(self.var)
+
+    def __repr__(self) -> str:
+        return f"RunningMeanStd(shape={self.shape}, mean={self.mean}, std={self.std})"
+
+    def push(self, x):
+        x = np.asarray(x).reshape(self.shape)
+        self.update(x)
+
+    def clear(self) -> None:
+        self.mean = np.zeros(self.shape, np.float64)
+        self.var = np.ones(self.shape, np.float64)
+        self.count = self.epsilon
 
 
 # Taken from: https://github.com/joschu/modular_rl/blob/6970cde3da265cf2a98537250fea5e0c0d9a7639/modular_rl/running_stat.py#L4
@@ -91,6 +117,9 @@ class RunningStats:
         self._M = np.zeros_like(self._M, dtype=np.float64)
         self._S = np.zeros_like(self._M, dtype=np.float64)
 
+    def update(self, x: np.ndarray) -> None:
+        self.push(x)
+
     def __repr__(self) -> str:
         return f"RunningStats(shape={self._M.shape}, mean={self.mean}, std={self.std})"
 
@@ -113,74 +142,3 @@ class RunningStats:
     @property
     def shape(self) -> np.ndarray:
         return self._M.shape
-
-
-class ZFilter:
-    """
-    y = (x-mean)/std
-    using running estimates of mean,std
-    :param shape: shape of input
-    :param center: If True, center the output by subtract running mean
-    :param scale: If True, scale the output by dividing by running std
-    :param clip: If not None, clip the output to be in [-clip,clip]
-    :param eps: very small value to avoid divide by zero error
-    """
-
-    __slots__ = ["_shape", "rs", "center", "scale", "clip", "eps"]
-
-    def __init__(
-        self,
-        shape: Tuple[int, ...],
-        center: bool = True,
-        scale: bool = True,
-        clip: Optional[float] = None,
-        eps: float = 1e-8,
-    ):
-        assert isinstance(shape, tuple)
-        self._shape = shape
-        self.center = center
-        self.scale = scale
-        self.clip = clip
-        self.rs = RunningStats(shape)
-        self.eps = eps
-
-    def __call__(self, x, update=True):
-        if update:
-            self.rs.push(x)
-
-        if self.center:
-            x = x - self.rs.mean
-        if self.scale:
-            x = x / (self.rs.std + 1e-8)
-        if self.clip:
-            x = np.clip(x, -self.clip, self.clip)
-        return x
-
-    def __repr__(self) -> str:
-        return f"ZFilterer(shape={self.shape}, center={self.center}, scale={self.scale}, clip={self.clip})"
-
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        return self._shape
-
-
-class StateWithTime:
-    """
-    Keeps track of the time t in an environment, and
-    adds t/T as a dimension to the state, where T is the
-    time horizon, given at initialization.
-    """
-
-    def __init__(self, prev_filter, horizon):
-        self.counter = 0
-        self.horizon = horizon
-        self.prev_filter = prev_filter
-
-    def __call__(self, x, reset=False, count=True, **kwargs):
-        x = self.prev_filter(x, **kwargs)
-        self.counter += 1 if count else 0
-        self.counter = 0 if reset else self.counter
-        return np.array(list(x) + [self.counter / self.horizon])
-
-    def reset(self):
-        self.prev_filter.reset()
