@@ -116,7 +116,8 @@ class Trainer(BaseTrainer):
             wandb.tensorboard.patch(root_logdir=self.summary_dir, pytorch=True)
 
         # Log setting.
-        self.writer = SummaryWriter(log_dir=self.summary_dir)
+        if self.enable_logging:
+            self.writer = SummaryWriter(log_dir=self.summary_dir)
 
         DEVICE = "".join(re.findall("[a-zA-Z]+", str(self.device)))
         self.total_timesteps_pbar.set_description(f"{self.algo} ({DEVICE})")
@@ -149,7 +150,8 @@ class Trainer(BaseTrainer):
                     self.train_logging(train_logs, global_step)
 
                     # Logging changes to tensorboard.
-                    self.info_to_tb(train_logs, global_step)
+                    if self.enable_logging:
+                        self.info_to_tb(train_logs, global_step)
                     # TODO: Set a better log strategy to reduce overhead. Current downsampling.
                     # TODO: implement two more logging strategies: Summarization / histogram.
                     # log.append(train_logs)
@@ -170,7 +172,7 @@ class Trainer(BaseTrainer):
                 self.evaluate(global_step)
 
             # Saving the model.
-            if self.is_saving_model(global_step):
+            if self.is_saving_model(global_step) and self.enable_logging:
                 self.save_models(os.path.join(self.model_dir, f"step{global_step}"))
 
         self.finish_logging()

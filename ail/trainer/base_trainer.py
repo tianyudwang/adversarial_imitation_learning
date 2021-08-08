@@ -1,7 +1,6 @@
 import os
 from time import time
 from datetime import timedelta
-from abc import ABC, abstractmethod
 from collections import OrderedDict
 from typing import Tuple, Dict, Any, Union, Optional
 
@@ -16,7 +15,7 @@ from ail.common.type_alias import GymEnv
 from ail.common.utils import set_random_seed, get_stats, countdown
 
 
-class BaseTrainer(ABC):
+class BaseTrainer:
     """
     Base Class for RL_Trainer and IRL_Trainer.
     :param num_steps: number of steps to train
@@ -39,6 +38,32 @@ class BaseTrainer(ABC):
         mode: use the mode of the Gaussian instead of sampling,
         average: sample half and use mode half and take the average of them.
     """
+    __slots__ = [
+        "env",
+        "env_test",
+        "max_ep_len",
+        "seed",
+        "enable_logging",
+        "log_dir",
+        "summary_dir",
+        "model_dir",
+        "use_wandb",
+        "writer",
+        "tb_tags",
+        "save_freq",
+        "eval_interval",
+        "num_eval_episodes",
+        "tochastic_eval_episodes",
+        "log_interval",
+        "total_timesteps_pbar",
+        "best_ret",
+        "total_timesteps",
+        "verbose",
+        "algo",
+        "batch_size",
+        "device",
+        "start_time",
+    ]
 
     def __init__(
         self,
@@ -49,7 +74,7 @@ class BaseTrainer(ABC):
         eval_interval: int,
         num_eval_episodes: int,
         save_freq: int,
-        log_dir: str,
+        log_dir: Optional[str],
         log_interval: int,
         seed: int,
         verbose: int,
@@ -92,16 +117,23 @@ class BaseTrainer(ABC):
         # Set RNG seed.
         set_random_seed(seed)
 
-        # Tensorboard/wandb log setting.
-        self.log_dir, self.summary_dir, self.model_dir = (
-            log_dir,
-            os.path.join(log_dir, "summary"),
-            os.path.join(log_dir, "model"),
-        )
+        if log_dir is None or log_dir == "":
+            self.enable_logging = False
+        
+        else:
+            self.enable_logging = True
+        
+        if self.enable_logging:
+            # Tensorboard/wandb log setting.
+            self.log_dir, self.summary_dir, self.model_dir = (
+                log_dir,
+                os.path.join(log_dir, "summary"),
+                os.path.join(log_dir, "model"),
+            )
 
-        for d in [self.log_dir, self.summary_dir, self.model_dir]:
-            if not os.path.exists(d):
-                os.makedirs(d, exist_ok=True)
+            for d in [self.log_dir, self.summary_dir, self.model_dir]:
+                if not os.path.exists(d):
+                    os.makedirs(d, exist_ok=True)
 
         # Check if use wandb
         if use_wandb:
@@ -173,7 +205,6 @@ class BaseTrainer(ABC):
     # Training/ evaluation
     # -----------------------
 
-    @abstractmethod
     def run_training_loop(self):
         raise NotImplementedError()
 
@@ -318,7 +349,8 @@ class BaseTrainer(ABC):
         self.output_block(time_logs, tag="Time", color="back_bold_blue")
         print("\n")
 
-        self.metric_to_tb(step, train_logs, eval_logs)
+        if self.enable_logging:
+            self.metric_to_tb(step, train_logs, eval_logs)
 
     @staticmethod
     def output_block(logs: Dict[str, Any], tag: str, color="invisible") -> None:
