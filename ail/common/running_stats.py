@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Tuple
 
 import numpy as np
 import torch as th
@@ -100,6 +100,7 @@ class RunningStats:
         else:
             x = np.asarray(x)
         from icecream import ic
+
         ic(x.shape, self._M.shape)
         assert x.shape == self._M.shape
 

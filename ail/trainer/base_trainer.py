@@ -38,6 +38,7 @@ class BaseTrainer:
         mode: use the mode of the Gaussian instead of sampling,
         average: sample half and use mode half and take the average of them.
     """
+
     __slots__ = [
         "env",
         "env_test",
@@ -119,10 +120,10 @@ class BaseTrainer:
 
         if log_dir is None or log_dir == "":
             self.enable_logging = False
-        
+
         else:
             self.enable_logging = True
-        
+
         if self.enable_logging:
             # Tensorboard/wandb log setting.
             self.log_dir, self.summary_dir, self.model_dir = (

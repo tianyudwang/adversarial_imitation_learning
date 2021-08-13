@@ -78,6 +78,6 @@ class AlgoTags(Enum):
 
 
 class DoneMask(Enum):
-    ABSORBING = -1.0  # TODO: this should have anther value
-    DONE = 1.0
-    NOT_DONE = 0.0
+    ABSORBING = -1.0  # TODO: this should have another value
+    DONE = 0.0
+    NOT_DONE = 1.0

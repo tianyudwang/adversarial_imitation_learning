@@ -185,7 +185,8 @@ class SAC(OffPolicyAgent):
         env: GymEnv,
         state: th.Tensor,
         episode_timesteps: th.Tensor,
-        total_timesteps: Optional[int] = None,
+        global_timesteps: Optional[int] = None,
+        add_absorbing_state=False,
     ) -> Tuple[np.ndarray, int]:
 
         """
@@ -204,7 +205,7 @@ class SAC(OffPolicyAgent):
         episode_timesteps += 1
 
         # Random exploration step
-        if total_timesteps <= self.start_steps:
+        if global_timesteps <= self.start_steps:
             # Random uniform sampling from env's action space.
             scaled_action = env.action_space.sample()
             # * Need to apply tanh transoform to the action to make it in range [-1, 1]
@@ -252,6 +253,12 @@ class SAC(OffPolicyAgent):
         else:
             done_mask = DoneMask.DONE.value
 
+        absorbing_cond = all(
+            add_absorbing_state, done, episode_timesteps < env._max_episode_steps
+        )
+        if absorbing_cond:
+            next_state = env.get_absorbing_state()        
+        
         data = {
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
@@ -275,6 +282,20 @@ class SAC(OffPolicyAgent):
         if done:
             episode_timesteps = 0
             next_state = env.reset()
+            # Add a absorbing state to buffer when done.
+            if absorbing_cond:
+                # A fake action for the absorbing state.
+                zero_action = np.zeros(env.action_space.shape)
+                absorbing_state = env.get_absorbing_state()
+                absorbing_data = {
+                    "obs": asarray_shape2d(absorbing_state),
+                    "acts": asarray_shape2d(zero_action),
+                    "rews": asarray_shape2d(0.0),
+                    "dones": asarray_shape2d(DoneMask.ABSORBING.value),
+                    "log_pis": asarray_shape2d(log_pi),  # TODO: what to do with log_pi?
+                    "next_obs": asarray_shape2d(absorbing_state),
+                }
+                self.buffer.store(absorbing_data, truncate_ok=False)
         return next_state, episode_timesteps
 
     def update(self, log_this_batch: bool = False) -> Dict[str, Any]:
