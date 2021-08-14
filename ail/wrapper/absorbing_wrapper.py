@@ -38,7 +38,7 @@ class AbsorbingWrapper(gym.ObservationWrapper):
     @property
     def absorbing_state(self) -> np.ndarray:
         return self._absorbing_state
-    
+
     @property
     def _max_episode_steps(self) -> int:
         return self.env._max_episode_steps  # pylint: disable=protected-access

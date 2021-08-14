@@ -6,6 +6,7 @@ import math
 
 import numpy as np
 import torch as th
+import torch.nn.functional as F
 from torch.cuda.amp import autocast
 
 from ail.agents.rl_agent.rl_core import OffPolicyAgent
@@ -92,6 +93,7 @@ class SAC(OffPolicyAgent):
         init_models: bool = True,
         expert_mode: bool = False,
         use_as_generator: bool = False,
+        ues_absorbing_state: bool = False,
         **kwargs,
     ):
         super().__init__(
@@ -142,6 +144,7 @@ class SAC(OffPolicyAgent):
 
         self.tag = AlgoTags.SAC
         self.use_as_generator = use_as_generator
+        self.use_absorbing_state = ues_absorbing_state
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
@@ -186,7 +189,6 @@ class SAC(OffPolicyAgent):
         state: th.Tensor,
         episode_timesteps: th.Tensor,
         global_timesteps: Optional[int] = None,
-        add_absorbing_state=False,
     ) -> Tuple[np.ndarray, int]:
 
         """
@@ -202,7 +204,6 @@ class SAC(OffPolicyAgent):
         :param total_timesteps: total number of timesteps to run in outer loop
         :return: next_state, episode length
         """
-        episode_timesteps += 1
 
         # Random exploration step
         if global_timesteps <= self.start_steps:
@@ -241,24 +242,24 @@ class SAC(OffPolicyAgent):
         if log_pi is not None:
             assert not math.isnan(log_pi)
 
-        # Interact with environment.
+        # Interact with environment (Info might be useful for some special env).
         next_state, reward, done, info = env.step(scaled_action)
 
-        # * (Yifan) Intuitively, done mask make sense
-        # * Agent keeps alive and keep running if it is not done by env's time limit.
+        # Done mask removes the time limit constrain of some env to keep makorvian.
+        # Agent keeps alive should not be done by env's time limit.
         # See: https://github.com/sfujim/TD3/blob/master/main.py#L127
-        done_mask: float
-        if episode_timesteps == env._max_episode_steps or not done:
+        # * Here we use an inverse convention in which DONE = 0 and NOT_DONE = 1.
+        if (episode_timesteps + 1 == env._max_episode_steps) or not done:
             done_mask = DoneMask.NOT_DONE.value
         else:
             done_mask = DoneMask.DONE.value
 
-        absorbing_cond = all(
-            add_absorbing_state, done, episode_timesteps < env._max_episode_steps
-        )
-        if absorbing_cond:
-            next_state = env.get_absorbing_state()        
-        
+        episode_timesteps += 1
+
+        if self.use_absorbing_state:
+            if done and episode_timesteps < env._max_episode_steps:
+                next_state = env.get_absorbing_state()
+
         data = {
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
@@ -267,7 +268,7 @@ class SAC(OffPolicyAgent):
             "next_obs": asarray_shape2d(next_state),
         }
 
-        # * No need to store log_pi for pure SAC, useful when use SAC as generator
+        # * No need to store log_pi for pure SAC, may be useful when use SAC as generator
         if self.use_as_generator:
             assert (
                 "log_pis" in self.buffer.stored_keys()
@@ -282,8 +283,15 @@ class SAC(OffPolicyAgent):
         if done:
             episode_timesteps = 0
             next_state = env.reset()
-            # Add a absorbing state to buffer when done.
-            if absorbing_cond:
+            """
+            Absorbing state corresponds to a state 
+            which a policy gets in after reaching a goal state and stays there forever.
+            For most RL problems, we can just assign 0 to all reward after the goal.
+            But for GAIL, we need to have an actual absorbing state.
+            """
+            if self.use_absorbing_state and (
+                episode_timesteps < env._max_episode_steps
+            ):
                 # A fake action for the absorbing state.
                 zero_action = np.zeros(env.action_space.shape)
                 absorbing_state = env.get_absorbing_state()
@@ -292,7 +300,7 @@ class SAC(OffPolicyAgent):
                     "acts": asarray_shape2d(zero_action),
                     "rews": asarray_shape2d(0.0),
                     "dones": asarray_shape2d(DoneMask.ABSORBING.value),
-                    "log_pis": asarray_shape2d(log_pi),  # TODO: what to do with log_pi?
+                    # "log_pis": asarray_shape2d(log_pi),  # TODO: what to do with log_pi?
                     "next_obs": asarray_shape2d(absorbing_state),
                 }
                 self.buffer.store(absorbing_data, truncate_ok=False)
@@ -317,7 +325,10 @@ class SAC(OffPolicyAgent):
             info = self.update_algo(replay_data, gradient_step)
             if log_this_batch:
                 for k in info.keys():
-                    train_logs[k].append(info[k])
+                    if info[k] is None:
+                        continue
+                    else:
+                        train_logs[k].append(info[k])
 
         return train_logs
 
@@ -339,20 +350,20 @@ class SAC(OffPolicyAgent):
         actions_new, log_pis_new = self.actor.sample(states)
 
         # Update and obtain the entropy coefficient.
-        loss_alpha = self.update_alpha(log_pis_new)
+        loss_alpha = self._update_alpha(log_pis_new)
 
         # First run one gradient descent step for Q1 and Q2
-        loss_critic = self.update_critic(states, actions, rewards, dones, next_states)
+        loss_critic = self._update_critic(states, actions, rewards, dones, next_states)
 
         # Freeze Q-networks so we don't waste computational effort
         # computing gradients for them during the policy learning step.
         disable_gradient(self.critic)
-        loss_actor = self.update_actor(states, actions_new, log_pis_new)
+        loss_actor = self._update_actor(states, actions_new, log_pis_new, dones)
         enable_gradient(self.critic)
 
         # Update target networks by polyak averaging.
         if gradient_step % self.target_update_interval == 0:
-            self.update_target()
+            self._update_target()
         # Return log changes(key used for logging name).
         return {
             "actor_loss": loss_actor,
@@ -364,7 +375,7 @@ class SAC(OffPolicyAgent):
             "ent_lr": self.lr_alpha,
         }
 
-    def update_alpha(self, log_pis_new: th.Tensor) -> th.Tensor:
+    def _update_alpha(self, log_pis_new: th.Tensor) -> th.Tensor:
         """
         Optimize entropy coefficient (alpha)
         L(alpha) = E_{at ∼ pi_t} [−alpha * log pi(a_t |s_t ) − alpha * H].
@@ -387,7 +398,7 @@ class SAC(OffPolicyAgent):
         self.optim_alpha.step()
         return loss_alpha.detach()
 
-    def update_critic(
+    def _update_critic(
         self,
         states: th.Tensor,
         actions: th.Tensor,
@@ -395,36 +406,58 @@ class SAC(OffPolicyAgent):
         dones: th.Tensor,
         next_states: th.Tensor,
     ) -> th.Tensor:
-        """Update Q-functions by one step of gradient"""
+        """Update Q-functions by one gradient step"""
         self.optim_critic.zero_grad(set_to_none=self.optim_set_to_none)
 
         with autocast(enabled=self.fp16):
-            # Get current Q-values estimation for each critic network
-            # * Using action from the replay buffer
-            curr_qs1, curr_qs2 = self.critic(states, actions)
+            if self.use_absorbing_state:
+                a_mask = th.maximum(0, dones)
+                # * Using action from the replay buffer
+                curr_qs1, curr_qs2 = self.critic(states, actions)
 
-            # Bellman backup for Q functions
-            with th.no_grad():
-                # * Target actions come from *current* policy
-                # * Whereas by contrast, r and s' should come from the replay buffer.
-                next_actions, next_log_pis = self.actor.sample(next_states)
-                next_qs1, next_qs2 = self.critic_target(next_states, next_actions)
-                # clipped double-Q trick and takes the minimum Q-value between two Q approximators.
-                next_qs = th.min(next_qs1, next_qs2) - self.alpha * next_log_pis
+                # Bellman backup for Q functions
+                with th.no_grad():
+                    # * Target actions come from *current* policy
+                    next_actions, next_log_pis = self.actor.sample(next_states)
+                    next_qs1, next_qs2 = self.critic_target(
+                        next_states, next_actions * a_mask
+                    )
+                    next_qs = th.min(next_qs1, next_qs2) - self.alpha * next_log_pis
 
-                # Target (TD error + entropy term):
-                # r + gamma(1-d) * ( Q(s', a') - alpha log pi(a'|s') )
-                target_qs = rewards + self.gamma * (1.0 - dones) * next_qs
+                    # Target (TD error + entropy term):
+                    target_qs = rewards + self.gamma * dones * next_qs
+            else:
+                # Get current Q-values estimation for each critic network
+                # * Using action from the replay buffer
+                curr_qs1, curr_qs2 = self.critic(states, actions)
+
+                # Bellman backup for Q functions
+                with th.no_grad():
+                    # * Target actions come from *current* policy
+                    # * Whereas by contrast, r and s' should come from the replay buffer.
+                    next_actions, next_log_pis = self.actor.sample(next_states)
+                    next_qs1, next_qs2 = self.critic_target(next_states, next_actions)
+                    # Double-Q trick and takes the minimum Q-value between two Q approximators.
+                    next_qs = th.min(next_qs1, next_qs2) - self.alpha * next_log_pis
+
+                    # Target (TD error + entropy term):
+                    # r + gamma(1-d) * ( Q(s', a') - alpha log pi(a'|s') )
+                    # * Here we use an inverse convention in which DONE = 0 and NOT_DONE = 1.
+                    target_qs = rewards + self.gamma * dones * next_qs
 
             #  Mean-squared Bellman error (MSBE) loss
-            loss_critic1 = (curr_qs1 - target_qs).pow_(2).mean()
-            loss_critic2 = (curr_qs2 - target_qs).pow_(2).mean()
-            loss_critic = loss_critic1 + loss_critic2
+            loss_critic = F.mse_loss(curr_qs1, target_qs) + F.mse_loss(
+                curr_qs2, target_qs
+            )
         self.one_gradient_step(loss_critic, self.optim_critic, self.critic)
         return loss_critic.detach()
 
-    def update_actor(
-        self, states: th.Tensor, actions_new: th.Tensor, log_pis_new: th.Tensor
+    def _update_actor(
+        self,
+        states: th.Tensor,
+        actions_new: th.Tensor,
+        log_pis_new: th.Tensor,
+        dones: Optional[th.Tensor] = None,
     ) -> th.Tensor:
         """
         Update policy by one step of gradient
@@ -437,11 +470,23 @@ class SAC(OffPolicyAgent):
         with autocast(enabled=self.fp16):
             qs1, qs2 = self.critic(states, actions_new)
             qs = th.min(qs1, qs2)
-            loss_actor = (self.alpha * log_pis_new - qs).mean()
+            if self.use_absorbing_state:
+                # Don't update the actor for absorbing states.
+                # And skip update if all states are absorbing.
+                a_mask = 1.0 - th.maximum(0, -dones)
+                if a_mask.sum() < 1e-8:
+                    ic("Here")
+                    return
+                else:
+                    loss_actor = (
+                        self.alpha * log_pis_new - qs * a_mask
+                    ).sum() / a_mask.sum()
+            else:
+                loss_actor = (self.alpha * log_pis_new - qs).mean()
         self.one_gradient_step(loss_actor, self.optim_actor, self.actor)
         return loss_actor.detach()
 
-    def update_target(self) -> None:
+    def _update_target(self) -> None:
         """update the target network by polyak averaging."""
         # * here tau = (1 - polyak)
         soft_update(self.critic_target, self.critic, self.tau, self.one)

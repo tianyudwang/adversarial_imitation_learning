@@ -144,25 +144,26 @@ class PPO(OnPolicyAgent):
             self.scale_action(action) if not self.normalized_action_space else action
         )
 
-        # Interact with environment.
+        # Interact with environment (Info might be useful for some special env).
         next_state, reward, done, info = env.step(scale_action)
 
-        # Info might be useful for some special env
-        # * (Yifan) Intuitively, done mask make sense
-        # * that agent keeps alive and keep running if it is not done by env's time limit.
+        # Done mask removes the time limit constrain of some env to keep makorvian.
+        # Agent keeps alive should not be done by env's time limit.
         # See: https://github.com/sfujim/TD3/blob/master/main.py#L127
+        # * Here we use an inverse convention in which DONE = 0 and NOT_DONE = 1
+        # * to match absorbing state implementation in DAC paper.
         done_mask: float
-        if episode_timesteps == env._max_episode_steps or not done:
+        if (episode_timesteps == env._max_episode_steps) or not done:
             done_mask = DoneMask.NOT_DONE.value
         else:
             done_mask = DoneMask.DONE.value
 
         absorbing_cond = all(
-            add_absorbing_state, done, episode_timesteps < env._max_episode_steps
+            [add_absorbing_state, done, episode_timesteps < env._max_episode_steps]
         )
         if absorbing_cond:
             next_state = env.get_absorbing_state()
-        
+
         data = {
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
@@ -181,7 +182,7 @@ class PPO(OnPolicyAgent):
             episode_timesteps = 0
             next_state = env.reset()
             # Add a absorbing state to buffer when done.
-            if absorbing_cond:
+            if add_absorbing_state and (episode_timesteps < env._max_episode_steps):
                 # A fake action for the absorbing state.
                 zero_action = np.zeros(env.action_space.shape)
                 absorbing_state = env.get_absorbing_state()
@@ -231,13 +232,13 @@ class PPO(OnPolicyAgent):
             next_values = self.critic(next_states)
 
         targets, gaes = calculate_gae(
-            rewards, 1.0-dones, values, next_values, self.gamma, self.gae_lambda
+            rewards, (1.0 - dones), values, next_values, self.gamma, self.gae_lambda
         )
 
         for _ in range(self.epoch_ppo):
             self.learning_steps_ppo += 1
-            loss_critic = self.update_critic(states, targets)
-            loss_actor, pi_info = self.update_actor(states, actions, log_pis, gaes)
+            loss_critic = self._update_critic(states, targets)
+            loss_actor, pi_info = self._update_actor(states, actions, log_pis, gaes)
 
         if log_this_batch:
             # Return log changes(key used for logging name).
@@ -254,7 +255,7 @@ class PPO(OnPolicyAgent):
         else:
             return {}
 
-    def update_critic(self, states: th.Tensor, targets: th.Tensor) -> th.Tensor:
+    def _update_critic(self, states: th.Tensor, targets: th.Tensor) -> th.Tensor:
         """
         Update critic. (value function approximation)
         :param states:
@@ -267,7 +268,7 @@ class PPO(OnPolicyAgent):
         self.one_gradient_step(loss_critic, self.optim_critic, self.critic)
         return loss_critic.detach()
 
-    def update_actor(
+    def _update_actor(
         self,
         states: th.Tensor,
         actions: th.Tensor,
@@ -284,7 +285,6 @@ class PPO(OnPolicyAgent):
         """
         log_pis = self.actor.evaluate_log_pi(states, actions)
 
-        # ? Does analytical form exists?
         # * (Yifan) Since we bounded the mean action with tanh(),
         # * there is no analytical form of entropy
         # Approximate entropy.
@@ -304,7 +304,6 @@ class PPO(OnPolicyAgent):
             loss_actor_ent = loss_actor - self.coef_ent * approx_ent
         self.one_gradient_step(loss_actor_ent, self.optim_actor, self.actor)
 
-        # * Useful extra info
         """
         Calculate approximate form of reverse KL Divergence for early stopping.
         See issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
@@ -317,6 +316,7 @@ class PPO(OnPolicyAgent):
         # ! This is an unbiased estimator, but it has large variance.
         # ! Since it can take on negative values.
         # ! as opposed to the actual KL Divergence measure
+        # Useful extra info
         with th.no_grad():
             approx_kl = ((ratios - 1) - log_ratios).mean()
             clipped = ratios.gt(1 + self.clip_eps) | ratios.lt(1 - self.clip_eps)
