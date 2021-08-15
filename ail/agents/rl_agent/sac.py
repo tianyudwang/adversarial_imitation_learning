@@ -93,7 +93,7 @@ class SAC(OffPolicyAgent):
         init_models: bool = True,
         expert_mode: bool = False,
         use_as_generator: bool = False,
-        ues_absorbing_state: bool = False,
+        use_absorbing_state: bool = False,
         **kwargs,
     ):
         super().__init__(
@@ -144,7 +144,7 @@ class SAC(OffPolicyAgent):
 
         self.tag = AlgoTags.SAC
         self.use_as_generator = use_as_generator
-        self.use_absorbing_state = ues_absorbing_state
+        self.use_absorbing_state = use_absorbing_state
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
@@ -411,7 +411,7 @@ class SAC(OffPolicyAgent):
 
         with autocast(enabled=self.fp16):
             if self.use_absorbing_state:
-                a_mask = th.maximum(0, dones)
+                a_mask = th.maximum(th.zeros_like(dones), dones)
                 # * Using action from the replay buffer
                 curr_qs1, curr_qs2 = self.critic(states, actions)
 
@@ -422,9 +422,10 @@ class SAC(OffPolicyAgent):
                     next_qs1, next_qs2 = self.critic_target(
                         next_states, next_actions * a_mask
                     )
+                    # TODO: what to do with log_pis? 
                     next_qs = th.min(next_qs1, next_qs2) - self.alpha * next_log_pis
-
                     # Target (TD error + entropy term):
+                    # * Here we use an inverse convention in which DONE = 0 and NOT_DONE = 1.
                     target_qs = rewards + self.gamma * dones * next_qs
             else:
                 # Get current Q-values estimation for each critic network
@@ -473,9 +474,9 @@ class SAC(OffPolicyAgent):
             if self.use_absorbing_state:
                 # Don't update the actor for absorbing states.
                 # And skip update if all states are absorbing.
-                a_mask = 1.0 - th.maximum(0, -dones)
+                a_mask = 1.0 - th.maximum(th.zeros_like(dones), -dones)
                 if a_mask.sum() < 1e-8:
-                    ic("Here")
+                    ic("Skip updating actor")
                     return
                 else:
                     loss_actor = (
