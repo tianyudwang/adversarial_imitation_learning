@@ -18,7 +18,6 @@ CUDA:
 
 ENV:
   wrapper: [clip_act]
-  # wrapper: [clip_act]
 
 
 OPTIM:
@@ -28,7 +27,7 @@ OPTIM:
 
 
 ALGO:
-  max_grad_norm: 0.5  # default: None
+  max_grad_norm: 40  # default: None
   gamma: 0.99         # default: 0.9
 
 
@@ -50,6 +49,7 @@ PPO:
 
 SAC:
   # desc: SAC unique inputs
+  # buffer_size: 3.0e+6
   start_steps: 10_000
   num_gradient_steps: 1  # ! slow O(n)
   target_update_interval: 1  # Recommend to sync with num_gradient_steps.
@@ -63,4 +63,5 @@ SAC:
   activation: 'relu'
   lr_actor: 7.3e-4
   lr_critic: 7.3e-4
+  use_absorbing_state: true
 

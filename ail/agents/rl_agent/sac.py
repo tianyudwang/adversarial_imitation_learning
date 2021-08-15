@@ -476,7 +476,6 @@ class SAC(OffPolicyAgent):
                 # And skip update if all states are absorbing.
                 a_mask = 1.0 - th.maximum(th.zeros_like(dones), -dones)
                 if a_mask.sum() < 1e-8:
-                    ic("Skip updating actor")
                     return
                 else:
                     loss_actor = (

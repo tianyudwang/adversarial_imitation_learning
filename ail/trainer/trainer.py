@@ -92,8 +92,10 @@ class Trainer(BaseTrainer):
             )
 
         if algo_kwargs.get("use_absorbing_state", False):
-            is_wrapped(self.env, AbsorbingWrapper)
-            self.env_test = AbsorbingWrapper(self.env_test)        
+            if not is_wrapped(self.env, AbsorbingWrapper):
+                self.env = AbsorbingWrapper(self.env)
+            if not is_wrapped(self.env_test, AbsorbingWrapper):
+                self.env_test = AbsorbingWrapper(self.env_test)
         
         # Number of variables and net arch.
         if self.verbose > 1:
@@ -120,9 +122,6 @@ class Trainer(BaseTrainer):
                 )
             # Sync with tensorboard.
             wandb.tensorboard.patch(root_logdir=self.summary_dir, pytorch=True)
-
-        ic(self.env)
-        ic(self.env_test)        
         
         # Log setting.
         if self.enable_logging:

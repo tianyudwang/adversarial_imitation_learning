@@ -85,7 +85,7 @@ _C.SAC.lr_alpha = 3e-4         # Learning rate for log_alpha.
 
 # SAC 
 _C.SAC.batch_size = 256       # Replay buffer batch size to use during updating.
-_C.SAC.buffer_size = int(1e6) # Capactiy of the replay buffer.
+_C.SAC.buffer_size = int(3e6) # Capactiy of the replay buffer.
 _C.SAC.with_reward = True     # Wether to store reward in replay buffer.
 _C.SAC.extra_data=[]          # Extra data to store in replay buffer.
 
