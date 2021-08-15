@@ -96,6 +96,7 @@ _C.SAC.activation = "relu_inplace" # Hidden activation
 _C.SAC.critic_type="twin"     # Critic type twin: (double Q).
 _C.SAC.lr_actor = 7.3 * 1e-4  # Policy learning rate.
 _C.SAC.lr_critic =7.3 * 1e-4  # Q-function learning rate.
+_C.SAC.use_absorbing_state = False  # Whether to use an absorbing state.
 
 # Discriminator settings
 _C.DISC = CN()

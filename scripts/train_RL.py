@@ -143,6 +143,7 @@ def run(args, cfg, path):
                 lr_actor=cfg.SAC.lr_actor,
                 lr_critic=cfg.SAC.lr_critic,
             ),
+            use_absorbing_state=cfg.SAC.use_absorbing_state,
         )
         algo_kwargs.update(sac_kwargs)
         ppo_kwargs = None

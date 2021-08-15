@@ -7,6 +7,7 @@ from ail.wrapper.action_wrapper import (
 )
 
 from ail.wrapper.vev_norm_wrapper import VecNormalize
+from ail.wrapper.absorbing_wrapper import AbsorbingWrapper
 
 
 EnvWrapper = {
@@ -28,4 +29,5 @@ EnvWrapper = {
         clip_obs=float("inf"),
         clip_reward=10,
     ),
+    "absorbing": AbsorbingWrapper,
 }
