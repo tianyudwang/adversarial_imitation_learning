@@ -286,7 +286,8 @@ def run(args, cfg, path):
                     f"{args.env_id}",
                     str(args.algo).upper(),
                     str(args.gen_algo).upper(),
-                    str(cfg.DISC.rew_input_choice)
+                    str(cfg.DISC.rew_input_choice),
+                    str(cfg.OPTIM.optim_cls)
                 ],
                 config=config_copy,  # Hyparams & meta data.
             )

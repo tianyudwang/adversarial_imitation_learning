@@ -27,7 +27,7 @@ OPTIM:
 
 
 ALGO:
-  max_grad_norm: 40  # default: None
+  max_grad_norm: 0.5  # default: None
   gamma: 0.99         # default: 0.9
 
 

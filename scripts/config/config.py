@@ -123,7 +123,7 @@ _C.DISC.obs_normalization = None   # Normalization of observations.
 # AIRL only args
 _C.AIRL = CN()
 _C.AIRL.disc_cls = "airl_sa"   # Choices = ["airl_so", "airl_sa"].
-_C.AIRL.subtract_logp = True   # Subtract log_p from discrtiminator logits.
+_C.AIRL.subtract_logp = False  # Subtract log_p from discrtiminator logits.
 
 
 # GAIL only args

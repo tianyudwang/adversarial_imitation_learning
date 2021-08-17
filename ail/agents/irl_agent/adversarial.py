@@ -97,7 +97,7 @@ class Adversarial(BaseIRLAgent):
         # Lables for the discriminator(Assuming same batch size for gen and exp)
         self.disc_labels = self.make_labels(
             n_gen=self.replay_batch_size, n_exp=self.replay_batch_size
-        )
+        ).to(self.device)
         self.n_labels = float(len(self.disc_labels))
 
         # loss function for the discriminator

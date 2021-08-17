@@ -285,7 +285,7 @@ class BaseTrainer:
         )
 
     def is_saving_model(self, step: int) -> bool:
-        cond = (step > 0, step % self.save_freq == 0, step / self.total_timesteps > 0.3)
+        cond = (step > 0, step % self.save_freq == 0)
         return all(cond) or step == self.total_timesteps - 1
 
     def train_logging(

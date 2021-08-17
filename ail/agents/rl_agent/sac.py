@@ -491,10 +491,11 @@ class SAC(OffPolicyAgent):
         # * here tau = (1 - polyak)
         soft_update(self.critic_target, self.critic, self.tau, self.one)
 
-    def save_models(self, save_dir):
+    def save_models(self, save_dir: str) -> None:
+        """
+        Save the model. (Only save actor to reduce workloads)
+        """
         super().save_models(save_dir)
-        # TODO: (Yifan) implement this.
-        # Only save actor to reduce workloads
         th.save(self.actor.state_dict(), os.path.join(save_dir, "actor.pth"))
 
     @classmethod

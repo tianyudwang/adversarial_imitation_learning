@@ -129,10 +129,10 @@ class BaseIRLAgent(BaseAgent, ABC):
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         # Generator
-        th.save(self.actor, os.path.join(save_dir, "gen_actor.pth"))
+        th.save(self.actor.state_dict(), os.path.join(save_dir, "gen_actor.pth"))
 
         # Discriminator
-        th.save(self.disc, os.path.join(save_dir, "discrim.pth"))
+        th.save(self.disc.state_dict(), os.path.join(save_dir, "discrim.pth"))
 
     def one_gradient_step(
         self,

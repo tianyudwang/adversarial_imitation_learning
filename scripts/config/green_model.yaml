@@ -1,22 +1,7 @@
 
 
-CUDA:
-  # desc: torch.backends
-  cudnn: true
-
-LOG:
-  log_every_n_updates: 20
-  eval_interval: 5000
-  num_eval_episodes: 10
-
-WANDB:
-  # desc: wandb.watch function inputs
-  log_param: true
-  log_type: gradients
-  log_freq: 1000
-
 ENV:
-  wrapper: [clip_act, ]  # default: [] norm_clip_obs
+  wrapper: [clip_act]  # default: []
 
 
 OPTIM:
@@ -57,7 +42,7 @@ SAC:
   log_alpha_init: 1.0         # default: 1.0
   lr_alpha: 3.0e-4            # default: 3.0e-4
 
-  batch_size: 256             # default: 256        
+  batch_size: 256             # default: 256     PPO: 2048 
   buffer_size: 2_000_000      # default: 1_000_000
   with_reward: false          # dont use reward for ail     
   extra_data: []              # default: []
@@ -72,17 +57,13 @@ SAC:
 
 # Discriminator settings
 DISC:
-  # use_spectral_norm: true    # default: false
-  # dropout_input: true        # default: false
-  # dropout_input_rate: 0.5     # default: 0.1
-  # dropout_hidden: true       # default: false
-  # dropout_hidden_rate: 0.75   # default: 0.1
+  use_spectral_norm: true    # default: false
   
   # Discriminator Architecture
-  hidden_units: [528]    # default: [128, 128] 
+  hidden_units: [100, 100]    # default: [128, 128] 
   hidden_activation: relu_inplace
 
-  # ent_coef: 0.03  # default: 0.0
+  ent_coef: 0.03 # default: 0.0
 
   epoch_disc: 1  
   lr_disc: 1.0e-4
@@ -98,32 +79,6 @@ DISC:
 
 AIRL:
   disc_cls: airl_sa  
-  # subtract_logp: true # default: false# deafult: true
+  subtract_logp: false  # deafult: true
 
 
-# Record:
-# InvertedPendulum:
-#   airl_so: # * work without subtract_logp, unstable otherwise
-      # logsigmoid:
-      # softplus:
-      # logit:
-#   airl_sa: # * work without subtract_logp, unstable otherwise
-      # logsigmoid: pass
-      # softplus: pass
-      # logit: pass
-#   gail: work
-      # logsigmoid: pass
-      # softplus: pass
-
-
-# HalfCheetah:
-#   airl_so:
-#   airl_sa:
-#   gail:
-
-# Hopper: 
-#   desc:
-      # ppo: pi_lr 7.3e-4, vf_lr 3.0e-4 disc_lr 1.0e-4
-#   airl_so:
-#   airl_sa:
-#   gail:
