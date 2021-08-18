@@ -19,3 +19,4 @@ Some experimental configurations are discussed in [What Matters for Adversarial 
 
 - [Progress](https://www.notion.so/AIL-Progess-314fc6ed97414f85ba76457508c5237d)
 - [Experiment](https://wandb.ai/ucsd-erl-ail)
+- [Weekly logs](https://docs.google.com/document/d/1yIPSliESbQ115IjWtfVEMWLetxz_BUp6ofBl7Qt1quc)
