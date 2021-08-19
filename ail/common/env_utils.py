@@ -93,7 +93,9 @@ def env_summary(env: Union[GymEnv, str], tag="", verbose=False) -> Dict:
     return summary
 
 
-def unwrap_wrapper(env: GymEnv, wrapper_class: Type[gym.Wrapper]) -> Optional[gym.Wrapper]:
+def unwrap_wrapper(
+    env: GymEnv, wrapper_class: Type[gym.Wrapper]
+) -> Optional[gym.Wrapper]:
     """
     Retrieve a ``VecEnvWrapper`` object by recursively searching.
     :param env: Environment to unwrap

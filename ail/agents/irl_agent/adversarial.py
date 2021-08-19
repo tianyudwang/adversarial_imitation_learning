@@ -126,27 +126,6 @@ class Adversarial(BaseIRLAgent):
                 assert min_rew_magnitude < max_rew_magnitude
                 self.min_rew_magnitude = min_rew_magnitude
 
-        if obs_normalization is not None:
-            assert isinstance(
-                obs_normalization, str
-            ), "obs_normalization should be a string"
-            if obs_normalization == "fixed":
-                self.normalize_obs = True
-                self.normalize_mode = "fixed"
-            elif obs_normalization == "online":
-                self.normalize_obs = True
-                self.normalize_mode = "online"
-                raise NotImplementedError()
-            else:
-                raise ValueError(
-                    f"Valid inputs of obs_normalization: ['fixed', 'online']."
-                )
-        else:
-            self.normalize_obs = False
-
-        self.absorbing_states = th.zeros(self.obs_dim + 1).reshape(1, -1)
-        self.absorbing_states[:, -1] = 1.0
-
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
 
@@ -176,25 +155,6 @@ class Adversarial(BaseIRLAgent):
             data_exp = self.buffer_exp.sample(self.replay_batch_size)
 
             # self.make_absorbing_states(data_gen["obs"], data_gen["dones"])
-
-            if self.normalize_obs:
-
-                data_gen["obs"] = self.fix_normalize_obs(
-                    data_gen["obs"], data_exp["obs"]
-                )
-                data_exp["obs"] = self.fix_normalize_obs(
-                    data_exp["obs"], data_exp["obs"]
-                )
-                data_gen["next_obs"] = self.fix_normalize_obs(
-                    data_gen["next_obs"], data_exp["next_obs"]
-                )
-                data_exp["next_obs"] = self.fix_normalize_obs(
-                    data_exp["next_obs"], data_exp["next_obs"]
-                )
-                # ic(data_gen["obs"].mean(0), data_gen["next_obs"].mean(0))
-                # ic(data_gen["obs"].std(0), data_gen["next_obs"].std(0))
-                # ic(data_exp["obs"].mean(0), data_exp["next_obs"].mean(0))
-                # ic(data_exp["obs"].std(0), data_exp["next_obs"].std(0))
 
             # Calculate log probabilities of generator's actions.
             # And evaluate log probabilities of expert actions.
@@ -230,12 +190,6 @@ class Adversarial(BaseIRLAgent):
 
         else:
             raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
-
-        # if self.normalize_obs:
-        #     data["obs"] = normalize(data["obs"], exp_obs_mean, exp_obs_std)
-        #     data["next_obs"] = normalize(
-        #         data["next_obs"], exp_next_obs_mean, exp_next_obs_std
-        #     )
 
         # Calculate learning rewards.
         data["rews"] = self.disc.calculate_rewards(choice=self.rew_input_choice, **data)

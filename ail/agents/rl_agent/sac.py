@@ -422,7 +422,7 @@ class SAC(OffPolicyAgent):
                     next_qs1, next_qs2 = self.critic_target(
                         next_states, next_actions * a_mask
                     )
-                    # TODO: what to do with log_pis? 
+                    # TODO: what to do with log_pis?
                     next_qs = th.min(next_qs1, next_qs2) - self.alpha * next_log_pis
                     # Target (TD error + entropy term):
                     # * Here we use an inverse convention in which DONE = 0 and NOT_DONE = 1.

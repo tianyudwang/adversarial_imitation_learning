@@ -82,8 +82,6 @@ def CLI():
     p.add_argument("--cuda", action="store_true")
     p.add_argument("--fp16", action="store_true")
 
-    # Random seed
-    p.add_argument("--seed", type=int, default=0)
 
     # Utility
     p.add_argument("--verbose", type=int, default=2)
@@ -110,7 +108,7 @@ def run(args, cfg, path):
         # common args
         device=args.device,
         fp16=args.fp16,
-        seed=args.seed,
+        seed=cfg.ALGO.seed,
         gamma=cfg.ALGO.gamma,
         max_grad_norm=cfg.ALGO.max_grad_norm,
         optim_kwargs=dict(cfg.OPTIM),
@@ -225,7 +223,7 @@ def run(args, cfg, path):
     )
     
     timestamp = make_unique_timestamp()
-    exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{timestamp}")
+    exp_name = os.path.join(args.env_id, args.algo, f"seed{cfg.ALGO.seed}-{timestamp}")
     log_dir = path.joinpath("runs", exp_name)
 
     
@@ -236,7 +234,7 @@ def run(args, cfg, path):
         algo_kwargs=algo_kwargs,
         env_kwargs={"env_wrapper": cfg.ENV.wrapper},
         max_ep_len=args.rollout_length,
-        seed=args.seed,
+        seed=cfg.ALGO.seed,
         eval_interval=args.eval_interval,
         eval_behavior_type=args.eval_mode,
         num_eval_episodes=args.num_eval_episodes,
@@ -279,10 +277,10 @@ def run(args, cfg, path):
             # Save API key for convenience or you have to login every time.
             wandb.login()
             wandb.init(
-                project="AIL",
+                entity="ucsd-erl-ail",
+                project="ail",
                 notes="tweak baseline",
                 tags=[
-                    "baseline",
                     f"{args.env_id}",
                     str(args.algo).upper(),
                     str(args.gen_algo).upper(),

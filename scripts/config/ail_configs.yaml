@@ -16,18 +16,20 @@ WANDB:
   log_freq: 1000
 
 ENV:
-  wrapper: [clip_act, ]  # default: [] norm_clip_obs
+  wrapper: [clip_act,]  # default: [] norm_clip_obs
 
 
 OPTIM:
   # desc: Optimizer class and zero_grad input
   optim_cls: adam        # default: adam
   optim_set_to_none: false  # default: false
+  # weight_decay: 10       # default: 0.0
 
 
 ALGO:
   max_grad_norm: 10  # default: None 10 is good
   gamma: 0.99         # default: 0.99
+  seed: 0
 
 
 PPO:
@@ -45,7 +47,7 @@ PPO:
   activation: relu_inplace  # default: "relu"
   lr_actor: 3.0e-4            # default: 3.0e-4 
   lr_critic: 3.0e-4           # default: 3.0e-4
-  orthogonal_init: false       # default: false
+  # orthogonal_init: true       # default: false
 
 
 SAC:
@@ -79,13 +81,13 @@ DISC:
   # dropout_hidden_rate: 0.75   # default: 0.1
   
   # Discriminator Architecture
-  hidden_units: [528]    # default: [128, 128] 
+  hidden_units: [1024]    # default: [128, 128] 
   hidden_activation: relu_inplace
 
   # ent_coef: 0.03  # default: 0.0
 
   epoch_disc: 1  
-  lr_disc: 1.0e-4
+  lr_disc: 7.0e-5
   # choice = ["logsigmoid", "softplus", "logit"] # default: "logsigmoid"
   rew_input_choice: logsigmoid
   # rew_input_choice: softplus
@@ -98,7 +100,7 @@ DISC:
 
 AIRL:
   disc_cls: airl_sa  
-  # subtract_logp: true # default: false# deafult: true
+  # subtract_logp: true   # default: false
 
 
 # Record:

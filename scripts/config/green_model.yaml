@@ -7,12 +7,13 @@ ENV:
 OPTIM:
   # desc: Optimizer class and zero_grad input
   optim_cls: adam        # default: adam
-  optim_set_to_none: false  # default: false
+  optim_set_to_none: true  # default: false
 
 
 ALGO:
   max_grad_norm: 10  # default: None 10 is good
   gamma: 0.99         # default: 0.99
+  seed: 42
 
 
 PPO:

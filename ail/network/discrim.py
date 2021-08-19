@@ -434,7 +434,7 @@ class AIRLStateActionDiscrim(DiscrimNet):
     """
     Discriminator used in AIRL with entangled reward.
     As in the trajectory-centric case,
-        f* (s, a) = log π∗ (a|s) = A∗ (s, a)
+        f* (s, a) = log π* (a|s) = A*(s, a)
     """
 
     def __init__(

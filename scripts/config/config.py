@@ -44,13 +44,13 @@ _C.STEP.rollout_length = None  # Max episode length if None, it sets to the envi
 _C.OPTIM = CN()
 _C.OPTIM.optim_cls = "adam"        # Choices of ["adam", "adamW"].
 _C.OPTIM.optim_set_to_none = False  # Set grad to None instead of zero.
-
+# _C.OPTIM.weight_decay = 0.0
 
 # algo kwargs
 _C.ALGO = CN()
 _C.ALGO.max_grad_norm = None   # Gradient clipping norm.
 _C.ALGO.gamma = 0.99           # Discount factor.
-_C.ALGO.seed = 0               # Seed for the random generator.
+_C.ALGO.seed = 42               # Seed for the random generator.
 
 
 # PPO only args
