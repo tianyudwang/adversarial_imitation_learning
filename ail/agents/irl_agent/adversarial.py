@@ -141,20 +141,35 @@ class Adversarial(BaseIRLAgent):
         """
         for _ in range(self.epoch_disc):
             self.learning_steps_disc += 1
-            # * Sample transitions from ``current`` policy.
+            
             if self.gen.buffer.tag == BufferTag.ROLLOUT:
+                # * Sample transitions from ``current`` policy.
                 data_gen = self.gen.buffer.sample(self.replay_batch_size)
 
             elif self.gen.buffer.tag == BufferTag.REPLAY:
-                data_gen = self.gen.buffer.get(self.replay_batch_size, last_n=True)
+                '''
+                Sampele transition from a ``mixture of all policy``.
+                
+                Instead of sampling trajectories from a policy directly, 
+                we sample transitions from a replay buffer R collected
+                while performing off-policy training:
+                max_{D} E_R [log(D(s, a))] + E_demo  [log(1 − D(s, a))] − \lambd H(\pi).
+                which can be seen as a mixture of all policy distributions that appeared during
+                training, instead of the latest trained policy.
+                
+                In order to recover the original on-policy expectation,
+                one needs to use importance sampling:
+                max_{D} E_R [(p_pi/p_R) log(D(s, a))] + E_demo  [log(1 − D(s, a))] − \lambd H(\pi).
+                '''                
+                # It can be challenging to properly estimate these densities
+                # Algorithm works well in practice with the importance weight omitted.
+                data_gen = self.gen.buffer.sample(self.replay_batch_size)
 
             else:
                 raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
 
             # Samples transitions from expert's demonstrations.
             data_exp = self.buffer_exp.sample(self.replay_batch_size)
-
-            # self.make_absorbing_states(data_gen["obs"], data_gen["dones"])
 
             # Calculate log probabilities of generator's actions.
             # And evaluate log probabilities of expert actions.
@@ -175,33 +190,39 @@ class Adversarial(BaseIRLAgent):
                     }
                 )
                 disc_logs = dict(disc_logs)
+            ic(data_gen["dones"])
+            ic(data_exp["dones"])
+
             del data_gen, data_exp
 
         # Calculate rewards:
         if self.gen.buffer.tag == BufferTag.ROLLOUT:
             # Obtain entire batch of transitions from rollout buffer.
-            data = self.gen.buffer.get()
+            train_policy_data = self.gen.buffer.get()
             # Clear buffer after getting entire buffer.
             self.gen.buffer.reset()
 
         elif self.gen.buffer.tag == BufferTag.REPLAY:
             # Random uniform sampling a batch of transitions from agent's replay buffer
-            data = self.gen.buffer.sample(self.gen.batch_size)
+            train_policy_data = self.gen.buffer.sample(self.gen.batch_size)
 
         else:
             raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
 
+        # TODO: verify absorbing transitions
+        ic(train_policy_data["dones"])
+        import ipdb; ipdb.set_trace()
         # Calculate learning rewards.
-        data["rews"] = self.disc.calculate_rewards(choice=self.rew_input_choice, **data)
+        train_policy_data["rews"] = self.disc.calculate_rewards(choice=self.rew_input_choice, **train_policy_data)
         # Sanity check length of data are equal.
-        assert data["rews"].shape[0] == data["obs"].shape[0]
+        assert train_policy_data["rews"].shape[0] == train_policy_data["obs"].shape[0]
 
         # Reward Clipping
         if self.rew_clip:
-            data["rews"].clamp_(self.min_rew_magnitude, self.max_rew_magnitude)
+            train_policy_data["rews"].clamp_(self.min_rew_magnitude, self.max_rew_magnitude)
 
         # Update generator using estimated rewards.
-        gen_logs = self.update_generator(data, log_this_batch)
+        gen_logs = self.update_generator(train_policy_data, log_this_batch)
 
         return gen_logs, disc_logs
 

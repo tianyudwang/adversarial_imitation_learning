@@ -9,10 +9,12 @@ import torch as th
 from tqdm import tqdm
 
 from ail.color_console import COLORS, Console
-from ail.common.env_utils import maybe_make_env
+from ail.common.env_utils import maybe_make_env, is_wrapped
 from ail.common.pytorch_util import obs_as_tensor
 from ail.common.type_alias import GymEnv
 from ail.common.utils import set_random_seed, get_stats, countdown
+from ail.wrapper.absorbing_wrapper import AbsorbingWrapper
+
 
 
 class BaseTrainer:
@@ -90,18 +92,24 @@ class BaseTrainer:
                 "tag": "training",
                 "color": "green",
             }
-
+            
+        # Set RNG seed.
+        set_random_seed(seed)
+        
         # Env to collect samples.
         self.env = maybe_make_env(
             env, verbose=verbose, tag="training", color="green", **env_kwargs
         )
         self.seed = seed
         self.env.seed(seed)
-
+        
         # Env for evaluation.
+        test_env_wrapper = ["clip_act"]
+        if "absorbing" in env_kwargs.get("env_wrapper", []):
+            test_env_wrapper.append("absorbing")
         self.env_test = maybe_make_env(
             env,
-            env_wrapper=None,
+            env_wrapper=test_env_wrapper,
             verbose=verbose,
             tag="test",
             color="magenta",
@@ -115,15 +123,7 @@ class BaseTrainer:
             else self.env._max_episode_steps  # noqa
         )
 
-        # Set RNG seed.
-        set_random_seed(seed)
-
-        if log_dir is None or log_dir == "":
-            self.enable_logging = False
-
-        else:
-            self.enable_logging = True
-
+        self.enable_logging = False if log_dir is None or log_dir == "" else True
         if self.enable_logging:
             # Tensorboard/wandb log setting.
             self.log_dir, self.summary_dir, self.model_dir = (
@@ -145,7 +145,7 @@ class BaseTrainer:
             except ImportError:
                 Console.warning(
                     "`wandb` Module Not Found. You can do `pip install wandb` "
-                    "If you want to use it. Fall back to tensorboard logging"
+                    "If you wish to use it. Fall back to tensorboard logging"
                 )
                 self.use_wandb = False
         else:

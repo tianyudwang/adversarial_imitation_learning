@@ -1,4 +1,5 @@
 import argparse
+import os
 import pathlib
 from pprint import pprint
 
@@ -7,6 +8,8 @@ import gym
 import numpy as np
 import torch as th
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use("Tkagg")
 from tqdm import tqdm
 from stable_baselines3 import SAC, PPO, HER
 
@@ -19,9 +22,12 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 from ail.agents import ALGO
 from ail.buffer import ReplayBuffer
-from ail.common.env_utils import maybe_make_env
+from ail.common.env_utils import maybe_make_env, is_wrapped
 from ail.common.utils import set_random_seed
 from ail.common.pytorch_util import asarray_shape2d
+from ail.common.type_alias import DoneMask
+from ail.wrapper import AbsorbingWrapper
+
 
 
 SB3_ALGO = {
@@ -32,11 +38,13 @@ SB3_ALGO = {
 
 
 def collect_demo(
-    env, algo, buffer_size: int, device, seed=0, render=False, sb3_model=None, save_dir=None
+    env, algo, buffer_size: int, device, wrapper=[], seed=0, render=False, sb3_model=None, save_dir=None
 ):
-    env = maybe_make_env(env, tag="Expert", verbose=2)
+    env = maybe_make_env(env, env_wrapper=wrapper, tag="Expert", verbose=2)
     env.seed(seed)
     set_random_seed(seed)
+    
+    use_absorbing_state = is_wrapped(env, AbsorbingWrapper)
 
     demo_buffer = ReplayBuffer(
         capacity=buffer_size,
@@ -55,7 +63,6 @@ def collect_demo(
     num_episodes = 0
 
     for _ in tqdm(range(1, buffer_size + 1)):
-        t += 1
 
         if sb3_model is not None:
             action, _ = sb3_model.predict(
@@ -67,12 +74,21 @@ def collect_demo(
             raise ValueError("Please provide either sb3_model or cumstom algo")
 
         next_state, reward, done, _ = env.step(action)
-        mask = done
-
+        
+        # * Here we use an inverse convention in which DONE = 0 and NOT_DONE = 1.
+        if (t + 1 == env._max_episode_steps) or not done:
+            done_mask = DoneMask.NOT_DONE.value
+        else:
+            done_mask = DoneMask.DONE.value
+        t += 1
+        
+        if use_absorbing_state:
+            if done and t < env._max_episode_steps:
+                next_state = env.absorbing_state
         data = {
             "obs": asarray_shape2d(state),
             "acts": asarray_shape2d(action),
-            "dones": asarray_shape2d(mask),
+            "dones": asarray_shape2d(done_mask),
             "next_obs": asarray_shape2d(next_state),
         }
 
@@ -84,17 +100,29 @@ def collect_demo(
                 env.render()
             except KeyboardInterrupt:
                 pass
-
+        
+        
         if done:
-            num_episodes += 1
             total_return.append(episode_return)
             toral_ep_len.append(t)
-            state = env.reset()
+            num_episodes += 1
+            
+            if use_absorbing_state and (
+                t < env._max_episode_steps
+            ):
+                # A fake action for the absorbing state.
+                absorbing_data = {
+                    "obs": asarray_shape2d(env.absorbing_state),
+                    "acts": asarray_shape2d(env.zero_action),
+                    "dones": asarray_shape2d(DoneMask.ABSORBING.value),
+                    "next_obs": asarray_shape2d(env.absorbing_state),
+                }
+                buffer.store(absorbing_data, truncate_ok=False)        
             t = 0
             episode_return = 0.0
-
+            next_state = env.reset()
         state = next_state
-
+        
     print(
         f"Mean return of the expert is "
         f"{np.mean(total_return):.3f} +/- {np.std(total_return):.3f}"
@@ -104,6 +132,14 @@ def collect_demo(
         "return_std": np.std(total_return).item(),
     }
 
+    if wrapper:
+        save_name = 'wrapped/'
+        for w in wrapper:
+            save_name += w.__name__ + '_'
+    else:
+        save_name = ''
+        
+    
     fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(8, 6))
     ax[0].plot(total_return)
     ax[1].plot(toral_ep_len)
@@ -111,9 +147,12 @@ def collect_demo(
     ax[1].set_title("Episode Length")
     fig.supxlabel("Time Step")
     plt.tight_layout()
-    fig.savefig(save_dir / "return.png")
+    save_dir = save_dir / save_name
+    if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+    fig.savefig(save_dir/"return.png")
     plt.show()
-    return demo_buffer, info
+    return demo_buffer, info, save_dir
 
 
 if __name__ == "__main__":
@@ -121,6 +160,7 @@ if __name__ == "__main__":
     p.add_argument("--weight", type=str, default="")
     p.add_argument(
         "--env_id",
+        "-env",
         type=str,
         required=True,
         choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
@@ -129,28 +169,35 @@ if __name__ == "__main__":
     p.add_argument(
         "--algo",
         type=str, 
-        choices=["ppo","sac","sb3_ppo","sb3_sac"]
+        choices=["ppo","sac","sb3_ppo","sb3_sac"],
+        required=True,
     )
     p.add_argument("--hidden_size", "-hid", type=int, default=64)
     p.add_argument("--layers", "-l", type= int, default=2)
     p.add_argument("--buffer_size", type=int, default=1_000 * 11)
     p.add_argument("--render", "-r", action="store_true")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--absorbing", '-abs', action="store_true")
     args = p.parse_args()
 
     # run only on cpu for testing
     device = th.device("cpu")
 
+    env_wrapper = []    
+    
     path = pathlib.Path(__file__).parent.resolve()
     print(path,'\n')
     
     demo_dir = path.parent / "ail" / "rl-trained-agents" / args.env_id
-
     if not args.weight:
         if args.algo.startswith("sb3"):
             args.weight = demo_dir / args.algo[4:] / f"{args.env_id}_sb3"
         else:
-            args.weight = demo_dir / args.algo / f"{args.env_id}_actor.pth"
+            if args.absorbing:
+                env_wrapper.append(AbsorbingWrapper)
+                args.weight = demo_dir / args.algo / f"{args.env_id}_actor_absorbing.pth"
+            else:
+                args.weight = demo_dir / args.algo / f"{args.env_id}_actor.pth"
 
     print(args.weight, '\n')
     
@@ -159,6 +206,9 @@ if __name__ == "__main__":
         algo = None
     else:
         dummy_env = gym.make(args.env_id)
+        for wrapper in env_wrapper:
+            dummy_env = wrapper(dummy_env)
+        
         sb3_model = None
         algo = ALGO[args.algo].load(
             path=args.weight,
@@ -171,18 +221,22 @@ if __name__ == "__main__":
     print(f"weight_dir: {args.weight}\n")
     
     save_dir = path / "transitions" / args.env_id
-    buffer, ret_info = collect_demo(
+    buffer, ret_info, save_dir = collect_demo(
         env=args.env_id,
         algo=algo,
         buffer_size=args.buffer_size,
+        wrapper=env_wrapper,
         device=device,
         render=args.render,
         seed=args.seed,
         sb3_model=sb3_model,
         save_dir=save_dir,
     )
-     
-    data_path = save_dir / f"{args.algo}_size{args.buffer_size}"
+    
+    if args.absorbing:
+        data_path = save_dir / f"{args.algo}_absorbing_size{args.buffer_size}"
+    else:
+        data_path = save_dir / f"{args.algo}_size{args.buffer_size}"
     print(f"\nSaving to {data_path}")
     # * default save with .npz
     buffer.save(data_path)
@@ -207,5 +261,6 @@ if __name__ == "__main__":
     pprint(info)
     info.update(ret_info)
     # Saving hyperparams to yaml file.
-    with open(save_dir / "info.yaml", "w") as f:
+    hyperparams = save_dir / "info_abs.yaml" if args.absorbing else save_dir / f"info.yaml"
+    with open(hyperparams, "w") as f:
         yaml.dump(info, f)

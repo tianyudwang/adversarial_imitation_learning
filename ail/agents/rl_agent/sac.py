@@ -145,6 +145,9 @@ class SAC(OffPolicyAgent):
         self.tag = AlgoTags.SAC
         self.use_as_generator = use_as_generator
         self.use_absorbing_state = use_absorbing_state
+        
+        ic(self.use_as_generator)
+        ic(self.use_absorbing_state)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
@@ -246,7 +249,7 @@ class SAC(OffPolicyAgent):
         next_state, reward, done, info = env.step(scaled_action)
 
         # Done mask removes the time limit constrain of some env to keep makorvian.
-        # Agent keeps alive should not be done by env's time limit.
+        # Agent keeps alive should not be assigned to done by env's time limit.
         # See: https://github.com/sfujim/TD3/blob/master/main.py#L127
         # * Here we use an inverse convention in which DONE = 0 and NOT_DONE = 1.
         if (episode_timesteps + 1 == env._max_episode_steps) or not done:
@@ -258,7 +261,7 @@ class SAC(OffPolicyAgent):
 
         if self.use_absorbing_state:
             if done and episode_timesteps < env._max_episode_steps:
-                next_state = env.get_absorbing_state()
+                next_state = env.absorbing_state
 
         data = {
             "obs": asarray_shape2d(state),
@@ -281,8 +284,6 @@ class SAC(OffPolicyAgent):
 
         # Reset env if encounter done signal (not done mask!)
         if done:
-            episode_timesteps = 0
-            next_state = env.reset()
             """
             Absorbing state corresponds to a state 
             which a policy gets in after reaching a goal state and stays there forever.
@@ -292,18 +293,18 @@ class SAC(OffPolicyAgent):
             if self.use_absorbing_state and (
                 episode_timesteps < env._max_episode_steps
             ):
-                # A fake action for the absorbing state.
-                zero_action = np.zeros(env.action_space.shape)
-                absorbing_state = env.get_absorbing_state()
+                # A fake action for the absorbing state (all zeros).
                 absorbing_data = {
-                    "obs": asarray_shape2d(absorbing_state),
-                    "acts": asarray_shape2d(zero_action),
+                    "obs": asarray_shape2d(env.absorbing_state),
+                    "acts": asarray_shape2d(env.zero_action),
                     "rews": asarray_shape2d(0.0),
                     "dones": asarray_shape2d(DoneMask.ABSORBING.value),
-                    # "log_pis": asarray_shape2d(log_pi),  # TODO: what to do with log_pi?
-                    "next_obs": asarray_shape2d(absorbing_state),
+                    "log_pis": asarray_shape2d(0.0),  # TODO: what to do with log_pi?
+                    "next_obs": asarray_shape2d(env.absorbing_state),
                 }
                 self.buffer.store(absorbing_data, truncate_ok=False)
+            episode_timesteps = 0
+            next_state = env.reset()
         return next_state, episode_timesteps
 
     def update(self, log_this_batch: bool = False) -> Dict[str, Any]:
@@ -325,11 +326,10 @@ class SAC(OffPolicyAgent):
             info = self.update_algo(replay_data, gradient_step)
             if log_this_batch:
                 for k in info.keys():
-                    if info[k] is None:
-                        continue
+                    if info[k] is not None:
+                        train_logs[k].append(info[k])                       
                     else:
-                        train_logs[k].append(info[k])
-
+                        continue
         return train_logs
 
     def update_algo(self, data: TensorDict, gradient_step: int) -> Dict[str, Any]:

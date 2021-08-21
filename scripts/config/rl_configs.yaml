@@ -17,7 +17,7 @@ CUDA:
 
 
 ENV:
-  wrapper: [clip_act]
+  wrapper: [clip_act, absorbing]
 
 
 OPTIM:
@@ -27,8 +27,8 @@ OPTIM:
 
 
 ALGO:
-  max_grad_norm: 0.5  # default: None
-  gamma: 0.99         # default: 0.9
+  max_grad_norm: 0.5    # default: None  0.5 for sac on hopper
+  # gamma: 0.99         # default: 0.99
 
 
 PPO:
@@ -39,8 +39,8 @@ PPO:
   coef_ent: 0.01
 
   # policy_kwargs
-  pi: [64, 64]
-  vf: [64, 64]
+  pi: [128, 128]
+  vf: [128, 128]
   activation: 'relu'
   lr_actor: 7.0e-4
   lr_critic: 3.0e-4
@@ -58,10 +58,9 @@ SAC:
   lr_alpha: 3.0e-4
 
   # policy_kwargs
-  pi: [128, 128]
-  qf: [128, 128]
+  pi: [256, 256]
+  qf: [256, 256]
   activation: 'relu'
   lr_actor: 7.3e-4
   lr_critic: 7.3e-4
-  use_absorbing_state: true
 

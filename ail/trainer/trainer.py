@@ -8,9 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from ail.agents import ALGO
 from ail.agents.rl_agent.rl_core import OnPolicyAgent, OffPolicyAgent
-from ail.common.env_utils import is_wrapped
 from ail.common.type_alias import GymEnv
-from ail.wrapper.absorbing_wrapper import AbsorbingWrapper
 from ail.trainer.base_trainer import BaseTrainer
 
 
@@ -90,12 +88,6 @@ class Trainer(BaseTrainer):
                 self.env.action_space,
                 **algo_kwargs,
             )
-
-        if algo_kwargs.get("use_absorbing_state", False):
-            if not is_wrapped(self.env, AbsorbingWrapper):
-                self.env = AbsorbingWrapper(self.env)
-            if not is_wrapped(self.env_test, AbsorbingWrapper):
-                self.env_test = AbsorbingWrapper(self.env_test)
 
         # Number of variables and net arch.
         if self.verbose > 1:

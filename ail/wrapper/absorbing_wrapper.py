@@ -13,6 +13,7 @@ class AbsorbingWrapper(gym.ObservationWrapper):
             high=obs_space.high[0],
         )
         self._absorbing_state = self.get_absorbing_state()
+        self._zero_action = self.get_fake_action()
 
     def observation(self, observation: np.ndarray) -> np.ndarray:
         return self.get_non_absorbing_state(observation)
@@ -34,7 +35,14 @@ class AbsorbingWrapper(gym.ObservationWrapper):
         obs = np.zeros(self.observation_space.shape)
         obs[-1] = 1
         return obs
+    
+    def get_fake_action(self) -> np.ndarray:
+        return np.zeros(self.env.action_space.shape)
 
+    @property
+    def zero_action(self) -> np.ndarray:
+        return self._zero_action
+    
     @property
     def absorbing_state(self) -> np.ndarray:
         return self._absorbing_state

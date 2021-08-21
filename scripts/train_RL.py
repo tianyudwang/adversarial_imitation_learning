@@ -32,7 +32,6 @@ def CLI():
     p.add_argument(
         "--env_id",
         type=str,
-        default="InvertedPendulum-v2",
         choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
         help="Envriment to train on",
     )
@@ -48,7 +47,7 @@ def CLI():
     )
     p.add_argument("--num_steps", "-n", type=int, default=0.5 * 1e6)
     p.add_argument("--rollout_length", type=int, default=None)
-    p.add_argument("--batch_size", type=int, default=256)
+    p.add_argument("--batch_size", "-bs", type=int, default=256)
     # p.add_argument("--buffer_size", type=int, default=1 * 1e6)
     p.add_argument("--log_every_n_updates", "-lg", type=int, default=20)
     p.add_argument("--eval_interval", type=int, default=5 * 1e3)
@@ -87,6 +86,7 @@ def run(args, cfg, path):
         max_grad_norm=cfg.ALGO.max_grad_norm,
         optim_kwargs=dict(cfg.OPTIM)
     )
+        
     
     rl_algo = args.algo.lower()
     
@@ -143,8 +143,10 @@ def run(args, cfg, path):
                 lr_actor=cfg.SAC.lr_actor,
                 lr_critic=cfg.SAC.lr_critic,
             ),
-            use_absorbing_state=cfg.SAC.use_absorbing_state,
+            
         )
+        if "absorbing" in cfg.ENV.wrapper: 
+            sac_kwargs["use_absorbing_state"] = True
         algo_kwargs.update(sac_kwargs)
         ppo_kwargs = None
 

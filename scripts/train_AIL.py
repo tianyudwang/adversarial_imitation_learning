@@ -62,7 +62,7 @@ def CLI():
     p.add_argument(
         "--demo_path", "-demo", type=str, help="Path to demo"
     )  # required=True,
-
+    p.add_argument("--absorbing", "-abs", action="store_true")
 
     # Total steps and batch size
     p.add_argument("--num_steps", "-n", type=int, default=2 * 1e6)
@@ -167,6 +167,8 @@ def run(args, cfg, path):
                 lr_critic=cfg.SAC.lr_critic,
             ),
         )
+        if "absorbing" in cfg.ENV.wrapper: 
+            sac_kwargs["use_absorbing_state"] = True
         gen_kwargs = {**algo_kwargs, **sac_kwargs}
         ppo_kwargs = None
 
@@ -178,6 +180,9 @@ def run(args, cfg, path):
     if args.demo_path is None:
         # TODO: REMOVE THIS
         demo_dir = path / "transitions"/ args.env_id
+        
+        if args.absorbing:
+            demo_dir = demo_dir / "wrapped"/"AbsorbingWrapper_"
         dir_lst = os.listdir(demo_dir)
         repeat = []
         for fname in dir_lst:
@@ -186,6 +191,8 @@ def run(args, cfg, path):
         if len(repeat) > 1:
             raise ValueError(f"Too many demo files in {demo_dir}")
         args.demo_path = demo_dir / fname
+        
+    
                 
     transitions = dict(np.load(args.demo_path))
 
@@ -218,7 +225,6 @@ def run(args, cfg, path):
             rew_clip = cfg.DISC.rew_clip,
             max_rew_magnitude = cfg.DISC.max_rew_magnitude,
             min_rew_magnitude = cfg.DISC.min_rew_magnitude,
-            obs_normalization = cfg.DISC.obs_normalization,
         )
     )
     
