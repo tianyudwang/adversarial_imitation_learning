@@ -2,7 +2,6 @@ from typing import Union, Optional, Tuple, Dict, Any
 from collections import defaultdict
 from copy import deepcopy
 import os
-import math
 
 import numpy as np
 import torch as th
@@ -22,6 +21,7 @@ from ail.common.pytorch_util import (
 from ail.common.type_alias import AlgoTags, DoneMask, GymEnv, GymSpace, TensorDict
 from ail.network.policies import StateDependentPolicy
 from ail.network.value import mlp_value
+from ail.color_console import Console
 
 
 class SAC(OffPolicyAgent):
@@ -145,9 +145,11 @@ class SAC(OffPolicyAgent):
         self.tag = AlgoTags.SAC
         self.use_as_generator = use_as_generator
         self.use_absorbing_state = use_absorbing_state
-        
-        ic(self.use_as_generator)
-        ic(self.use_absorbing_state)
+
+        if self.use_as_generator:
+            Console.info("Using as generator.")
+        if self.use_absorbing_state:
+            Console.info("wrapped absorbing state.")
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
@@ -169,7 +171,7 @@ class SAC(OffPolicyAgent):
             self.critic_type,
         ).to(self.device)
 
-        # Set target param equalto main param. Using deep copy instead.
+        # Set target param equal to main param. Using deep copy instead.
         self.critic_target = deepcopy(self.critic).to(self.device).eval()
 
         # Sanity check for zip() in soft_update.
@@ -243,7 +245,7 @@ class SAC(OffPolicyAgent):
 
         # Ensures log_pi is not NaN.
         if log_pi is not None:
-            assert not math.isnan(log_pi)
+            assert not th.isnan(log_pi)
 
         # Interact with environment (Info might be useful for some special env).
         next_state, reward, done, info = env.step(scaled_action)
@@ -279,13 +281,13 @@ class SAC(OffPolicyAgent):
             data["log_pis"] = asarray_shape2d(log_pi)
 
         # Store transitions (s, a, r, s',d).
-        # * ALLOW size larger than buffer capcity.
+        # * ALLOW size larger than buffer capcity and truncate.
         self.buffer.store(data, truncate_ok=True)
 
         # Reset env if encounter done signal (not done mask!)
         if done:
             """
-            Absorbing state corresponds to a state 
+            Absorbing state corresponds to a state
             which a policy gets in after reaching a goal state and stays there forever.
             For most RL problems, we can just assign 0 to all reward after the goal.
             But for GAIL, we need to have an actual absorbing state.
@@ -327,7 +329,7 @@ class SAC(OffPolicyAgent):
             if log_this_batch:
                 for k in info.keys():
                     if info[k] is not None:
-                        train_logs[k].append(info[k])                       
+                        train_logs[k].append(info[k])
                     else:
                         continue
         return train_logs
@@ -352,7 +354,7 @@ class SAC(OffPolicyAgent):
         # Update and obtain the entropy coefficient.
         loss_alpha = self._update_alpha(log_pis_new)
 
-        # First run one gradient descent step for Q1 and Q2
+        # First take one gradient descent step for Q1 and Q2
         loss_critic = self._update_critic(states, actions, rewards, dones, next_states)
 
         # Freeze Q-networks so we don't waste computational effort
@@ -382,7 +384,7 @@ class SAC(OffPolicyAgent):
         ent_loss = E[-alpha * (log_pis) - alpha * target_ent]
                  = E [-alpha (log_pis + target_ent)]
                  = (-alpha * (log_pis + target_ent)).mean()
-                 As log do preserve order
+                 As log do preserve orders
                  = (-log_alpha * (target_ent + log_ent).mean()
         As discussed in https://github.com/rail-berkeley/softlearning/issues/37
         """
@@ -419,11 +421,12 @@ class SAC(OffPolicyAgent):
                 with th.no_grad():
                     # * Target actions come from *current* policy
                     next_actions, next_log_pis = self.actor.sample(next_states)
+                    assert th.isnan(next_log_pis).sum() == 0
                     next_qs1, next_qs2 = self.critic_target(
                         next_states, next_actions * a_mask
                     )
                     # TODO: what to do with log_pis?
-                    next_qs = th.min(next_qs1, next_qs2) - self.alpha * next_log_pis
+                    next_qs = th.min(next_qs1, next_qs2) - self.alpha * next_log_pis 
                     # Target (TD error + entropy term):
                     # * Here we use an inverse convention in which DONE = 0 and NOT_DONE = 1.
                     target_qs = rewards + self.gamma * dones * next_qs

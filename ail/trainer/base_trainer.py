@@ -9,12 +9,11 @@ import torch as th
 from tqdm import tqdm
 
 from ail.color_console import COLORS, Console
-from ail.common.env_utils import maybe_make_env, is_wrapped
+from ail.common.env_utils import maybe_make_env
 from ail.common.pytorch_util import obs_as_tensor
 from ail.common.type_alias import GymEnv
 from ail.common.utils import set_random_seed, get_stats, countdown
 from ail.wrapper.absorbing_wrapper import AbsorbingWrapper
-
 
 
 class BaseTrainer:
@@ -92,17 +91,17 @@ class BaseTrainer:
                 "tag": "training",
                 "color": "green",
             }
-            
+
         # Set RNG seed.
         set_random_seed(seed)
-        
+
         # Env to collect samples.
         self.env = maybe_make_env(
             env, verbose=verbose, tag="training", color="green", **env_kwargs
         )
         self.seed = seed
         self.env.seed(seed)
-        
+
         # Env for evaluation.
         test_env_wrapper = ["clip_act"]
         if "absorbing" in env_kwargs.get("env_wrapper", []):

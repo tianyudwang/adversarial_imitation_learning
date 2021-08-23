@@ -62,7 +62,6 @@ def CLI():
     p.add_argument(
         "--demo_path", "-demo", type=str, help="Path to demo"
     )  # required=True,
-    p.add_argument("--absorbing", "-abs", action="store_true")
 
     # Total steps and batch size
     p.add_argument("--num_steps", "-n", type=int, default=2 * 1e6)
@@ -181,7 +180,7 @@ def run(args, cfg, path):
         # TODO: REMOVE THIS
         demo_dir = path / "transitions"/ args.env_id
         
-        if args.absorbing:
+        if "absorbing" in cfg.ENV.wrapper:
             demo_dir = demo_dir / "wrapped"/"AbsorbingWrapper_"
         dir_lst = os.listdir(demo_dir)
         repeat = []

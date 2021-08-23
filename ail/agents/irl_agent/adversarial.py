@@ -141,26 +141,26 @@ class Adversarial(BaseIRLAgent):
         """
         for _ in range(self.epoch_disc):
             self.learning_steps_disc += 1
-            
+
             if self.gen.buffer.tag == BufferTag.ROLLOUT:
                 # * Sample transitions from ``current`` policy.
                 data_gen = self.gen.buffer.sample(self.replay_batch_size)
 
             elif self.gen.buffer.tag == BufferTag.REPLAY:
-                '''
+                """
                 Sampele transition from a ``mixture of all policy``.
-                
-                Instead of sampling trajectories from a policy directly, 
+
+                Instead of sampling trajectories from a policy directly,
                 we sample transitions from a replay buffer R collected
                 while performing off-policy training:
                 max_{D} E_R [log(D(s, a))] + E_demo  [log(1 − D(s, a))] − \lambd H(\pi).
                 which can be seen as a mixture of all policy distributions that appeared during
                 training, instead of the latest trained policy.
-                
+
                 In order to recover the original on-policy expectation,
                 one needs to use importance sampling:
                 max_{D} E_R [(p_pi/p_R) log(D(s, a))] + E_demo  [log(1 − D(s, a))] − \lambd H(\pi).
-                '''                
+                """
                 # It can be challenging to properly estimate these densities
                 # Algorithm works well in practice with the importance weight omitted.
                 data_gen = self.gen.buffer.sample(self.replay_batch_size)
@@ -190,9 +190,6 @@ class Adversarial(BaseIRLAgent):
                     }
                 )
                 disc_logs = dict(disc_logs)
-            ic(data_gen["dones"])
-            ic(data_exp["dones"])
-
             del data_gen, data_exp
 
         # Calculate rewards:
@@ -210,16 +207,21 @@ class Adversarial(BaseIRLAgent):
             raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
 
         # TODO: verify absorbing transitions
-        ic(train_policy_data["dones"])
-        import ipdb; ipdb.set_trace()
+        # dones = train_policy_data["dones"]
+        
+        # import ipdb; ipdb.set_trace()
         # Calculate learning rewards.
-        train_policy_data["rews"] = self.disc.calculate_rewards(choice=self.rew_input_choice, **train_policy_data)
+        train_policy_data["rews"] = self.disc.calculate_rewards(
+            choice=self.rew_input_choice, **train_policy_data
+        )
         # Sanity check length of data are equal.
         assert train_policy_data["rews"].shape[0] == train_policy_data["obs"].shape[0]
 
         # Reward Clipping
         if self.rew_clip:
-            train_policy_data["rews"].clamp_(self.min_rew_magnitude, self.max_rew_magnitude)
+            train_policy_data["rews"].clamp_(
+                self.min_rew_magnitude, self.max_rew_magnitude
+            )
 
         # Update generator using estimated rewards.
         gen_logs = self.update_generator(train_policy_data, log_this_batch)
@@ -265,7 +267,6 @@ class Adversarial(BaseIRLAgent):
             E_{exp} [log(sigmoid(f))] + E_{\pi} [log(1 - sigmoid(f))]
             *Note: S(x) = 1 - S(-x) -> S(-x) = 1 - S(x)
             
-            # ! Deprecated:
             Implmentation below is correct, but using BCEWithLogitsLoss
             is more numerically stable than using a plain Sigmoid followed by a BCELoss
             
@@ -291,7 +292,6 @@ class Adversarial(BaseIRLAgent):
             disc_logs = self.compute_disc_stats(
                 disc_logits.detach(), loss_disc.detach()
             )
-
         return disc_logs
 
     def compute_disc_stats(
@@ -363,22 +363,6 @@ class Adversarial(BaseIRLAgent):
             ("explained_var_gen", float(explained_var_gen)),
         ]
         return OrderedDict(pairs)
-
-    @staticmethod
-    def fix_normalize_obs(input_obs: th.Tensor, obs_exp: th.Tensor) -> th.Tensor:
-        """
-        Normalize expert's observations.
-        :param obs_exp: expert's observations which has shape (batch_size, obs_dim)
-        :return: normalized input_obs with approximately zero mean and std one
-        """
-        exp_obs_mean, exp_obs_std = obs_exp.mean(axis=0), obs_exp.std(axis=0)
-        return normalize(input_obs, exp_obs_mean, exp_obs_std)
-
-    def make_absorbing_states(self, obs: th.Tensor, dones: th.Tensor) -> th.Tensor:
-        combined_states = th.hstack([obs, dones])
-        is_done = th.all(combined_states, dim=-1, keepdims=True)
-        absorbing_obs = th.where(is_done, self.absorbing_states, combined_states)
-        return absorbing_obs
 
     @staticmethod
     def make_labels(n_gen: int, n_exp: int) -> th.Tensor:
