@@ -279,19 +279,22 @@ def run(args, cfg, path):
         try:
             import wandb
 
+            tags = [
+                    f"{args.env_id}",
+                    str(args.algo).upper(),
+                    str(args.gen_algo).upper(),
+                    str(cfg.DISC.rew_input_choice),
+                    str(cfg.OPTIM.optim_cls)
+            ]
+            if "absorbing" in cfg.ENV.wrapper: 
+                tags.append("absorbing")
             # Save API key for convenience or you have to login every time.
             wandb.login()
             wandb.init(
                 entity="ucsd-erl-ail",
                 project="ail",
                 notes="tweak baseline",
-                tags=[
-                    f"{args.env_id}",
-                    str(args.algo).upper(),
-                    str(args.gen_algo).upper(),
-                    str(cfg.DISC.rew_input_choice),
-                    str(cfg.OPTIM.optim_cls)
-                ],
+                tags=tags,
                 config=config_copy,  # Hyparams & meta data.
             )
             wandb.run.name = exp_name

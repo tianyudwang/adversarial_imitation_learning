@@ -185,12 +185,15 @@ def run(args, cfg, path):
         try:
             import wandb
 
+            tags = ["baseline", f"{args.env_id}", str(args.algo).upper()]
+            if "absorbing" in cfg.ENV.wrapper: 
+                tags.append("absorbing")
             # Save API key for convenience or you have to login every time
             wandb.login()
             wandb.init(
                 project="AIL",
                 notes="tweak baseline",
-                tags=["baseline", f"{args.env_id}", str(args.algo).upper()],
+                tags=tags,
                 config=config,  # Hyparams & meta data
             )
             wandb.run.name = exp_name

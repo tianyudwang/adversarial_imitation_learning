@@ -150,7 +150,7 @@ class Adversarial(BaseIRLAgent):
                 """
                 Sampele transition from a ``mixture of all policy``.
 
-                Instead of sampling trajectories from a policy directly,
+                Instead of sampling trajectories from current policy directly,
                 we sample transitions from a replay buffer R collected
                 while performing off-policy training:
                 max_{D} E_R [log(D(s, a))] + E_demo  [log(1 − D(s, a))] − \lambd H(\pi).
