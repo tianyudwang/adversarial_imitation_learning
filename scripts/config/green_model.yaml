@@ -1,7 +1,7 @@
 
 
 ENV:
-  wrapper: [clip_act]  # default: []
+  wrapper: [clip_act, absorbing]  # default: []
 
 
 OPTIM:

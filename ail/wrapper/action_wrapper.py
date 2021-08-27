@@ -1,4 +1,5 @@
 import numpy as np
+import gym
 from gym import ActionWrapper
 from gym.spaces.box import Box
 
@@ -82,3 +83,21 @@ class NormalizeBoxAction(ActionWrapper):
     @property
     def _max_episode_steps(self) -> int:
         return self.env._max_episode_steps  # pylint: disable=protected-access
+
+
+class ActionNoiseWrapper(gym.Wrapper):
+    """
+    Add gaussian noise to the action (without telling the agent),
+    to test the robustness of the control.
+    :param env: (gym.Env)
+    :param noise_std: (float) Standard deviation of the noise
+    """
+
+    def __init__(self, env, noise_std: float = 0.1):
+        super().__init__(env)
+        self.noise_std = noise_std
+
+    def step(self, action: np.ndarray) -> tuple:
+        noise = np.random.normal(np.zeros_like(action), np.ones_like(action) * self.noise_std)
+        noisy_action = action + noise
+        return self.env.step(noisy_action)
