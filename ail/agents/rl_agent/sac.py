@@ -29,7 +29,6 @@ class SAC(OffPolicyAgent):
     """
     Soft Actor-Critic (SAC)
     Paper: https://arxiv.org/abs/1801.01290
-
     :param state_space: state space
     :param action_space: action space
     :param device: PyTorch device to which the values will be converted.
@@ -195,10 +194,8 @@ class SAC(OffPolicyAgent):
         episode_timesteps: th.Tensor,
         global_timesteps: Optional[int] = None,
     ) -> Tuple[np.ndarray, int]:
-
         """
         Intereact with environment and store the transition.
-
         A trick to improve exploration at the start of training (for a fixed number of steps)
         Agent takes actions which are sampled from a uniform random distribution over valid actions.
         After that, it returns to normal SAC exploration.
@@ -426,7 +423,7 @@ class SAC(OffPolicyAgent):
                         next_states, next_actions * a_mask
                     )
                     # TODO: what to do with log_pis?
-                    next_qs = th.min(next_qs1, next_qs2) - self.alpha * next_log_pis 
+                    next_qs = th.min(next_qs1, next_qs2) - self.alpha * next_log_pis
                     # Target (TD error + entropy term):
                     # * Here we use an inverse convention in which DONE = 0 and NOT_DONE = 1.
                     target_qs = rewards + self.gamma * dones * next_qs

@@ -98,6 +98,8 @@ class ActionNoiseWrapper(gym.Wrapper):
         self.noise_std = noise_std
 
     def step(self, action: np.ndarray) -> tuple:
-        noise = np.random.normal(np.zeros_like(action), np.ones_like(action) * self.noise_std)
+        noise = np.random.normal(
+            np.zeros_like(action), np.ones_like(action) * self.noise_std
+        )
         noisy_action = action + noise
         return self.env.step(noisy_action)

@@ -76,7 +76,7 @@ def collect_demo(
         next_state, reward, done, _ = env.step(action)
         
         # * Here we use an inverse convention in which DONE = 0 and NOT_DONE = 1.
-        if (t + 1 == env._max_episode_steps) or not done:
+        if not done or t+1 == env._max_episode_steps:
             done_mask = DoneMask.NOT_DONE.value
         else:
             done_mask = DoneMask.DONE.value

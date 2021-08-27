@@ -17,7 +17,8 @@ CUDA:
 
 
 ENV:
-  wrapper: [clip_act, absorbing]
+  # Choice: [clip_act, vec_norm, norm_clip_obs, absorbing]
+  wrapper: [clip_act,]
 
 
 OPTIM:
@@ -27,7 +28,7 @@ OPTIM:
 
 
 ALGO:
-  max_grad_norm: 0.5    # default: None  0.5 for sac on hopper
+  max_grad_norm: 10    # default: None  0.5 for sac on hopper
   # gamma: 0.99         # default: 0.99
 
 

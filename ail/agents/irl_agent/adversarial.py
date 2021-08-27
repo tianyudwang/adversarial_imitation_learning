@@ -208,7 +208,7 @@ class Adversarial(BaseIRLAgent):
 
         # TODO: verify absorbing transitions
         # dones = train_policy_data["dones"]
-        
+
         # import ipdb; ipdb.set_trace()
         # Calculate learning rewards.
         train_policy_data["rews"] = self.disc.calculate_rewards(
