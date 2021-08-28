@@ -72,7 +72,6 @@ class Adversarial(BaseIRLAgent):
         rew_clip: bool,
         max_rew_magnitude: float,
         min_rew_magnitude: float,
-        obs_normalization: Optional[str],
         **kwargs,
     ):
         super().__init__(

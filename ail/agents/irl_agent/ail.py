@@ -33,7 +33,6 @@ class AIRL(Adversarial):
         rew_clip: bool = False,
         max_rew_magnitude: float = 10.0,
         min_rew_magnitude: Optional[float] = None,
-        obs_normalization: Optional[str] = None,
         **kwargs,
     ):
 
@@ -87,7 +86,6 @@ class AIRL(Adversarial):
             rew_clip,
             max_rew_magnitude,
             min_rew_magnitude,
-            obs_normalization,
             **kwargs,
         )
         self.tag = AlgoTags.AIRL
@@ -122,7 +120,6 @@ class GAIL(Adversarial):
         rew_clip: bool = False,
         max_rew_magnitude: float = 10.0,
         min_rew_magnitude: Optional[float] = None,
-        obs_normalization: Optional[str] = None,
         **kwargs,
     ):
 
@@ -156,6 +153,5 @@ class GAIL(Adversarial):
             rew_clip,
             max_rew_magnitude,
             min_rew_magnitude,
-            obs_normalization,
         )
         self.tag = AlgoTags.GAIL

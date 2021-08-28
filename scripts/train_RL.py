@@ -32,7 +32,7 @@ def CLI():
     p.add_argument(
         "--env_id",
         type=str,
-        choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
+        choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3", "NavEnv-v0"],
         help="Envriment to train on",
     )
     p.add_argument(
@@ -62,13 +62,16 @@ def CLI():
 
     args = p.parse_args()
 
+    if args.env_id == "NavEnv-v0":
+        import gym_nav  # noqa
+
     args.device = "cuda" if args.cuda else "cpu"
 
     # Enforce type int
     args.num_steps = int(args.num_steps)
     args.batch_size = int(args.batch_size)
     args.log_every_n_updates = int(args.log_every_n_updates)
-    
+
     # How often (in terms of steps) to output training info.
     args.log_interval = args.batch_size * args.log_every_n_updates
 
@@ -84,20 +87,19 @@ def run(args, cfg, path):
         seed=args.seed,
         gamma=cfg.ALGO.gamma,
         max_grad_norm=cfg.ALGO.max_grad_norm,
-        optim_kwargs=dict(cfg.OPTIM)
+        optim_kwargs=dict(cfg.OPTIM),
     )
-        
-    
+
     rl_algo = args.algo.lower()
-    
+
     if rl_algo == "ppo":
         # state_ space, action space inside trainer
         ppo_kwargs = dict(
             # buffer args
             batch_size=args.batch_size,  # PPO assums batch size == buffer_size
             buffer_kwargs=dict(
-                with_reward=cfg.PPO.with_reward,
-                extra_data=cfg.PPO.extra_data),
+                with_reward=cfg.PPO.with_reward, extra_data=cfg.PPO.extra_data
+            ),
             # PPO only args
             epoch_ppo=cfg.PPO.epoch_ppo,
             gae_lambda=cfg.PPO.gae_lambda,
@@ -120,20 +122,19 @@ def run(args, cfg, path):
     elif rl_algo == "sac":
         sac_kwargs = dict(
             # buffer args
-            batch_size=args.batch_size,  
-            buffer_size=cfg.SAC.buffer_size,  
+            batch_size=args.batch_size,
+            buffer_size=cfg.SAC.buffer_size,
             buffer_kwargs=dict(
-                with_reward=cfg.SAC.with_reward, 
-                extra_data=cfg.SAC.extra_data),
+                with_reward=cfg.SAC.with_reward, extra_data=cfg.SAC.extra_data
+            ),
             # SAC only args
             start_steps=cfg.SAC.start_steps,
             lr_alpha=cfg.SAC.lr_alpha,
             log_alpha_init=cfg.SAC.log_alpha_init,
-            tau=cfg.SAC.tau,  
+            tau=cfg.SAC.tau,
             # * Recommend to sync following two params to reduce overhead
             num_gradient_steps=cfg.SAC.num_gradient_steps,  # ! slow O(n)
             target_update_interval=cfg.SAC.target_update_interval,
-            
             # poliy args: net arch, activation, lr
             policy_kwargs=dict(
                 pi=cfg.SAC.pi,
@@ -143,9 +144,8 @@ def run(args, cfg, path):
                 lr_actor=cfg.SAC.lr_actor,
                 lr_critic=cfg.SAC.lr_critic,
             ),
-            
         )
-        if "absorbing" in cfg.ENV.wrapper: 
+        if "absorbing" in cfg.ENV.wrapper:
             sac_kwargs["use_absorbing_state"] = True
         algo_kwargs.update(sac_kwargs)
         ppo_kwargs = None
@@ -153,11 +153,10 @@ def run(args, cfg, path):
     else:
         raise ValueError(f"RL ALgo {args.algo} not Implemented.")
 
-        
     timestamp = make_unique_timestamp()
     exp_name = os.path.join(args.env_id, args.algo, f"seed{args.seed}-{timestamp}")
     log_dir = path.joinpath("runs", exp_name)
-    
+
     if not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
 
@@ -186,7 +185,7 @@ def run(args, cfg, path):
             import wandb
 
             tags = ["baseline", f"{args.env_id}", str(args.algo).upper()]
-            if "absorbing" in cfg.ENV.wrapper: 
+            if "absorbing" in cfg.ENV.wrapper:
                 tags.append("absorbing")
             # Save API key for convenience or you have to login every time
             wandb.login()
@@ -218,22 +217,23 @@ def run(args, cfg, path):
 
     trainer.run_training_loop()
 
+
 if __name__ == "__main__":
     # ENVIRONMENT VARIABLE
     os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # modify to assign a meaningful name
-    
+
     args = CLI()
-    
+
     path = pathlib.Path(__file__).parent.resolve()
     print(path)
-    
-    cfg_path = path / "config" /'rl_configs.yaml'
+
+    cfg_path = path / "config" / "rl_configs.yaml"
     cfg = get_cfg_defaults()
     cfg.merge_from_file(cfg_path)
     cfg.freeze()
-    
+
     print(cfg)
-    
+
     if args.debug:
         import numpy as np
 
@@ -244,6 +244,8 @@ if __name__ == "__main__":
         # TODO: investigate this
         os.environ["OMP_NUM_THREADS"] = "1"
         # torch backends
-        th.backends.cudnn.benchmark = cfg.CUDA.cudnn  # ? Does this useful for non-convolutions?
+        th.backends.cudnn.benchmark = (
+            cfg.CUDA.cudnn
+        )  # ? Does this useful for non-convolutions?
 
     run(args, cfg, path)

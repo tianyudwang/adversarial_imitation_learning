@@ -24,6 +24,8 @@ class RewardType(Enum):
     AIRL = "airl"
     gail = "gail"
     GAIL = "gail"
+    inverse_gail = "inverse_gail"
+    INVERSE_GAIL = "inverse_gail"
 
 
 class ChoiceType(Enum):
@@ -232,6 +234,12 @@ class DiscrimNet(nn.Module, ABC):
                     f"Choice {choices} not supported. Valid choices are {choices}."
                 )
 
+        elif rew_type == "inverse_gail":
+            if choice == "logsigmoid":
+                return self.airl_logsigmoid
+            elif choice == "softplus":
+                return self.airl_softplus
+
         else:
             raise ValueError(
                 f"Reward type {rew_type} not supported. "
@@ -279,6 +287,14 @@ class DiscrimNet(nn.Module, ABC):
         """
         return x
 
+    @staticmethod
+    def inverse_gail_logsigmoid(x: th.Tensor) -> th.Tensor:
+        return F.logsigmoid(x)
+
+    @staticmethod
+    def inverse_gail_sofplus(x: th.Tensor) -> th.Tensor:
+        return -F.softplus(-x)
+
 
 class DiscrimTag(Enum):
     GAIL_DISCRIM = auto()
@@ -307,6 +323,7 @@ class GAILDiscrim(DiscrimNet):
             **disc_kwargs,
         )
         self._tag = DiscrimTag.GAIL_DISCRIM
+        self.inverse = disc_kwargs.get("inverse", False)
 
     @property
     def tag(self):
@@ -327,7 +344,10 @@ class GAILDiscrim(DiscrimNet):
         r(s, a) = − ln(1 − D) = softplus(h)
         """
         with th.no_grad():
-            reward_fn = self.reward_fn("gail", choice)
+            if self.inverse:
+                reward_fn = self.reward_fn("inverse_gail", choice)
+            else:
+                reward_fn = self.reward_fn("gail", choice)
             logits = self.forward(obs, acts, **kwargs)
             rews = reward_fn(logits)
         return rews

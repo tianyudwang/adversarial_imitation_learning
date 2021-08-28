@@ -36,7 +36,7 @@ def CLI():
         "-env",
         type=str,
         default="InvertedPendulum-v2",
-        choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3"],
+        choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3", "NavEnv-v0"],
         help="Envriment to train on.",
     )
     p.add_argument(
@@ -74,13 +74,16 @@ def CLI():
     p.add_argument("--eval_interval", type=int, default=5 * 1e3)
     p.add_argument("--eval_mode", type=str, default="average")
     p.add_argument("--num_eval_episodes", type=int, default=10)
-    p.add_argument("--save_freq", type=int, default=50_000, 
-                   help="Save model every `save_freq` steps.")
+    p.add_argument(
+        "--save_freq",
+        type=int,
+        default=50_000,
+        help="Save model every `save_freq` steps.",
+    )
 
     # Cuda options
     p.add_argument("--cuda", action="store_true")
     p.add_argument("--fp16", action="store_true")
-
 
     # Utility
     p.add_argument("--verbose", type=int, default=2)
@@ -88,13 +91,16 @@ def CLI():
     p.add_argument("--use_wandb", "-wb", action="store_true")
     args = p.parse_args()
 
+    if args.env_id == "NavEnv-v0":
+        import gym_nav  # noqa
+
     args.device = "cuda" if args.cuda else "cpu"
 
     # Enforce type int
     args.num_steps = int(args.num_steps)
     args.gen_batch_size = int(args.gen_batch_size)
     args.log_every_n_updates = int(args.log_every_n_updates)
-    
+
     # How often (in terms of steps) to output training info.
     args.log_interval = args.gen_batch_size * args.log_every_n_updates
     return args
@@ -112,9 +118,9 @@ def run(args, cfg, path):
         max_grad_norm=cfg.ALGO.max_grad_norm,
         optim_kwargs=dict(cfg.OPTIM),
     )
-    
+
     gen_algo = args.gen_algo.lower()
-    if  gen_algo == "ppo":
+    if gen_algo == "ppo":
         # state space, action space inside trainer
         ppo_kwargs = dict(
             # buffer args
@@ -125,7 +131,6 @@ def run(args, cfg, path):
             gae_lambda=cfg.PPO.gae_lambda,
             clip_eps=cfg.PPO.clip_eps,
             coef_ent=cfg.PPO.coef_ent,
-            
             # poliy args: net arch, activation, lr.
             policy_kwargs=dict(
                 pi=cfg.PPO.pi,
@@ -154,9 +159,8 @@ def run(args, cfg, path):
             # * Recommend to sync following two params to reduce overhead.
             num_gradient_steps=cfg.SAC.num_gradient_steps,  # ! slow O(n)
             target_update_interval=cfg.SAC.target_update_interval,
-            use_as_generator = True,
-            
-           # poliy args: net arch, activation, lr.
+            use_as_generator=True,
+            # poliy args: net arch, activation, lr.
             policy_kwargs=dict(
                 pi=cfg.SAC.pi,
                 qf=cfg.SAC.qf,
@@ -166,7 +170,7 @@ def run(args, cfg, path):
                 lr_critic=cfg.SAC.lr_critic,
             ),
         )
-        if "absorbing" in cfg.ENV.wrapper: 
+        if "absorbing" in cfg.ENV.wrapper:
             sac_kwargs["use_absorbing_state"] = True
         gen_kwargs = {**algo_kwargs, **sac_kwargs}
         ppo_kwargs = None
@@ -174,14 +178,13 @@ def run(args, cfg, path):
     else:
         raise ValueError(f"RL ALgo (generator) {args.gen_algo} not Implemented.")
 
-    
     # Demo data.
     if args.demo_path is None:
         # TODO: REMOVE THIS
-        demo_dir = path / "transitions"/ args.env_id
-        
+        demo_dir = path / "transitions" / args.env_id
+
         if "absorbing" in cfg.ENV.wrapper:
-            demo_dir = demo_dir / "wrapped"/"AbsorbingWrapper_"
+            demo_dir = demo_dir / "wrapped" / "AbsorbingWrapper_"
         dir_lst = os.listdir(demo_dir)
         repeat = []
         for fname in dir_lst:
@@ -190,9 +193,7 @@ def run(args, cfg, path):
         if len(repeat) > 1:
             raise ValueError(f"Too many demo files in {demo_dir}")
         args.demo_path = demo_dir / fname
-        
-    
-                
+
     transitions = dict(np.load(args.demo_path))
 
     algo_kwargs.update(
@@ -215,23 +216,23 @@ def run(args, cfg, path):
                 dropout_input_rate=cfg.DISC.dropout_input_rate,
                 dropout_hidden=cfg.DISC.dropout_hidden,
                 dropout_hidden_rate=cfg.DISC.dropout_hidden_rate,
+                inverse=cfg.GAIL.inverse,
             ),
             disc_ent_coef=cfg.DISC.ent_coef,
             epoch_disc=cfg.DISC.epoch_disc,
             lr_disc=cfg.DISC.lr_disc,
-            subtract_logp = cfg.AIRL.subtract_logp,
-            rew_input_choice = cfg.DISC.rew_input_choice,
-            rew_clip = cfg.DISC.rew_clip,
-            max_rew_magnitude = cfg.DISC.max_rew_magnitude,
-            min_rew_magnitude = cfg.DISC.min_rew_magnitude,
+            subtract_logp=cfg.AIRL.subtract_logp,
+            rew_input_choice=cfg.DISC.rew_input_choice,
+            rew_clip=cfg.DISC.rew_clip,
+            max_rew_magnitude=cfg.DISC.max_rew_magnitude,
+            min_rew_magnitude=cfg.DISC.min_rew_magnitude,
         )
     )
-    
+
     timestamp = make_unique_timestamp()
     exp_name = os.path.join(args.env_id, args.algo, f"seed{cfg.ALGO.seed}-{timestamp}")
     log_dir = path.joinpath("runs", exp_name)
 
-    
     config = dict(
         total_timesteps=args.num_steps,
         env=args.env_id,
@@ -250,7 +251,7 @@ def run(args, cfg, path):
         use_wandb=args.use_wandb,
         wandb_kwargs=cfg.WANDB,
     )
-    
+
     # Log with tensorboard and sync to wandb dashboard as well.
     # https://docs.wandb.ai/guides/integrations/tensorboard
     if args.use_wandb:
@@ -271,22 +272,22 @@ def run(args, cfg, path):
         )
         for k in entries_to_remove:
             config_copy.pop(k)
-        
-        # import pandas as pd             
+
+        # import pandas as pd
         # df = pd.json_normalize(config_copy, sep='_').to_dict(orient='records')[0]
         # config_copy={k.replace("algo_kwargs_", ""): v for k, v in df.items()}
-        
+
         try:
             import wandb
 
             tags = [
-                    f"{args.env_id}",
-                    str(args.algo).upper(),
-                    str(args.gen_algo).upper(),
-                    str(cfg.DISC.rew_input_choice),
-                    str(cfg.OPTIM.optim_cls)
+                f"{args.env_id}",
+                str(args.algo).upper(),
+                str(args.gen_algo).upper(),
+                str(cfg.DISC.rew_input_choice),
+                str(cfg.OPTIM.optim_cls),
             ]
-            if "absorbing" in cfg.ENV.wrapper: 
+            if "absorbing" in cfg.ENV.wrapper:
                 tags.append("absorbing")
             # Save API key for convenience or you have to login every time.
             wandb.login()
@@ -305,10 +306,9 @@ def run(args, cfg, path):
     # Create Trainer.
     trainer = Trainer(**config)
 
-    
-     # It's a dict of data too large to store.
+    # It's a dict of data too large to store.
     algo_kwargs["buffer_kwargs"].pop("transitions")
-    if args.verbose:       
+    if args.verbose:
         # algo kwargs
         print("-" * 35, f"{args.algo}", "-" * 35)
         ic(algo_kwargs)
@@ -324,18 +324,18 @@ def run(args, cfg, path):
 
 def main():
     args = CLI()
-    
+
     # Path
     path = pathlib.Path(__file__).parent.resolve()
-    print(f"File_dir: {path}")    
-    
-    cfg_path = path / "config" /"ail_configs.yaml"
+    print(f"File_dir: {path}")
+
+    cfg_path = path / "config" / "ail_configs.yaml"
     cfg = get_cfg_defaults()
     cfg.merge_from_file(cfg_path)
     cfg.freeze()
-    
+
     print(cfg)
-    
+
     if args.debug:
         np.seterr(all="raise")
         th.autograd.set_detect_anomaly(True)
@@ -343,14 +343,16 @@ def main():
     if args.cuda:
         os.environ["OMP_NUM_THREADS"] = "1"
         # torch backends
-        th.backends.cudnn.benchmark = cfg.CUDA.cudnn  # ? Does this useful for non-convolutions?
+        th.backends.cudnn.benchmark = (
+            cfg.CUDA.cudnn
+        )  # ? Does this useful for non-convolutions?
     else:
         os.environ["OMP_NUM_THREADS"] = "2"
-    
+
     run(args, cfg, path)
+
 
 if __name__ == "__main__":
     # ENVIRONMENT VARIABLE
     os.environ["WANDB_NOTEBOOK_NAME"] = "test"  # Modify to assign a meaningful name.
     main()
-    

@@ -70,7 +70,7 @@ class VecNormalize(gym.Wrapper):
 
         self.ret_rms = RunningMeanStd(shape=())
         self.clip_obs = clip_obs
-        self.clip_reward = clip_reward
+        self.clip_rew = clip_reward
 
         # Returns: discounted rewards
         # * Currently only support one env
@@ -172,13 +172,13 @@ class VecNormalize(gym.Wrapper):
         """
         if self.norm_reward:
 
-            if math.isinf(self.clip_reward):
+            if math.isinf(self.clip_rew):
                 norm_rew = reward / np.sqrt(self.ret_rms.var + self.epsilon)
             else:
                 norm_rew = np.clip(
                     reward / np.sqrt(self.ret_rms.var + self.epsilon),
-                    -self.clip_reward,
-                    self.clip_reward,
+                    -self.clip_rew,
+                    self.clip_rew,
                 )
         else:
             norm_rew = reward
