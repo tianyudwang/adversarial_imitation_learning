@@ -33,6 +33,10 @@ _C.WANDB.log_freq = 1000  # Log gradients evey 1000 steps.
 _C.ENV = CN()
 _C.ENV.wrapper = []
 
+# Test ENV settings.
+_C.TEST_ENV = CN()
+_C.TEST_ENV.wrapper = []
+
 
 # Steps, batch size, buffer size.
 _C.STEP = CN()

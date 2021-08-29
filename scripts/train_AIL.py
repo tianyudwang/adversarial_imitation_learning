@@ -35,7 +35,6 @@ def CLI():
         "--env_id",
         "-env",
         type=str,
-        default="InvertedPendulum-v2",
         choices=["InvertedPendulum-v2", "HalfCheetah-v2", "Hopper-v3", "NavEnv-v0"],
         help="Envriment to train on.",
     )
@@ -239,6 +238,7 @@ def run(args, cfg, path):
         algo=args.algo,
         algo_kwargs=algo_kwargs,
         env_kwargs={"env_wrapper": cfg.ENV.wrapper},
+        test_env_kwargs={"env_wrapper": cfg.TEST_ENV.wrapper},
         max_ep_len=args.rollout_length,
         seed=cfg.ALGO.seed,
         eval_interval=args.eval_interval,

@@ -1,6 +1,7 @@
 from functools import partial
 
 from ail.wrapper.action_wrapper import (
+    NormalActionNoise,
     ClipBoxAction,
     NormalizeBoxAction,
     RescaleBoxAction,
@@ -11,6 +12,7 @@ from ail.wrapper.absorbing_wrapper import AbsorbingWrapper
 
 
 EnvWrapper = {
+    "noisy_act": NormalActionNoise,
     "clip_act": ClipBoxAction,
     "normalize_act": NormalizeBoxAction,
     "rescale_act": RescaleBoxAction,

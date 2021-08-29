@@ -166,6 +166,7 @@ def run(args, cfg, path):
         algo=args.algo,
         algo_kwargs=algo_kwargs,
         env_kwargs={"env_wrapper": cfg.ENV.wrapper},
+        test_env_kwargs={"env_wrapper": cfg.TEST_ENV.wrapper},
         max_ep_len=args.rollout_length,
         seed=args.seed,
         eval_interval=args.eval_interval,

@@ -65,6 +65,8 @@ class BaseTrainer:
         "batch_size",
         "device",
         "start_time",
+        "use_optuna",
+        "global_step",
     ]
 
     def __init__(
@@ -72,6 +74,7 @@ class BaseTrainer:
         total_timesteps: int,
         env: Union[GymEnv, str],
         env_kwargs: Dict[str, Any],
+        test_env_kwargs: Dict[str, Any],
         max_ep_len: Optional[int],
         eval_interval: int,
         num_eval_episodes: int,
@@ -82,15 +85,16 @@ class BaseTrainer:
         verbose: int,
         use_wandb: bool,
         eval_behavior_type: str = "mix",
+        use_optuna: bool = False,
         **kwargs,
     ):
 
         if env_kwargs is None:
-            env_kwargs = {
-                "env_wrapper": [],  # ? should we apply ActionNormlize wrapper by default?
-                "tag": "training",
-                "color": "green",
-            }
+            # We apply ClipBoxAction wrapper to both env by default
+            env_kwargs = {"env_wrapper": ["clip_act"]}
+
+        if test_env_kwargs is None:
+            test_env_kwargs = {"env_wrapper": ["clip_act"]}
 
         # Set RNG seed.
         set_random_seed(seed)
@@ -103,15 +107,10 @@ class BaseTrainer:
         self.env.seed(seed)
 
         # Env for evaluation.
-        test_env_wrapper = ["clip_act"]
         if "absorbing" in env_kwargs.get("env_wrapper", []):
-            test_env_wrapper.append("absorbing")
+            test_env_kwargs["env_wrapper"].append("absorbing")
         self.env_test = maybe_make_env(
-            env,
-            env_wrapper=test_env_wrapper,
-            verbose=verbose,
-            tag="test",
-            color="magenta",
+            env, verbose=verbose, tag="test", color="magenta", **test_env_kwargs
         )
         self.env_test.seed(2 ** 31 - seed)
 
@@ -200,6 +199,18 @@ class BaseTrainer:
         self.batch_size = None
         self.device = None
         self.start_time = None
+        self.use_optuna = use_optuna
+        self._records = []
+        self.global_step = 0
+        if self.use_optuna:
+            try:
+                import optuna
+            except ImportError:
+                Console.warning(
+                    "`optuna` Module Not Found. You can do `pip install optuna` "
+                    "If you wish to use it."
+                )
+                self.use_optuna = False
 
     # -----------------------
     # Training/ evaluation
@@ -209,7 +220,7 @@ class BaseTrainer:
         raise NotImplementedError()
 
     @th.no_grad()
-    def evaluate(self, step: int) -> None:
+    def evaluate(self, step: int, trial=None) -> None:
         # set algo to evaluation mode
         self.algo.actor.eval()
         train_returns, train_ep_lens = [], []
@@ -260,6 +271,19 @@ class BaseTrainer:
             f"| Best Ret: {self.best_ret:.2f}\t"
             f"| Return: {mean:.2f} +/- {std:.2f}"
         )
+        if self.use_optuna and trial is not None:
+            if len(self._records) == 5:
+                self._records.pop(0)
+            self._records.append(np.mean(valid_returns))
+            # Report intermediate objective value.
+            intermediate_value = self.get_records()
+            trial.report(intermediate_value, self.global_step)
+
+            # Handle pruning based on the intermediate value.
+            if trial.should_prune():
+                import optuna
+
+                raise optuna.TrialPruned()
 
     # -----------------------
     # Logging conditions
@@ -270,7 +294,7 @@ class BaseTrainer:
             [
                 step % self.log_interval == 0,
                 step > self.log_interval,
-                self.verbose >= 1,
+                self.verbose > 1,
             ]
         )
 
@@ -279,7 +303,7 @@ class BaseTrainer:
             [
                 step % self.eval_interval == 0,
                 step > self.eval_interval,
-                self.verbose >= 1,
+                self.verbose > 1,
             ]
         )
 
@@ -342,7 +366,6 @@ class BaseTrainer:
             eval_logs["max_return"],
             eval_logs["min_return"],
         ) = get_stats(eval_returns)
-
         print("-" * 41)
         self.output_block(train_logs, tag="Train", color="back_bold_green")
         self.output_block(eval_logs, tag="Evaluate", color="back_bold_red")
@@ -434,9 +457,13 @@ class BaseTrainer:
 
     def finish_logging(self) -> None:
         # Wait to ensure that all pending events have been written to disk.
-        self.writer.flush()
-        Console.info(
-            "Wait to ensure that all pending events have been written to disk."
-        )
-        countdown(10)
-        self.writer.close()
+        if self.writer is not None:
+            self.writer.flush()
+            Console.info(
+                "Wait to ensure that all pending events have been written to disk."
+            )
+            countdown(10)
+            self.writer.close()
+
+    def get_records(self):
+        return np.mean(self._records)

@@ -46,6 +46,7 @@ class Trainer(BaseTrainer):
         algo: Union[OnPolicyAgent, OffPolicyAgent],
         algo_kwargs: Dict[str, Any],
         env_kwargs: Optional[Dict[str, Any]] = None,
+        test_env_kwargs: Dict[str, Any] = None,
         max_ep_len=None,
         seed: int = 42,
         eval_interval: int = 5_000,
@@ -57,12 +58,15 @@ class Trainer(BaseTrainer):
         verbose: int = 2,
         use_wandb: bool = False,
         wandb_kwargs: Optional[Dict[str, Any]] = None,
+        use_optuna: bool = False,
+        trial=None,
         **kwargs,
     ):
         super().__init__(
             total_timesteps,
             env,
             env_kwargs,
+            test_env_kwargs,
             max_ep_len,
             eval_interval,
             num_eval_episodes,
@@ -73,6 +77,7 @@ class Trainer(BaseTrainer):
             verbose,
             use_wandb,
             eval_behavior_type,
+            use_optuna,
             **kwargs,
         )
 
@@ -121,6 +126,7 @@ class Trainer(BaseTrainer):
 
         DEVICE = "".join(re.findall("[a-zA-Z]+", str(self.device)))
         self.total_timesteps_pbar.set_description(f"{self.algo} ({DEVICE})")
+        self.trial = trial
 
     def run_training_loop(self):
         """
@@ -135,6 +141,7 @@ class Trainer(BaseTrainer):
 
         # log = []
         for global_step in self.total_timesteps_pbar:
+            self.global_step = global_step
             # Pass to the algorithm to update state and episode timestep.
             # * return of algo.step() is next_obs, episode_timesteps
             obs, episode_timesteps = self.algo.step(
@@ -169,7 +176,7 @@ class Trainer(BaseTrainer):
 
             # Evaluate regularly.
             if global_step % self.eval_interval == 0:
-                self.evaluate(global_step)
+                self.evaluate(global_step, self.trial)
 
             # Saving the model.
             if self.is_saving_model(global_step) and self.enable_logging:
