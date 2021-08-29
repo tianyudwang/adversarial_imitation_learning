@@ -13,7 +13,6 @@ from ail.common.env_utils import maybe_make_env
 from ail.common.pytorch_util import obs_as_tensor
 from ail.common.type_alias import GymEnv
 from ail.common.utils import set_random_seed, get_stats, countdown
-from ail.wrapper.absorbing_wrapper import AbsorbingWrapper
 
 
 class BaseTrainer:
@@ -202,15 +201,6 @@ class BaseTrainer:
         self.use_optuna = use_optuna
         self._records = []
         self.global_step = 0
-        if self.use_optuna:
-            try:
-                import optuna
-            except ImportError:
-                Console.warning(
-                    "`optuna` Module Not Found. You can do `pip install optuna` "
-                    "If you wish to use it."
-                )
-                self.use_optuna = False
 
     # -----------------------
     # Training/ evaluation
