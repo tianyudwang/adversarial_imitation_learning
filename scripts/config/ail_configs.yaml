@@ -17,7 +17,10 @@ WANDB:
 
 ENV:
   # Choice: [clip_act, vec_norm, norm_clip_obs, absorbing]
-  wrapper: [clip_act, absorbing]  # default: [] norm_clip_obs
+  wrapper: [clip_act, absorbing]  # default: [] (no wrapper)
+
+TEST_ENV:
+  wrapper: [clip_act, ]  # default: [] (no wrapper)
 
 
 OPTIM:
@@ -43,8 +46,8 @@ PPO:
   with_reward: false  # dont use reward for ail 
 
   # PPO policy_kwargs
-  pi: [128, 128]              # default: [64, 64]
-  vf: [128, 128]              # default: [64, 64]
+  pi: [32, 32]              # default: [64, 64]
+  vf: [256, 256]              # default: [64, 64]
   activation: relu_inplace  # default: "relu"
   lr_actor: 3.0e-4            # default: 3.0e-4 
   lr_critic: 3.0e-4           # default: 3.0e-4
@@ -62,8 +65,8 @@ SAC:
 
   # batch_size: 256             # default: 256        
   buffer_size: 3_000_000      # default: 1_000_000
-  with_reward: false          # dont use reward for ail     
-  extra_data: []              # default: []
+  with_reward: false          # dont use reward for ail
+  extra_data: ["log_pis", "remaining_steps"]              # default: []
   
   # SAC policy_kwargs
   pi: [256, 256]              # default: [128, 128]
@@ -98,6 +101,8 @@ DISC:
   # rew_clip: true         # default: False
   # max_rew_magnitude: 1.0   # default: 10.0
   # min_rew_magnitude: -1.0  # default: -10.0
+
+  # infinite_horizon: true     # default: false
     
 
 AIRL:
@@ -106,6 +111,7 @@ AIRL:
 
 
 GAIL:
+  inverse: false   # default: false
   # inverse: true  # default: false
 
 

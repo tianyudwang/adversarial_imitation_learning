@@ -399,6 +399,8 @@ class AIRLStateDiscrim(DiscrimNet):
         v_s = self.h(obs)
         next_vs = self.h(next_obs)
         # * Reshape (1-done) to (n,1) to prevent boardcasting mismatch in case done is (n,).
+        # Change to match back to convention of dones where done = 1 not_done = 0
+        dones = 1.0 - th.where(dones <= 0, 0, 1)
         return r_s + self.gamma * (1 - dones).view(-1, 1) * next_vs - v_s
 
     def forward(

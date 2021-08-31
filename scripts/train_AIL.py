@@ -149,7 +149,7 @@ def run(args, cfg, path):
             # buffer args.
             batch_size=args.gen_batch_size,  # PPO assums batch size == buffer_size
             buffer_size=cfg.SAC.buffer_size,  # only used in SAC,
-            buffer_kwargs=dict(with_reward=False, extra_data=["log_pis"]),
+            buffer_kwargs=dict(with_reward=False, extra_data=cfg.SAC.extra_data),
             # SAC only args.
             start_steps=cfg.SAC.start_steps,
             lr_alpha=cfg.SAC.lr_alpha,
@@ -225,6 +225,8 @@ def run(args, cfg, path):
             rew_clip=cfg.DISC.rew_clip,
             max_rew_magnitude=cfg.DISC.max_rew_magnitude,
             min_rew_magnitude=cfg.DISC.min_rew_magnitude,
+            use_absorbing_state="absorbing" in cfg.ENV.wrapper,
+            infinite_horizon=cfg.DISC.infinite_horizon,
         )
     )
 

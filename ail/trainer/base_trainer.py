@@ -165,6 +165,7 @@ class BaseTrainer:
             "disc_acc_exp": "info/disc/acc_exp",
             "disc_entropy": "info/disc/entropy",
             "proportion_gen_pred": "info/disc/prop_gen",
+            "absorbing_rew": "info/disc/absorbing_rew",
         }
 
         # Log and Saving.

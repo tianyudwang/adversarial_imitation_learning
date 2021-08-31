@@ -72,6 +72,8 @@ class Adversarial(BaseIRLAgent):
         rew_clip: bool,
         max_rew_magnitude: float,
         min_rew_magnitude: float,
+        use_absorbing_state: bool,
+        infinite_horizon: bool,
         **kwargs,
     ):
         super().__init__(
@@ -124,6 +126,31 @@ class Adversarial(BaseIRLAgent):
                 assert isinstance(min_rew_magnitude, (float, int))
                 assert min_rew_magnitude < max_rew_magnitude
                 self.min_rew_magnitude = min_rew_magnitude
+
+        self.use_absorbing_state = use_absorbing_state
+
+        if self.use_absorbing_state:
+            self.infinite_horizon = infinite_horizon
+            absorbing_state = th.zeros(self.state_shape, dtype=th.float32).to(
+                self.device
+            )
+            absorbing_state[-1] = 1.0
+            absorbing_action = th.zeros(self.action_shape, dtype=th.float32).to(
+                self.device
+            )
+            absorbing_done = (
+                -th.ones(1, dtype=th.float32).reshape(-1, 1).to(self.device)
+            )
+
+            self.absorbing_data = {
+                "obs": absorbing_state,
+                "acts": absorbing_action,
+                "next_obs": absorbing_state,
+                "dones": absorbing_done,
+                "log_pis": None,
+                "subtract_logp": False,
+            }
+            self.counter = 0
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
@@ -205,14 +232,30 @@ class Adversarial(BaseIRLAgent):
         else:
             raise ValueError(f"Unknown generator buffer type: {self.gen.buffer}.")
 
-        # TODO: verify absorbing transitions
-        # dones = train_policy_data["dones"]
-
-        # import ipdb; ipdb.set_trace()
-        # Calculate learning rewards.
-        train_policy_data["rews"] = self.disc.calculate_rewards(
+        # Calculate Batch rewards
+        rews = self.disc.calculate_rewards(
             choice=self.rew_input_choice, **train_policy_data
         )
+
+        if self.use_absorbing_state:
+
+            # Absorbing state reward
+            r_sa = self.disc.calculate_rewards(
+                choice=self.rew_input_choice, **self.absorbing_data
+            )
+            if self.counter % 500 == 0:
+                ic(r_sa)
+            self.counter += 1
+            with th.no_grad():
+                train_policy_data["rews"] = self.absorbing_cumulative_return(
+                    r_sa,
+                    rews,
+                    dones=train_policy_data["dones"],
+                    remaining_steps=train_policy_data["remaining_steps"],
+                    discount=self.gen.gamma,
+                    infinite_horizon=self.infinite_horizon,
+                )
+
         # Sanity check length of data are equal.
         assert train_policy_data["rews"].shape[0] == train_policy_data["obs"].shape[0]
 
@@ -224,7 +267,8 @@ class Adversarial(BaseIRLAgent):
 
         # Update generator using estimated rewards.
         gen_logs = self.update_generator(train_policy_data, log_this_batch)
-
+        if log_this_batch:
+            gen_logs.update({"absorbing_rew": r_sa.detach()})
         return gen_logs, disc_logs
 
     def update_generator(
@@ -368,3 +412,41 @@ class Adversarial(BaseIRLAgent):
         return th.cat(
             [th.zeros(n_gen, dtype=th.float32), th.ones(n_exp, dtype=th.float32)]
         ).reshape(-1, 1)
+
+    def absorbing_cumulative_return(
+        self,
+        r_sa: th.Tensor,
+        rews: th.Tensor,
+        dones: th.Tensor,
+        remaining_steps: th.Tensor,
+        discount: float,
+        infinite_horizon: bool = True,
+    ) -> th.Tensor:
+        """
+        Calculate the cumulative return for the absorbing state.
+        The returns for final states are
+            R_T = r(s_T, a_T) + sum_{t'=T+1}^{\inf} gamma^t' * r(s_a)
+        :param r_sa: the reward for the absorbing state-action pair
+        :param rew: rewards of the batch
+        :param dones: done signal with absorbing state indicator
+        :param remaining_steps: remaining steps in the episode
+        :returns: cumulative return.
+        """
+        # final states before the absorbing state
+        done_idx = th.where(dones == 0)[0]
+        for i in done_idx:
+            if infinite_horizon:
+                # In practice, analytical infinite horizon alternative is much less stable.
+                rews[i] += discount * r_sa / (1 - discount)
+            else:
+                # t' = t - T
+                t_prime = remaining_steps[i].long()[0]
+                power_idx = th.arange(1, t_prime + 1)
+                r = th.ones_like(power_idx, device=self.device) * r_sa
+                # discount gammas: [gamma, gamma^2,...,gamma^N]
+                discounts = th.pow(discount, power_idx).to(self.device)
+                # discounts * rewards from T+1 to N or inf
+                sum_discounted_rews = th.sum(discounts * r)
+                # Final state return
+                rews[i] += sum_discounted_rews
+        return rews

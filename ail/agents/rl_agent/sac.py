@@ -193,6 +193,7 @@ class SAC(OffPolicyAgent):
         state: th.Tensor,
         episode_timesteps: th.Tensor,
         global_timesteps: Optional[int] = None,
+        max_ep_len: Optional[int] = None,
     ) -> Tuple[np.ndarray, int]:
         """
         Intereact with environment and store the transition.
@@ -206,6 +207,8 @@ class SAC(OffPolicyAgent):
         :param total_timesteps: total number of timesteps to run in outer loop
         :return: next_state, episode length
         """
+        if max_ep_len is None:
+            max_ep_len = env._max_episode_steps
 
         # Random exploration step
         if global_timesteps <= self.start_steps:
@@ -258,9 +261,11 @@ class SAC(OffPolicyAgent):
 
         episode_timesteps += 1
 
+        remaining_steps = 0
         if self.use_absorbing_state:
             if done and episode_timesteps < env._max_episode_steps:
                 next_state = env.absorbing_state
+                remaining_steps = env._max_episode_steps - episode_timesteps
 
         data = {
             "obs": asarray_shape2d(state),
@@ -269,6 +274,8 @@ class SAC(OffPolicyAgent):
             "dones": asarray_shape2d(done_mask),
             "next_obs": asarray_shape2d(next_state),
         }
+        if remaining_steps > 0:
+            data["remaining_steps"] = asarray_shape2d(remaining_steps)
 
         # * No need to store log_pi for pure SAC, may be useful when use SAC as generator
         if self.use_as_generator:
@@ -301,7 +308,7 @@ class SAC(OffPolicyAgent):
                     "log_pis": asarray_shape2d(0.0),  # TODO: what to do with log_pi?
                     "next_obs": asarray_shape2d(env.absorbing_state),
                 }
-                self.buffer.store(absorbing_data, truncate_ok=False)
+                self.buffer.store(absorbing_data, truncate_ok=True)
             episode_timesteps = 0
             next_state = env.reset()
         return next_state, episode_timesteps

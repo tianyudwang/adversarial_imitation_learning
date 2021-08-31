@@ -262,7 +262,7 @@ class Objective(object):
             # run = wandb.init(project="optuna",
             #                      name=f"trial_",
             #                      group="sampling",
-            #                      config=config,
+            #                      config=config["algo_kwargs"],
             #                      reinit=True
             # )
         try:

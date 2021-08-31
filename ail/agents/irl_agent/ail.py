@@ -33,6 +33,8 @@ class AIRL(Adversarial):
         rew_clip: bool = False,
         max_rew_magnitude: float = 10.0,
         min_rew_magnitude: Optional[float] = None,
+        use_absorbing_state: bool = False,
+        infinite_horizon: bool = False,
         **kwargs,
     ):
 
@@ -86,6 +88,8 @@ class AIRL(Adversarial):
             rew_clip,
             max_rew_magnitude,
             min_rew_magnitude,
+            use_absorbing_state,
+            infinite_horizon,
             **kwargs,
         )
         self.tag = AlgoTags.AIRL
@@ -120,6 +124,8 @@ class GAIL(Adversarial):
         rew_clip: bool = False,
         max_rew_magnitude: float = 10.0,
         min_rew_magnitude: Optional[float] = None,
+        use_absorbing_state: bool = False,
+        infinite_horizon: bool = False,
         **kwargs,
     ):
 
@@ -153,5 +159,7 @@ class GAIL(Adversarial):
             rew_clip,
             max_rew_magnitude,
             min_rew_magnitude,
+            use_absorbing_state,
+            infinite_horizon,
         )
         self.tag = AlgoTags.GAIL

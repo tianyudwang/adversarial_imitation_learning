@@ -115,7 +115,7 @@ class Trainer(BaseTrainer):
                 wandb.watch(
                     self.algo,
                     log=wandb_kwargs.get("log_type", "gradients"),
-                    log_freq=wandb_kwargs.get("log_freq", 1000),
+                    log_freq=wandb_kwargs.get("log_freq", 1_000),
                 )
             # Sync with tensorboard.
             wandb.tensorboard.patch(root_logdir=self.summary_dir, pytorch=True)

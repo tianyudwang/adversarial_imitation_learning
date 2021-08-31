@@ -54,6 +54,7 @@ class Extra_shape:
     rets: Tuple[int, ...] = (1,)
     vals: Tuple[int, ...] = (1,)
     log_pis: Tuple[int, ...] = (1,)
+    remaining_steps: Tuple[int, ...] = (1,)
 
 
 @dataclass(frozen=True, eq=False)
@@ -64,6 +65,7 @@ class Extra_dtypes:
     rets: np.dtype = np.float32
     vals: np.dtype = np.float32
     log_pis: np.dtype = np.float32
+    remaining_steps: np.dtype = np.float32
 
 
 EXTRA_SHAPES = Extra_shape()

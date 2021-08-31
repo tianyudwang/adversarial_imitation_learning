@@ -18,7 +18,11 @@ CUDA:
 
 ENV:
   # Choice: [clip_act, vec_norm, norm_clip_obs, absorbing]
-  wrapper: [clip_act, ]
+  wrapper: [clip_act, absorbing]
+
+TEST_ENV:
+  wrapper: [clip_act, ]  # noisy_act
+
 
 
 OPTIM:
@@ -57,6 +61,7 @@ SAC:
   tau: 0.01
   log_alpha_init: 1.0
   lr_alpha: 3.0e-4
+  extra_data: ["log_pis", "remaining_steps"]              # default: []
 
   # policy_kwargs
   pi: [256, 256]

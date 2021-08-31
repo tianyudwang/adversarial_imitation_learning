@@ -123,7 +123,7 @@ _C.DISC.rew_clip = False  # Clipping rewards.
 _C.DISC.max_rew_magnitude = 10.0  # Max reward clipping magnitude.
 _C.DISC.min_rew_magnitude = -10.0  # Min reward clipping magnitude.
 _C.DISC.obs_normalization = None  # Normalization of observations.
-
+_C.DISC.infinite_horizon = False
 
 # AIRL only args
 _C.AIRL = CN()
