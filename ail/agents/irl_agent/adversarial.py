@@ -150,7 +150,6 @@ class Adversarial(BaseIRLAgent):
                 "log_pis": None,
                 "subtract_logp": False,
             }
-            self.counter = 0
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
@@ -236,16 +235,12 @@ class Adversarial(BaseIRLAgent):
         rews = self.disc.calculate_rewards(
             choice=self.rew_input_choice, **train_policy_data
         )
-
-        if self.use_absorbing_state:
-
+        need_absorbing_return = self.use_absorbing_state and -1 in train_policy_data["dones"]
+        if need_absorbing_return:
             # Absorbing state reward
             r_sa = self.disc.calculate_rewards(
                 choice=self.rew_input_choice, **self.absorbing_data
             )
-            if self.counter % 500 == 0:
-                ic(r_sa)
-            self.counter += 1
             with th.no_grad():
                 train_policy_data["rews"] = self.absorbing_cumulative_return(
                     r_sa,
@@ -255,6 +250,9 @@ class Adversarial(BaseIRLAgent):
                     discount=self.gen.gamma,
                     infinite_horizon=self.infinite_horizon,
                 )
+        else:
+            train_policy_data["rews"] = rews        
+            
 
         # Sanity check length of data are equal.
         assert train_policy_data["rews"].shape[0] == train_policy_data["obs"].shape[0]
@@ -267,7 +265,7 @@ class Adversarial(BaseIRLAgent):
 
         # Update generator using estimated rewards.
         gen_logs = self.update_generator(train_policy_data, log_this_batch)
-        if log_this_batch:
+        if log_this_batch and need_absorbing_return:
             gen_logs.update({"absorbing_rew": r_sa.detach()})
         return gen_logs, disc_logs
 
@@ -442,7 +440,7 @@ class Adversarial(BaseIRLAgent):
                 # t' = t - T
                 t_prime = remaining_steps[i].long()[0]
                 power_idx = th.arange(1, t_prime + 1)
-                r = th.ones_like(power_idx, device=self.device) * r_sa
+                r = r_sa.repeat(t_prime)
                 # discount gammas: [gamma, gamma^2,...,gamma^N]
                 discounts = th.pow(discount, power_idx).to(self.device)
                 # discounts * rewards from T+1 to N or inf
