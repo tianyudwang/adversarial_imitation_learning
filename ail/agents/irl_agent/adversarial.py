@@ -235,24 +235,25 @@ class Adversarial(BaseIRLAgent):
         rews = self.disc.calculate_rewards(
             choice=self.rew_input_choice, **train_policy_data
         )
+        
         need_absorbing_return = self.use_absorbing_state and -1 in train_policy_data["dones"]
         if need_absorbing_return:
             # Absorbing state reward
             r_sa = self.disc.calculate_rewards(
                 choice=self.rew_input_choice, **self.absorbing_data
             )
-            with th.no_grad():
-                train_policy_data["rews"] = self.absorbing_cumulative_return(
-                    r_sa,
-                    rews,
-                    dones=train_policy_data["dones"],
-                    remaining_steps=train_policy_data["remaining_steps"],
-                    discount=self.gen.gamma,
-                    infinite_horizon=self.infinite_horizon,
-                )
-        else:
-            train_policy_data["rews"] = rews        
-            
+            # Final state return keeps the same if absorbing reward is zero.
+            if r_sa != 0.0:
+                with th.no_grad():
+                    rews = self.absorbing_cumulative_return(
+                        r_sa,
+                        rews,
+                        dones=train_policy_data["dones"],
+                        remaining_steps=train_policy_data["remaining_steps"],
+                        discount=self.gen.gamma,
+                        infinite_horizon=self.infinite_horizon,
+                    )
+        train_policy_data["rews"] = rews
 
         # Sanity check length of data are equal.
         assert train_policy_data["rews"].shape[0] == train_policy_data["obs"].shape[0]

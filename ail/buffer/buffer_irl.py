@@ -229,8 +229,8 @@ class Buffer:
     def sample(self, n_samples: int) -> Dict[str, th.Tensor]:
         """
         Uniformly sample `n_samples` samples from the buffer with replacement.
-        :param: n_samples: The number of samples to randomly sample.
-        : return: A dictionary of samples (np.ndarray)
+        :param n_samples: The number of samples to randomly sample.
+        :return: A dictionary of samples (np.ndarray)
             with shape `(n_samples) + self.sample_shape`.
         """
         # TODO: ERE (https://arxiv.org/pdf/1906.04009.pdf)
@@ -346,8 +346,7 @@ class BaseBuffer:
         "dtypes",
         "device",
         "_buffer",
-        "obs_mean",
-        "obs_std",
+        "abs_counter",
     ]
 
     """
@@ -430,6 +429,7 @@ class BaseBuffer:
 
         self.device = device
         self._buffer = None
+        self.abs_counter=0
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
@@ -531,11 +531,10 @@ class BaseBuffer:
         self._buffer.store(trans_dict, truncate_ok=truncate_ok)
 
     def sample(self, n_samples: int) -> Dict[str, th.Tensor]:
-        """Sample obs-act-obs triples.
-        Args:
-            n_samples: The number of samples.
-        Returns:
-            A Transitions named tuple containing n_samples transitions.
+        """
+        Sample obs-act-obs triples.
+        :param n_samples: The number of samples.
+        :return:A Transitions named tuple containing n_samples transitions.
         """
         return self._buffer.sample(n_samples)
 

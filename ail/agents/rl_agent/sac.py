@@ -266,6 +266,7 @@ class SAC(OffPolicyAgent):
             if done and episode_timesteps < env._max_episode_steps:
                 next_state = env.absorbing_state
                 remaining_steps = env._max_episode_steps - episode_timesteps
+                self.buffer.abs_counter += remaining_steps
 
         data = {
             "obs": asarray_shape2d(state),
