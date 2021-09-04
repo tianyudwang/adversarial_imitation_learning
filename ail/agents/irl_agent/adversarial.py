@@ -235,8 +235,10 @@ class Adversarial(BaseIRLAgent):
         rews = self.disc.calculate_rewards(
             choice=self.rew_input_choice, **train_policy_data
         )
-        
-        need_absorbing_return = self.use_absorbing_state and -1 in train_policy_data["dones"]
+
+        need_absorbing_return = (
+            self.use_absorbing_state and -1 in train_policy_data["dones"]
+        )
         if need_absorbing_return:
             # Absorbing state reward
             r_sa = self.disc.calculate_rewards(

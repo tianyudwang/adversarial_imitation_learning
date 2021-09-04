@@ -4,7 +4,9 @@ import os
 import warnings
 
 import numpy as np
+from numpy.random.mtrand import seed
 import torch as th
+from traitlets.traitlets import default
 
 from ail.common.type_alias import GymEnv
 from ail.common.math import normalize
@@ -19,6 +21,8 @@ class Buffer:
         "_n_data",
         "_idx",
         "device",
+        "seed",
+        "rng"
     ]
     """
     A FIFO ring buffer for NumPy arrays of a fixed shape and dtype.
@@ -41,6 +45,7 @@ class Buffer:
         sample_shapes: Mapping[str, Tuple[int, ...]],
         dtypes: Mapping[str, np.dtype],
         device: Union[th.device, str],
+        seed: int
     ):
         assert isinstance(capacity, int), "capacity must be integer."
 
@@ -63,6 +68,8 @@ class Buffer:
         # An integer in `range(0, self.capacity)`.
         self._idx = 0
         self.device = device
+        self.seed = seed
+        self.rng = np.random.default_rng(self.seed)
 
     @property
     def capacity(self) -> int:
@@ -237,8 +244,24 @@ class Buffer:
         assert isinstance(n_samples, int), "n_samples must be int"
         assert self.size() != 0, "Buffer is empty"
         # Uniform sampling
-        ind = np.random.randint(self.size(), size=n_samples)
+        ind = self.rng.integers(self.size(), size=n_samples)
         return self._get_batch_from_index(ind)
+        
+        # res_idx = []
+        # res2={}
+        # for idx, (k, buffer) in enumerate(self._arrays.items()):
+        #     if idx == 0:
+        #         enum = self.rng.choice(list(enumerate(buffer[:self.size()])), size=n_samples, replace=True, p=None, axis=0, shuffle=True)
+                
+        #         # ic(k, enum)
+        #         for i in enum:
+        #             res_idx.append(i[0])
+        #         # ic(res_idx)
+        #     break
+        # res2 = self._get_batch_from_index(np.asarray(res_idx))
+        # ic(res_idx)
+        # ic(res2)
+        # return res2
 
     def get(
         self,
@@ -346,6 +369,7 @@ class BaseBuffer:
         "dtypes",
         "device",
         "_buffer",
+        "seed"
         "abs_counter",
     ]
 
@@ -368,6 +392,7 @@ class BaseBuffer:
         self,
         capacity: int,
         device: Union[th.device, str],
+        seed: int,
         env: Optional[GymEnv] = None,
         obs_shape: Optional[Tuple[int, ...]] = None,
         act_shape: Optional[Tuple[int, ...]] = None,
@@ -429,6 +454,7 @@ class BaseBuffer:
 
         self.device = device
         self._buffer = None
+        self.seed = seed
         self.abs_counter=0
 
     def __repr__(self) -> str:
@@ -449,6 +475,7 @@ class BaseBuffer:
             sample_shapes=self.sample_shapes,
             dtypes=self.dtypes,
             device=self.device,
+            seed=self.seed,
         )
 
     def stored_keys(self) -> Set[str]:
@@ -555,6 +582,7 @@ class BaseBuffer:
         cls,
         transitions: Dict[str, np.ndarray],
         device: Union[th.device, str],
+        seed: int,
         capacity: Optional[int] = None,
         truncate_ok: bool = False,
         with_reward: bool = True,
@@ -594,6 +622,7 @@ class BaseBuffer:
             obs_dtype=transitions["obs"].dtype,
             act_dtype=transitions["acts"].dtype,
             device=device,
+            seed=seed,
             with_reward=with_reward,
         )
         instance._init_buffer()
@@ -617,6 +646,7 @@ class ReplayBuffer(BaseBuffer):
         self,
         capacity: int,
         device: Union[th.device, str],
+        seed: int,
         env: Optional[GymEnv] = None,
         obs_shape: Optional[Tuple[int, ...]] = None,
         act_shape: Optional[Tuple[int, ...]] = None,
@@ -644,6 +674,7 @@ class ReplayBuffer(BaseBuffer):
         super(ReplayBuffer, self).__init__(
             capacity,
             device,
+            seed,
             env,
             obs_shape,
             act_shape,
@@ -681,6 +712,7 @@ class RolloutBuffer(BaseBuffer):
         self,
         capacity: int,
         device: Union[th.device, str],
+        seed: int,
         env: Optional[GymEnv] = None,
         obs_shape: Optional[Tuple[int, ...]] = None,
         act_shape: Optional[Tuple[int, ...]] = None,
@@ -708,6 +740,7 @@ class RolloutBuffer(BaseBuffer):
         super(RolloutBuffer, self).__init__(
             capacity,
             device,
+            seed,
             env,
             obs_shape,
             act_shape,

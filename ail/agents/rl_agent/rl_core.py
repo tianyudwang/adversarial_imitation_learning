@@ -232,6 +232,7 @@ class BaseRLAgent(BaseAgent, ABC):
         self.buffer = buffer_cls(
             capacity=self.buffer_size,
             device=self.device,
+            seed=self.seed,
             obs_shape=self.state_shape,
             act_shape=self.action_shape,
             with_reward=self.buffer_kwargs.get("with_reward", True),
