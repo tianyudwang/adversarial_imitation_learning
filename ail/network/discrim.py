@@ -52,7 +52,6 @@ class DiscrimNet(nn.Module, ABC):
     2. r(s, a) = ln D − ln(1 − D) = h \in (-inf, inf)
         (introduced in AIRL).
 
-    # ! 3 Not Implemented.
     3. r(s, a) = ln D = −softplus(−h) \in (-inf, 0]
         (a natural choice we have not encountered in literature)
 

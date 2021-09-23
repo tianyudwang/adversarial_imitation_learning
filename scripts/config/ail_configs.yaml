@@ -111,8 +111,8 @@ AIRL:
 
 
 GAIL:
-  inverse: false   # default: false
-  # inverse: true  # default: false
+  # inverse: false   # default: false
+  inverse: true  # default: false
 
 
 # Record:

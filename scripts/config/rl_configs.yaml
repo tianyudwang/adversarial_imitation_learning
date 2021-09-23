@@ -18,7 +18,7 @@ CUDA:
 
 ENV:
   # Choice: [clip_act, vec_norm, norm_clip_obs, absorbing]
-  wrapper: [clip_act, absorbing]
+  wrapper: [clip_act, ]
 
 TEST_ENV:
   wrapper: [clip_act, ]  # noisy_act
